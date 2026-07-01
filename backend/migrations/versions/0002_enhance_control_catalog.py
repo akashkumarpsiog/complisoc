@@ -1,14 +1,14 @@
 """Add confidence workflow fields to control_mappings and candidate_controls
 
 Revision ID: 0002_confidence_workflow
-Revises: 0001_initial_schema
+Revises: 0001_initial
 """
 
 from alembic import op
 import sqlalchemy as sa
 
 revision = "0002_confidence_workflow"
-down_revision = "0001_initial_schema"
+down_revision = "0001_initial"
 branch_labels = None
 depends_on = None
 
