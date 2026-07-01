@@ -1,4 +1,5 @@
 from sqlalchemy.orm import Session
+from sqlalchemy.orm import joinedload
 from complisoc.backend.models import (
     ScanRun,
     ScannerExecution,
@@ -30,6 +31,15 @@ class ScanRunRepository:
 
     def list(self):
         return self.db.query(ScanRun).all()
+
+    def update_status(self, scan_run_id: int, status: str):
+        scan_run = self.get(scan_run_id)
+        if scan_run is None:
+            return None
+        scan_run.status = status
+        self.db.commit()
+        self.db.refresh(scan_run)
+        return scan_run
 
 
 class ScannerExecutionRepository:
@@ -109,6 +119,13 @@ class ControlCatalogRepository:
     def list(self):
         return self.db.query(ControlCatalog).all()
 
+    def list_by_framework(self, framework: str):
+        return (
+            self.db.query(ControlCatalog)
+            .filter(ControlCatalog.framework_name == framework)
+            .all()
+        )
+
 
 class CandidateControlRepository:
     def __init__(self, db: Session):
@@ -155,6 +172,36 @@ class ControlMappingRepository:
             .all()
         )
 
+    def list_by_status(self, status: str):
+        return self.db.query(ControlMapping).filter(ControlMapping.mapping_status == status).all()
+
+    def list(self):
+        return self.db.query(ControlMapping).all()
+
+    def update_status(self, mapping_id: int, status: str):
+        mapping = self.get(mapping_id)
+        if mapping is None:
+            return None
+        mapping.mapping_status = status
+        self.db.commit()
+        self.db.refresh(mapping)
+        return mapping
+
+    def get_lineage(self, mapping_id: int):
+        return (
+            self.db.query(ControlMapping)
+            .options(
+                joinedload(ControlMapping.control_catalog),
+                joinedload(ControlMapping.verification_records),
+                joinedload(ControlMapping.normalized_finding)
+                .joinedload(NormalizedFinding.raw_finding)
+                .joinedload(RawFinding.scanner_execution)
+                .joinedload(ScannerExecution.scan_run),
+            )
+            .filter(ControlMapping.id == mapping_id)
+            .first()
+        )
+
 
 class VerificationRecordRepository:
     def __init__(self, db: Session):
@@ -188,6 +235,20 @@ class ReviewQueueItemRepository:
     def list_pending(self):
         return self.db.query(ReviewQueueItem).filter(ReviewQueueItem.status == "pending").all()
 
+    def list(self):
+        return self.db.query(ReviewQueueItem).all()
+
+    def update_status(self, item_id: int, status: str, reviewer_id: str | None = None, comments: str | None = None):
+        item = self.get(item_id)
+        if item is None:
+            return None
+        item.status = status
+        item.reviewer_id = reviewer_id
+        item.comments = comments
+        self.db.commit()
+        self.db.refresh(item)
+        return item
+
 
 class ComplianceReportRepository:
     def __init__(self, db: Session):
@@ -206,6 +267,9 @@ class ComplianceReportRepository:
     def list_by_scan_run(self, scan_run_id: int):
         return self.db.query(ComplianceReport).filter(ComplianceReport.scan_run_id == scan_run_id).all()
 
+    def list(self):
+        return self.db.query(ComplianceReport).all()
+
 
 class AuditBundleRepository:
     def __init__(self, db: Session):
@@ -223,3 +287,6 @@ class AuditBundleRepository:
 
     def list_by_scan_run(self, scan_run_id: int):
         return self.db.query(AuditBundle).filter(AuditBundle.scan_run_id == scan_run_id).all()
+
+    def list(self):
+        return self.db.query(AuditBundle).all()
