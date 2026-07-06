@@ -1,0 +1,100 @@
+# Python
+venv/
+.venv/
+env/
+.dotenv/
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Unit test / coverage reports
+htmlcov/
+.tox/
+.nox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.py,cover
+.hypothesis/
+.pytest_cache/
+pytestdebug.log
+
+# Environments
+.env
+.env.*
+!.env.example
+.venv
+.venv/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+*.log
+
+# Node.js / Frontend
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+dist/
+build/
+.next/
+out/
+.vite/
+coverage/
+frontend/node_modules/
+# Artifacts
+artifacts/
+tmp/
+temp/
+
+# Locust
+*.html
+report.html
+
+# Great Expectations
+great_expectations/
+gx/
+
+# Trivy / Checkov / Scanner outputs
+*.tfstate
+*.tfstate.backup
+*.tfplan
+*.tfplan.out
+trivy-report.html
+checkov-report.html
