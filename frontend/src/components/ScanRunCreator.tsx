@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Play, Terminal } from "lucide-react";
+import { Play, Terminal, X } from "lucide-react";
 import { api } from "../services/api";
 import type { ScannerInfo } from "../types";
 import { parseFailureJson, parseFindingJson, sampleFailures, sampleFindings } from "../services/json";
@@ -20,25 +20,36 @@ export function ScanRunCreator({ onCreated }: { onCreated: () => void }) {
   }
 
   return (
-    <div className="absolute right-4 top-28 z-20 w-[min(720px,calc(100vw-2rem))] rounded-lg border border-line bg-white p-4 shadow-pop">
-      <div className="mb-3 flex gap-2">
-        <button
-          className={`rounded-md px-3 py-1.5 text-sm font-medium ${mode === "live" ? "bg-brand-600 text-white" : "bg-panel text-slate-600"}`}
-          onClick={() => setMode("live")}
-        >
-          Live scan
-        </button>
-        <button
-          className={`rounded-md px-3 py-1.5 text-sm font-medium ${mode === "sample" ? "bg-brand-600 text-white" : "bg-panel text-slate-600"}`}
-          onClick={() => setMode("sample")}
-        >
-          Sample scan
-        </button>
-        <button className="icon-button ml-auto" onClick={() => setOpen(false)}>
-          Close
-        </button>
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" onClick={() => setOpen(false)} />
+      <div className="relative w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-xl border border-line bg-white shadow-xl">
+        <div className="sticky top-0 z-10 flex items-center justify-between border-b border-line bg-white px-4 py-3">
+          <div className="flex gap-2">
+            <button
+              className={`rounded-md px-3 py-1.5 text-sm font-medium transition ${
+                mode === "live" ? "bg-brand-600 text-white" : "bg-panel text-slate-600 hover:bg-slate-100"
+              }`}
+              onClick={() => setMode("live")}
+            >
+              Live scan
+            </button>
+            <button
+              className={`rounded-md px-3 py-1.5 text-sm font-medium transition ${
+                mode === "sample" ? "bg-brand-600 text-white" : "bg-panel text-slate-600 hover:bg-slate-100"
+              }`}
+              onClick={() => setMode("sample")}
+            >
+              Sample scan
+            </button>
+          </div>
+          <button className="icon-button border-0 p-1" onClick={() => setOpen(false)} aria-label="Close">
+            <X className="h-4 w-4" aria-hidden />
+          </button>
+        </div>
+        <div className="p-4">
+          {mode === "live" ? <LiveScanForm onCreated={onCreated} onClose={() => setOpen(false)} /> : <SampleScanForm onCreated={onCreated} onClose={() => setOpen(false)} />}
+        </div>
       </div>
-      {mode === "live" ? <LiveScanForm onCreated={onCreated} onClose={() => setOpen(false)} /> : <SampleScanForm onCreated={onCreated} onClose={() => setOpen(false)} />}
     </div>
   );
 }

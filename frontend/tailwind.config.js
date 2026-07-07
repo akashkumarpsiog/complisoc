@@ -14,6 +14,7 @@ export default {
           500: "#3b6df6",
           600: "#2f59e0",
           700: "#2647b8",
+          800: "#1e3a8a",
         },
       },
       borderRadius: {

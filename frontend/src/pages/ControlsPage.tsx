@@ -15,7 +15,7 @@ export function ControlsPage() {
   const filtered = useMemo(() => (controls.data || []).filter((item) => !framework || item.framework_name === framework), [controls.data, framework]);
 
   return (
-    <div className="grid gap-5 xl:grid-cols-[1fr_420px]">
+    <div className="grid gap-5 2xl:grid-cols-[1fr_420px]">
       <Section title="Controls" actions={<FrameworkFilter frameworks={frameworks} value={framework} onChange={setFramework} />}>
         <ResourceBoundary resource={{ ...controls, data: filtered }}>
           {(data) => <ControlTable data={data} onSelect={setSelectedId} />}

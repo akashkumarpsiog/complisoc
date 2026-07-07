@@ -17,7 +17,7 @@ export function MappingsPage() {
   const filtered = useMemo(() => (mappings.data || []).filter((item) => !status || item.mapping_status === status), [mappings.data, status]);
 
   return (
-    <div className="grid gap-5 xl:grid-cols-[1fr_420px]">
+    <div className="grid gap-5 2xl:grid-cols-[1fr_420px]">
       <Section title="Mappings" actions={<MappingStatusFilter value={status} onChange={setStatus} />}>
         <ResourceBoundary resource={{ ...mappings, data: filtered }}>
           {(data) => <MappingTable data={data} onSelect={setSelectedId} />}

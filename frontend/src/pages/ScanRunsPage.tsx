@@ -15,7 +15,7 @@ export function ScanRunsPage() {
   const selected = scanRuns.data?.find((item) => item.id === selectedId) || null;
 
   return (
-    <div className="grid gap-5 xl:grid-cols-[1fr_420px]">
+    <div className="grid gap-5 2xl:grid-cols-[1fr_420px]">
       <Section title="Scan Runs" actions={<ScanRunCreator onCreated={scanRuns.reload} />}>
         <ResourceBoundary resource={scanRuns}>
           {(data) => <ScanRunTable data={data} onSelect={setSelectedId} />}

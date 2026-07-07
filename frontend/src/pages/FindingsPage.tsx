@@ -19,7 +19,7 @@ export function FindingsPage() {
   );
 
   return (
-    <div className="grid gap-5 xl:grid-cols-[1fr_420px]">
+    <div className="grid gap-5 2xl:grid-cols-[1fr_420px]">
       <Section title="Findings" actions={<FindingFilters severity={severity} scanner={scanner} setSeverity={setSeverity} setScanner={setScanner} />}>
         <ResourceBoundary resource={{ ...findings, data: filtered }}>
           {(data) => <FindingTable data={data} onSelect={setSelectedId} />}
