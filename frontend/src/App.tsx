@@ -1,6 +1,4 @@
-import { useCallback, useState } from "react";
-import { api } from "./services/api";
-import { useResource } from "./hooks/useResource";
+import { useState } from "react";
 import { Layout } from "./components/Layout";
 import type { ViewId } from "./navigation";
 import { OverviewPage } from "./pages/OverviewPage";
@@ -14,22 +12,9 @@ import { AuditBundlesPage } from "./pages/AuditBundlesPage";
 
 export function App() {
   const [view, setView] = useState<ViewId>("overview");
-  const health = useResource(api.health);
-  const readiness = useResource(api.readiness);
-
-  const refreshChrome = useCallback(() => {
-    void health.reload();
-    void readiness.reload();
-  }, [health, readiness]);
 
   return (
-    <Layout
-      view={view}
-      apiStatus={health.data?.status || health.status}
-      dbStatus={readiness.data?.database || readiness.status}
-      onViewChange={setView}
-      onRefresh={refreshChrome}
-    >
+    <Layout view={view} onViewChange={setView}>
       {view === "overview" && <OverviewPage />}
       {view === "scan-runs" && <ScanRunsPage />}
       {view === "findings" && <FindingsPage />}

@@ -32,7 +32,15 @@ python -m venv .venv
 
 ```powershell
 pip install --upgrade pip
-pip install sqlalchemy alembic pytest fastapi uvicorn
+pip install sqlalchemy alembic pytest fastapi uvicorn google-genai groq python-dotenv
+```
+
+3. Configure AI provider keys:
+
+Copy `.env.example` to `.env` and set `GEMINI_API_KEY` (Gemini 2.5 Flash, primary mapping) and `GROQ_API_KEY` (Groq Llama 3.3 70B, verification). Without these the pipeline falls back to deterministic behavior and logs a warning.
+
+```powershell
+cp .env.example .env
 ```
 
 3. Configure the database (optional):

@@ -2,8 +2,8 @@ from sqlalchemy.orm import Session
 
 from complisoc.backend.compliance.candidate_narrowing import narrow_candidates
 from complisoc.backend.compliance.confidence import calculate_final_confidence, publication_status
-from complisoc.backend.compliance.mapping import DeterministicGeminiMapper
-from complisoc.backend.compliance.verification import DeterministicGroqVerifier
+from complisoc.backend.compliance.mapping import GeminiMapper
+from complisoc.backend.compliance.verification import GroqVerifier
 from complisoc.backend.models import ControlMapping, NormalizedFinding, ReviewQueueItem, VerificationRecord
 from complisoc.backend.normalization.normalizer import normalize_raw_finding
 from complisoc.backend.scanners.ingestion import ingest_findings
@@ -28,8 +28,8 @@ def process_scan_run(
     mappings: list[ControlMapping] = []
     review_items: list[ReviewQueueItem] = []
 
-    mapper = DeterministicGeminiMapper()
-    verifier = DeterministicGroqVerifier()
+    mapper = GeminiMapper()
+    verifier = GroqVerifier()
 
     for raw_finding in raw_findings:
         normalized = normalize_raw_finding(db, raw_finding)

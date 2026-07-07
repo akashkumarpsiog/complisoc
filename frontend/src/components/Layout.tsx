@@ -1,21 +1,14 @@
-import { RefreshCw, ShieldCheck, Menu, X } from "lucide-react";
+import { ShieldCheck, Menu, X } from "lucide-react";
 import { useState } from "react";
-import { StatusBadge } from "./Primitives";
 import { navigation, type ViewId } from "../navigation";
 
 export function Layout({
   view,
-  apiStatus,
-  dbStatus,
   onViewChange,
-  onRefresh,
   children,
 }: {
   view: ViewId;
-  apiStatus: string;
-  dbStatus: string;
   onViewChange: (view: ViewId) => void;
-  onRefresh: () => void;
   children: React.ReactNode;
 }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -53,9 +46,9 @@ export function Layout({
           </button>
         </div>
         <Nav view={view} onViewChange={(id) => { onViewChange(id); setSidebarOpen(false); }} />
-        <div className="mt-auto border-t border-line px-5 py-3 text-xs text-slate-400">
-          v0.1 · deterministic mapping
-        </div>
+          <div className="mt-auto border-t border-line px-5 py-3 text-xs text-slate-400">
+            v0.1 · ai mapping
+          </div>
       </aside>
 
       <main className="flex-1 min-w-0 lg:overflow-y-auto">
@@ -73,14 +66,6 @@ export function Layout({
                 <h1 className="text-xl font-semibold text-ink">{active.label}</h1>
                 <p className="mt-0.5 text-sm text-slate-500">{active.description}</p>
               </div>
-            </div>
-            <div className="flex flex-wrap items-center gap-2">
-              <StatusBadge value={`api ${apiStatus}`} />
-              <StatusBadge value={`db ${dbStatus}`} />
-              <button className="primary-button" onClick={onRefresh}>
-                <RefreshCw className="h-4 w-4" aria-hidden />
-                Refresh
-              </button>
             </div>
           </div>
           <nav className="mt-3 flex gap-1.5 overflow-x-auto lg:hidden" aria-label="Mobile navigation">
