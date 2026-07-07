@@ -1,60 +1,142 @@
-import { useState } from "react";
-import { Play } from "lucide-react";
+import { useEffect, useState } from "react";
+import { Play, Terminal } from "lucide-react";
 import { api } from "../services/api";
+import type { ScannerInfo } from "../types";
 import { parseFailureJson, parseFindingJson, sampleFailures, sampleFindings } from "../services/json";
+
+type Mode = "live" | "sample";
 
 export function ScanRunCreator({ onCreated }: { onCreated: () => void }) {
   const [open, setOpen] = useState(false);
-  const [target, setTarget] = useState("aws-iac");
-  const [findingsJson, setFindingsJson] = useState(sampleFindings);
-  const [failuresJson, setFailuresJson] = useState(sampleFailures);
+  const [mode, setMode] = useState<Mode>("live");
+
+  if (!open) {
+    return (
+      <button className="primary-button" onClick={() => setOpen(true)}>
+        <Play className="h-4 w-4" aria-hidden />
+        New scan
+      </button>
+    );
+  }
+
+  return (
+    <div className="absolute right-4 top-28 z-20 w-[min(720px,calc(100vw-2rem))] rounded-lg border border-line bg-white p-4 shadow-pop">
+      <div className="mb-3 flex gap-2">
+        <button
+          className={`rounded-md px-3 py-1.5 text-sm font-medium ${mode === "live" ? "bg-brand-600 text-white" : "bg-panel text-slate-600"}`}
+          onClick={() => setMode("live")}
+        >
+          Live scan
+        </button>
+        <button
+          className={`rounded-md px-3 py-1.5 text-sm font-medium ${mode === "sample" ? "bg-brand-600 text-white" : "bg-panel text-slate-600"}`}
+          onClick={() => setMode("sample")}
+        >
+          Sample scan
+        </button>
+        <button className="icon-button ml-auto" onClick={() => setOpen(false)}>
+          Close
+        </button>
+      </div>
+      {mode === "live" ? <LiveScanForm onCreated={onCreated} onClose={() => setOpen(false)} /> : <SampleScanForm onCreated={onCreated} onClose={() => setOpen(false)} />}
+    </div>
+  );
+}
+
+function LiveScanForm({ onCreated, onClose }: { onCreated: () => void; onClose: () => void }) {
+  const [scanners, setScanners] = useState<ScannerInfo[]>([]);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [target, setTarget] = useState(".");
+  const [framework, setFramework] = useState("");
   const [message, setMessage] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    void api.scanners.list().then((items) => {
+      setScanners(items);
+      setSelected(new Set(items.filter((item) => item.available).map((item) => item.name)));
+    });
+  }, []);
 
   async function submit() {
     setSubmitting(true);
     setMessage(null);
     try {
-      const findings = parseFindingJson(findingsJson);
-      const scanner_failures = parseFailureJson(failuresJson);
-      const result = await api.scanRuns.create({ target_environment: target, findings, scanner_failures });
-      setMessage(`Created scan run ${result.id}.`);
+      const result = await api.scans.run({
+        target,
+        scanners: selected.size ? [...selected] : undefined,
+        framework: framework.trim() || undefined,
+      });
+      setMessage(`Created scan run ${result.id} from live scanners.`);
       onCreated();
     } catch (err) {
-      setMessage(err instanceof Error ? err.message : "Unable to create scan run.");
+      setMessage(err instanceof Error ? err.message : "Unable to run scan.");
     } finally {
       setSubmitting(false);
     }
   }
 
+  function toggle(name: string, available: boolean) {
+    if (!available) return;
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(name)) next.delete(name);
+      else next.add(name);
+      return next;
+    });
+  }
+
   return (
-    <div>
-      <button className="primary-button" onClick={() => setOpen((value) => !value)}>
-        <Play className="h-4 w-4" aria-hidden />
-        New sample scan
-      </button>
-      {open ? (
-        <div className="absolute right-4 top-28 z-20 w-[min(720px,calc(100vw-2rem))] rounded-lg border border-line bg-white p-4 shadow-xl">
-          <div className="grid gap-3">
-            <label className="text-sm font-medium">
-              Target environment
-              <input className="control mt-1 w-full" value={target} onChange={(event) => setTarget(event.target.value)} />
-            </label>
-            <JsonEditor label="Findings JSON" rows={12} value={findingsJson} onChange={setFindingsJson} />
-            <JsonEditor label="Scanner failures JSON" rows={5} value={failuresJson} onChange={setFailuresJson} />
-            {message ? <div className="rounded-md bg-panel px-3 py-2 text-sm text-slate-700">{message}</div> : null}
-            <div className="flex justify-end gap-2">
-              <button className="icon-button" onClick={() => setOpen(false)}>
-                Close
+    <div className="grid gap-3">
+      <label className="text-sm font-medium">
+        Target path
+        <input className="control mt-1" value={target} onChange={(event) => setTarget(event.target.value)} placeholder=". or C:/repo" />
+      </label>
+
+      <div>
+        <div className="mb-1 text-sm font-medium">Scanners</div>
+        <div className="flex flex-wrap gap-2">
+          {scanners.map((item) => {
+            const checked = selected.has(item.name);
+            return (
+              <button
+                key={item.name}
+                type="button"
+                onClick={() => toggle(item.name, item.available)}
+                className={`inline-flex items-center gap-2 rounded-md border px-3 py-1.5 text-sm font-medium transition ${
+                  !item.available
+                    ? "cursor-not-allowed border-line bg-panel text-slate-400"
+                    : checked
+                      ? "border-brand-200 bg-brand-50 text-brand-700"
+                      : "border-line bg-white text-slate-600"
+                }`}
+              >
+                <span className={`h-2 w-2 rounded-full ${item.available ? "bg-emerald-500" : "bg-slate-300"}`} />
+                {item.name}
+                {!item.available ? <span className="text-xs text-slate-400">(unavailable)</span> : null}
               </button>
-              <button className="primary-button" disabled={submitting} onClick={submit}>
-                <Play className="h-4 w-4" aria-hidden />
-                Create
-              </button>
-            </div>
-          </div>
+            );
+          })}
+          {scanners.length === 0 ? <span className="text-sm text-slate-500">Loading scanners…</span> : null}
         </div>
-      ) : null}
+      </div>
+
+      <label className="text-sm font-medium">
+        Framework (optional)
+        <input className="control mt-1" value={framework} onChange={(event) => setFramework(event.target.value)} placeholder="ISO/IEC 27001:2022 Annex A" />
+      </label>
+
+      {message ? <div className="rounded-md bg-panel px-3 py-2 text-sm text-slate-700">{message}</div> : null}
+
+      <div className="flex items-center justify-end gap-2">
+        <button className="icon-button" onClick={onClose}>
+          Cancel
+        </button>
+        <button className="primary-button" disabled={submitting} onClick={submit}>
+          <Terminal className="h-4 w-4" aria-hidden />
+          Run scan
+        </button>
+      </div>
     </div>
   );
 }

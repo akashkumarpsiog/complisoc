@@ -17,11 +17,14 @@ from complisoc.backend.api.schemas import (
     ReportCreate,
     ReviewDecision,
     ReviewQueueItemRead,
+    ScanRequest,
     ScanRunCreate,
     ScanRunRead,
+    ScannerInfo,
     VerificationRecordRead,
 )
 from complisoc.backend.compliance.workflow import process_scan_run
+from complisoc.backend.scanners.runners import list_scanners, run_scanners
 from complisoc.backend.models import (
     AuditBundle,
     ComplianceReport,
@@ -72,6 +75,24 @@ def create_scan_run(payload: ScanRunCreate, db: Session = Depends(get_db)):
         target_environment=payload.target_environment,
         findings=[finding.model_dump() for finding in payload.findings],
         scanner_failures=[failure.model_dump() for failure in payload.scanner_failures],
+    )
+    return result["scan_run"]
+
+
+@app.get("/api/v1/scanners", response_model=list[ScannerInfo])
+def list_available_scanners():
+    return [ScannerInfo(name=item["name"], available=item["available"]) for item in list_scanners()]
+
+
+@app.post("/api/v1/scans", response_model=ScanRunRead, status_code=201)
+def run_scan(payload: ScanRequest, db: Session = Depends(get_db)):
+    findings, scanner_failures = run_scanners(payload.target, payload.scanners)
+    result = process_scan_run(
+        db,
+        target_environment=payload.target,
+        findings=findings,
+        scanner_failures=scanner_failures,
+        framework=payload.framework,
     )
     return result["scan_run"]
 

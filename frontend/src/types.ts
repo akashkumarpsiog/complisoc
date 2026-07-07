@@ -147,3 +147,14 @@ export interface DashboardTrend {
     manual_review: number;
   }>;
 }
+
+export interface ScannerInfo {
+  name: string;
+  available: boolean;
+}
+
+export interface ScanRequest {
+  target: string;
+  scanners?: string[];
+  framework?: string;
+}

@@ -85,6 +85,13 @@ export const api = {
     }) => request<ScanRun>("/scan-runs", { method: "POST", body: JSON.stringify(payload) }),
     summary: (id: number) => request<ScanRunSummary>(`/scan-runs/${id}/summary`),
   },
+  scanners: {
+    list: () => request<ScannerInfo[]>("/scanners"),
+  },
+  scans: {
+    run: (payload: ScanRequest) =>
+      request<ScanRun>("/scans", { method: "POST", body: JSON.stringify(payload) }),
+  },
   findings: {
     list: (query?: Record<string, QueryValue>) => request<NormalizedFinding[]>("/findings", {}, query),
     mappings: (id: number) => request<ControlMapping[]>(`/findings/${id}/mappings`),

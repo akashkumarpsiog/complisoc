@@ -112,6 +112,8 @@ Note: The frontend expects the backend at `http://127.0.0.1:8000/api/v1`. To use
 | ------ | -------- | ------- |
 | `GET` | `/api/v1/health` | Health check |
 | `GET` | `/api/v1/readiness` | Dependency readiness |
+| `GET` | `/api/v1/scanners` | List available scanners (trivy, checkov, sonarqube, defender) |
+| `POST` | `/api/v1/scans` | Run live scanners against a target and ingest results |
 | `POST` | `/api/v1/scan-runs` | Create scan run |
 | `GET` | `/api/v1/scan-runs` | List scan runs |
 | `GET` | `/api/v1/scan-runs/{id}` | Get scan run |

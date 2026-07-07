@@ -15,6 +15,17 @@ class ScannerFailureInput(BaseModel):
     error_message: str = Field(min_length=1, max_length=2048)
 
 
+class ScannerInfo(BaseModel):
+    name: str
+    available: bool
+
+
+class ScanRequest(BaseModel):
+    target: str = Field(min_length=1, max_length=512)
+    scanners: list[str] | None = None
+    framework: str | None = None
+
+
 class ScanRunCreate(BaseModel):
     target_environment: str = Field(min_length=1, max_length=128)
     findings: list[RawFindingInput] = Field(default_factory=list)
