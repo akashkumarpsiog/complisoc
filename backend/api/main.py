@@ -2,8 +2,11 @@ from datetime import datetime
 from pathlib import Path
 
 from fastapi import Depends, FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
+
+from complisoc.backend.database.session import get_db
 
 from complisoc.backend.api.schemas import (
     AuditBundleRead,
@@ -19,7 +22,6 @@ from complisoc.backend.api.schemas import (
     VerificationRecordRead,
 )
 from complisoc.backend.compliance.workflow import process_scan_run
-from complisoc.backend.database.session import get_db
 from complisoc.backend.models import (
     AuditBundle,
     ComplianceReport,
@@ -35,6 +37,14 @@ from complisoc.backend.models import (
 from complisoc.backend.reporting.reports import generate_audit_bundle, generate_compliance_report
 
 app = FastAPI(title="Complisoc API")
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 
 def not_found(resource: str):
