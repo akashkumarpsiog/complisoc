@@ -1,7 +1,8 @@
 import { useCallback, useState } from "react";
 import { api } from "./services/api";
 import { useResource } from "./hooks/useResource";
-import { Layout, type ViewId } from "./components/Layout";
+import { Layout } from "./components/Layout";
+import type { ViewId } from "./navigation";
 import { OverviewPage } from "./pages/OverviewPage";
 import { ScanRunsPage } from "./pages/ScanRunsPage";
 import { FindingsPage } from "./pages/FindingsPage";
