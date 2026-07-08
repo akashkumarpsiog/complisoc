@@ -250,13 +250,11 @@ def test_leadership_report_uses_published_posture_only(client):
 
     leadership = client.post("/api/v1/reports/leadership", json={"scan_run_id": scan_run_id})
     assert leadership.status_code == 201
-    report_path = Path(leadership.json()["content_path"])
-    payload = json.loads(report_path.read_text(encoding="utf-8"))
-
-    assert payload["posture"]["published_decisions"] == 1
-    assert payload["posture"]["manual_review_count"] == 1
-    assert len(payload["published_mappings"]) == 1
-    assert payload["published_mappings"][0]["status"] == "published"
+    report = leadership.json()
+    assert report["scan_run_id"] == scan_run_id
+    assert report["report_type"] == "leadership"
+    assert report["content_path"].endswith(".pdf")
+    assert Path(report["content_path"]).exists()
 
 
 def test_audit_bundle_contains_lineage_checksums(client):

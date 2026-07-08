@@ -263,7 +263,7 @@ def download_report(report_id: int, db: Session = Depends(get_db)):
     report = db.get(ComplianceReport, report_id)
     if report is None:
         not_found("Report")
-    return _file_response(report.content_path, f"report-{report_id}.json")
+    return _file_response(report.content_path, f"report-{report_id}.pdf", "application/pdf")
 
 
 @app.get("/api/v1/audit-bundles", response_model=list[AuditBundleRead])
@@ -290,7 +290,7 @@ def download_audit_bundle(bundle_id: int, db: Session = Depends(get_db)):
     bundle = db.get(AuditBundle, bundle_id)
     if bundle is None:
         not_found("Audit bundle")
-    return _file_response(bundle.bundle_path, f"audit-bundle-{bundle_id}.json")
+    return _file_response(bundle.bundle_path, f"audit-bundle-{bundle_id}.json", "application/json")
 
 
 @app.get("/api/v1/dashboard/control-coverage")
@@ -344,13 +344,13 @@ def _ensure_scan_run(db: Session, scan_run_id: int):
         not_found("Scan run")
 
 
-def _file_response(path: str | None, filename: str):
+def _file_response(path: str | None, filename: str, media_type: str = "application/json"):
     if not path or not Path(path).exists():
         raise HTTPException(
             status_code=404,
             detail={"code": "RESOURCE_NOT_FOUND", "message": "Artifact file does not exist"},
         )
-    return FileResponse(path, media_type="application/json", filename=filename)
+    return FileResponse(path, media_type=media_type, filename=filename)
 
 
 def _decide_review_item(db: Session, item_id: int, item_status: str, mapping_status: str, payload: ReviewDecision):

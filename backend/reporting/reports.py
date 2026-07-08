@@ -1,10 +1,14 @@
 import hashlib
 import json
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 
+from fpdf import FPDF
+from groq import Groq
 from sqlalchemy.orm import Session
 
+from complisoc.backend.core.config import GROQ_API_KEY, GROQ_MODEL
 from complisoc.backend.models import AuditBundle, ComplianceReport, ControlMapping, NormalizedFinding, RawFinding, ScanRun, ScannerExecution
 
 
@@ -103,6 +107,82 @@ def _framework_counts(mappings: list[ControlMapping]) -> dict[str, int]:
     return frameworks
 
 
+def _generate_ai_report_content(scan_run_id: int, mappings: list[ControlMapping], report_type: str) -> str:
+    if not GROQ_API_KEY:
+        return "AI report generation unavailable: GROQ_API_KEY is not configured."
+
+    client = Groq(api_key=GROQ_API_KEY)
+    published = [m for m in mappings if m.mapping_status == "published"]
+    manual_review = [m for m in mappings if m.mapping_status == "manual_review"]
+
+    finding_summaries = []
+    for m in mappings[:20]:
+        f = m.normalized_finding
+        c = m.control_catalog
+        finding_summaries.append(
+            f"- [{f.severity.upper()}] {f.title} -> {c.framework_name} {c.control_id} ({m.mapping_status}, confidence={m.final_confidence:.0%})"
+        )
+
+    prompt = (
+        f"Generate a {report_type} compliance report for scan run {scan_run_id}.\n\n"
+        f"Summary:\n"
+        f"- Total mappings: {len(mappings)}\n"
+        f"- Published: {len(published)}\n"
+        f"- Manual review: {len(manual_review)}\n"
+        f"- Severity counts: {_severity_counts(mappings)}\n\n"
+        f"Findings mapped to controls:\n" + "\n".join(finding_summaries) + "\n\n"
+        f"Write a concise {report_type} report with:\n"
+        f"1. Executive summary (2-3 sentences)\n"
+        f"2. Key findings and their compliance impact\n"
+        f"3. Recommended actions prioritized by severity\n"
+        f"Keep it professional and actionable."
+    )
+
+    try:
+        response = client.chat.completions.create(
+            model=GROQ_MODEL,
+            messages=[
+                {"role": "system", "content": "You are a compliance report writer. Write clear, actionable reports."},
+                {"role": "user", "content": prompt},
+            ],
+            temperature=0.3,
+            max_tokens=2000,
+        )
+        return response.choices[0].message.content.strip()
+    except Exception as exc:
+        return f"AI report generation failed: {exc}. Using deterministic summary."
+
+
+def _generate_pdf(path: Path, title: str, ai_content: str, mappings: list[ControlMapping], report_type: str) -> None:
+    pdf = FPDF()
+    pdf.set_auto_page_break(auto=True, margin=15)
+    pdf.add_page()
+    pdf.set_font("Helvetica", "B", 16)
+    pdf.cell(0, 10, title, ln=True)
+    pdf.ln(5)
+
+    pdf.set_font("Helvetica", "", 11)
+    pdf.multi_cell(0, 6, ai_content)
+    pdf.ln(10)
+
+    pdf.set_font("Helvetica", "B", 14)
+    pdf.cell(0, 10, "Mapping Details", ln=True)
+    pdf.ln(5)
+
+    for mapping in mappings:
+        finding = mapping.normalized_finding
+        control = mapping.control_catalog
+        pdf.set_font("Helvetica", "B", 11)
+        pdf.cell(0, 8, f"Finding #{finding.id}: {finding.title}", ln=True)
+        pdf.set_font("Helvetica", "", 10)
+        pdf.cell(0, 6, f"  Severity: {finding.severity} | Resource: {finding.resource_identifier}", ln=True)
+        pdf.cell(0, 6, f"  Control: {control.framework_name} {control.control_id} - {control.title}", ln=True)
+        pdf.cell(0, 6, f"  Status: {mapping.mapping_status} | Confidence: {mapping.final_confidence:.0%}", ln=True)
+        pdf.ln(4)
+
+    pdf.output(str(path))
+
+
 def generate_compliance_report(db: Session, *, scan_run_id: int, report_type: str) -> ComplianceReport:
     if report_type not in {"engineering", "leadership"}:
         raise ValueError("report_type must be engineering or leadership")
@@ -110,6 +190,13 @@ def generate_compliance_report(db: Session, *, scan_run_id: int, report_type: st
     mappings = _scan_mappings(db, scan_run_id)
     published = [mapping for mapping in mappings if mapping.mapping_status == "published"]
     manual_review = [mapping for mapping in mappings if mapping.mapping_status == "manual_review"]
+
+    ai_content = _generate_ai_report_content(scan_run_id, mappings, report_type)
+
+    directory = ARTIFACT_ROOT / "reports"
+    directory.mkdir(parents=True, exist_ok=True)
+    pdf_path = directory / f"{report_type}-scan-{scan_run_id}.pdf"
+    _generate_pdf(pdf_path, f"{report_type.title()} Compliance Report - Scan #{scan_run_id}", ai_content, mappings, report_type)
 
     payload = {
         "scan_run_id": scan_run_id,
@@ -121,6 +208,7 @@ def generate_compliance_report(db: Session, *, scan_run_id: int, report_type: st
             "severity_counts": _severity_counts(mappings),
             "framework_counts": _framework_counts(mappings),
         },
+        "ai_content": ai_content,
     }
     if report_type == "engineering":
         payload["findings"] = [_mapping_payload(mapping) for mapping in mappings]
@@ -139,12 +227,12 @@ def generate_compliance_report(db: Session, *, scan_run_id: int, report_type: st
         }
         payload["published_mappings"] = [_mapping_payload(mapping) for mapping in published]
 
-    path, digest = _write_artifact("reports", f"{report_type}-scan-{scan_run_id}", payload)
+    json_path, digest = _write_artifact("reports", f"{report_type}-scan-{scan_run_id}", payload)
     report = ComplianceReport(
         scan_run_id=scan_run_id,
         report_type=report_type,
-        generated_by="complisoc-deterministic-mvp",
-        content_path=path,
+        generated_by="complisoc-ai-report",
+        content_path=str(pdf_path),
         content_hash=digest,
     )
     db.add(report)

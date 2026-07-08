@@ -72,7 +72,7 @@ export function ScanDetailPage({ scanRunId, onBack }: { scanRunId: number; onBac
         <FindingsTab findings={scanFindings} resource={findingsResource} onRefresh={findingsResource.reload} />
       )}
       {activeTab === "mappings" && (
-        <MappingsTab mappings={scanMappings} resource={mappingsResource} />
+        <MappingsTab mappings={scanMappings} resource={mappingsResource} scanRunId={scanRunId} />
       )}
       {activeTab === "review" && <ReviewTab items={reviewForScan} resource={reviewResource} onRefresh={reviewResource.reload} />}
       {activeTab === "reports" && (
@@ -166,7 +166,7 @@ function FindingsTab({
   );
 }
 
-function MappingsTab({ mappings, resource }: { mappings: ControlMapping[]; resource: ReturnType<typeof useResource<ControlMapping[]>> }) {
+function MappingsTab({ mappings, resource, scanRunId }: { mappings: ControlMapping[]; resource: ReturnType<typeof useResource<ControlMapping[]>>; scanRunId: number }) {
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const selected = mappings.find((m) => m.id === selectedId) || null;
   const [verification, setVerification] = useState<VerificationRecord[] | null>(null);
@@ -179,6 +179,21 @@ function MappingsTab({ mappings, resource }: { mappings: ControlMapping[]; resou
     void api.mappings.verification(selected.id).then(setVerification);
   }, [selected]);
 
+  const findingMap = useResource(() => api.findings.list({ scan_run_id: scanRunId }));
+  const controlMap = useResource(api.controls.list);
+
+  const findingsByTitle = useMemo(() => {
+    const map = new Map<number, { title: string; severity: string }>();
+    (findingMap.data || []).forEach((f) => map.set(f.id, { title: f.title, severity: f.severity }));
+    return map;
+  }, [findingMap.data]);
+
+  const controlsByTitle = useMemo(() => {
+    const map = new Map<number, { control_id: string; title: string; framework: string }>();
+    (controlMap.data || []).forEach((c) => map.set(c.id, { control_id: c.control_id, title: c.title, framework: c.framework_name }));
+    return map;
+  }, [controlMap.data]);
+
   return (
     <div className="grid gap-5 2xl:grid-cols-[1fr_420px]">
       <Section title="Mappings" description="Findings mapped to compliance controls for this scan.">
@@ -186,14 +201,33 @@ function MappingsTab({ mappings, resource }: { mappings: ControlMapping[]; resou
           {(data) => (
             <DataTable
               columns={["ID", "Finding", "Control", "Status", "Confidence", "Verification"]}
-              rows={data.map((mapping) => [
-                mapping.id,
-                mapping.normalized_finding_id,
-                mapping.control_catalog_id,
-                <StatusBadge value={mapping.mapping_status} />,
-                formatPercent(mapping.final_confidence),
-                <StatusBadge value={mapping.verification_status || "pending"} />,
-              ])}
+              rows={data.map((mapping) => {
+                const finding = findingsByTitle.get(mapping.normalized_finding_id);
+                const control = controlsByTitle.get(mapping.control_catalog_id);
+                return [
+                  mapping.id,
+                  finding ? (
+                    <span className="flex items-center gap-2">
+                      <StatusBadge value={finding.severity} />
+                      <span className="truncate" title={finding.title}>{finding.title}</span>
+                    </span>
+                  ) : (
+                    <span className="text-slate-500">#{mapping.normalized_finding_id}</span>
+                  ),
+                  control ? (
+                    <span className="truncate" title={`${control.framework} - ${control.title}`}>
+                      <span className="font-mono text-xs">{control.control_id}</span>
+                      <span className="mx-1 text-slate-400">·</span>
+                      <span>{control.title}</span>
+                    </span>
+                  ) : (
+                    <span className="text-slate-500">#{mapping.control_catalog_id}</span>
+                  ),
+                  <StatusBadge value={mapping.mapping_status} />,
+                  formatPercent(mapping.final_confidence),
+                  <StatusBadge value={mapping.verification_status || "pending"} />,
+                ];
+              })}
             />
           )}
         </ResourceBoundary>
@@ -202,8 +236,36 @@ function MappingsTab({ mappings, resource }: { mappings: ControlMapping[]; resou
         {selected ? (
           <div className="space-y-3">
             <Detail label="Mapping" value={selected.id} />
-            <Detail label="Finding" value={selected.normalized_finding_id} />
-            <Detail label="Control" value={selected.control_catalog_id} />
+            {(() => {
+              const finding = findingsByTitle.get(selected.normalized_finding_id);
+              return finding ? (
+                <div className="space-y-1">
+                  <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">Finding</div>
+                  <div className="flex items-center gap-2">
+                    <StatusBadge value={finding.severity} />
+                    <span className="text-sm font-medium">{finding.title}</span>
+                  </div>
+                </div>
+              ) : (
+                <Detail label="Finding" value={`#${selected.normalized_finding_id}`} />
+              );
+            })()}
+            {(() => {
+              const control = controlsByTitle.get(selected.control_catalog_id);
+              return control ? (
+                <div className="space-y-1">
+                  <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">Control</div>
+                  <div className="text-sm">
+                    <span className="font-mono text-xs">{control.control_id}</span>
+                    <span className="mx-1 text-slate-400">·</span>
+                    <span className="font-medium">{control.title}</span>
+                    <div className="text-xs text-slate-500">{control.framework}</div>
+                  </div>
+                </div>
+              ) : (
+                <Detail label="Control" value={`#${selected.control_catalog_id}`} />
+              );
+            })()}
             <Detail label="Gemini confidence" value={formatPercent(selected.gemini_confidence)} />
             <Detail label="Final confidence" value={formatPercent(selected.final_confidence)} />
             <Detail label="Status" value={<StatusBadge value={selected.mapping_status} />} />
@@ -255,14 +317,18 @@ function ReviewTab({ items, resource, onRefresh }: { items: ReviewQueueItem[]; r
               <StatusBadge value={item.status} />,
               item.review_reason_code,
               formatDate(item.reviewed_at),
-              <div className="flex gap-2">
-                <button className="icon-button" disabled={item.status !== "pending"} onClick={() => decide(item.id, "approve")}>
-                  Approve
-                </button>
-                <button className="icon-button" disabled={item.status !== "pending"} onClick={() => decide(item.id, "reject")}>
-                  Reject
-                </button>
-              </div>,
+              item.status === "pending" ? (
+                <div className="flex gap-2">
+                  <button className="icon-button" onClick={() => decide(item.id, "approve")}>
+                    Approve
+                  </button>
+                  <button className="icon-button" onClick={() => decide(item.id, "reject")}>
+                    Reject
+                  </button>
+                </div>
+              ) : (
+                <span className="text-xs text-slate-500">Closed</span>
+              ),
             ])}
           />
         )}

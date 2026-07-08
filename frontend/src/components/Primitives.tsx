@@ -131,7 +131,7 @@ export function DataTable({ columns, rows }: { columns: string[]; rows: ReactNod
           {rows.map((row, rowIndex) => (
             <tr className="border-b border-line transition-colors last:border-0 hover:bg-panel/60" key={rowIndex}>
               {row.map((cell, cellIndex) => (
-                <td className="max-w-[320px] px-3 py-2 align-top" key={`${rowIndex}-${cellIndex}`}>
+                <td className="max-w-[320px] px-3 py-2 align-top break-words" key={`${rowIndex}-${cellIndex}`}>
                   {cell}
                 </td>
               ))}
