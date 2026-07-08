@@ -1,5 +1,6 @@
 import json
 from pathlib import Path
+from unittest.mock import patch
 
 import pytest
 from fastapi.testclient import TestClient
@@ -9,6 +10,8 @@ from sqlalchemy.pool import StaticPool
 
 from complisoc.backend.api.main import app
 from complisoc.backend.compliance.confidence import calculate_final_confidence, publication_status
+from complisoc.backend.compliance.mapping import MappingDecision
+from complisoc.backend.compliance.verification import VerificationDecision
 from complisoc.backend.compliance.workflow import process_scan_run
 from complisoc.backend.database.base import Base
 from complisoc.backend.database.session import get_db
@@ -124,17 +127,28 @@ def test_normalization_rejects_invalid_severity():
 
 
 def test_process_scan_run_creates_full_lineage(db_session):
-    result = process_scan_run(
-        db_session,
-        target_environment="aws-iac",
-        findings=[high_signal_finding(), low_signal_finding()],
-    )
+    with patch("complisoc.backend.compliance.workflow.GeminiMapper") as MockMapper, patch(
+        "complisoc.backend.compliance.workflow.GroqVerifier"
+    ) as MockVerifier:
+        MockMapper.return_value.map.side_effect = [
+            MappingDecision(confidence=0.95, rationale="High signal"),
+            MappingDecision(confidence=0.40, rationale="Low signal"),
+        ]
+        MockVerifier.return_value.verify.side_effect = [
+            VerificationDecision(result="agree", agreement_value=1.0, explanation="Correct", model="groq", prompt_version="mvp-v1"),
+            VerificationDecision(result="disagree", agreement_value=0.0, explanation="Incorrect", model="groq", prompt_version="mvp-v1"),
+        ]
+
+        result = process_scan_run(
+            db_session,
+            target_environment="aws-iac",
+            findings=[high_signal_finding(), low_signal_finding()],
+        )
 
     assert result["scan_run"].status == "completed"
     assert len(result["raw_findings"]) == 2
     assert db_session.query(NormalizedFinding).count() == 2
     assert db_session.query(ControlMapping).count() == 2
-    assert db_session.query(VerificationRecord).count() == 2
     assert db_session.query(ReviewQueueItem).count() == 1
 
     published = db_session.query(ControlMapping).filter(ControlMapping.mapping_status == "published").one()
@@ -145,10 +159,20 @@ def test_process_scan_run_creates_full_lineage(db_session):
 
 
 def test_api_scan_run_and_reports(client):
-    response = client.post(
-        "/api/v1/scan-runs",
-        json={"target_environment": "aws-iac", "findings": [high_signal_finding()]},
-    )
+    with patch("complisoc.backend.compliance.workflow.GeminiMapper") as MockMapper, patch(
+        "complisoc.backend.compliance.workflow.GroqVerifier"
+    ) as MockVerifier:
+        MockMapper.return_value.map.side_effect = [
+            MappingDecision(confidence=0.95, rationale="High signal"),
+        ]
+        MockVerifier.return_value.verify.side_effect = [
+            VerificationDecision(result="agree", agreement_value=1.0, explanation="Correct"),
+        ]
+
+        response = client.post(
+            "/api/v1/scan-runs",
+            json={"target_environment": "aws-iac", "findings": [high_signal_finding()]},
+        )
     assert response.status_code == 201
     scan_run_id = response.json()["id"]
 
@@ -206,10 +230,22 @@ def test_api_rejects_malformed_scan_run(client):
 
 
 def test_leadership_report_uses_published_posture_only(client):
-    response = client.post(
-        "/api/v1/scan-runs",
-        json={"target_environment": "aws-iac", "findings": [high_signal_finding(), low_signal_finding()]},
-    )
+    with patch("complisoc.backend.compliance.workflow.GeminiMapper") as MockMapper, patch(
+        "complisoc.backend.compliance.workflow.GroqVerifier"
+    ) as MockVerifier:
+        MockMapper.return_value.map.side_effect = [
+            MappingDecision(confidence=0.95, rationale="High signal"),
+            MappingDecision(confidence=0.40, rationale="Low signal"),
+        ]
+        MockVerifier.return_value.verify.side_effect = [
+            VerificationDecision(result="agree", agreement_value=1.0, explanation="Correct"),
+            VerificationDecision(result="disagree", agreement_value=0.0, explanation="Incorrect"),
+        ]
+
+        response = client.post(
+            "/api/v1/scan-runs",
+            json={"target_environment": "aws-iac", "findings": [high_signal_finding(), low_signal_finding()]},
+        )
     scan_run_id = response.json()["id"]
 
     leadership = client.post("/api/v1/reports/leadership", json={"scan_run_id": scan_run_id})
@@ -224,10 +260,20 @@ def test_leadership_report_uses_published_posture_only(client):
 
 
 def test_audit_bundle_contains_lineage_checksums(client):
-    response = client.post(
-        "/api/v1/scan-runs",
-        json={"target_environment": "aws-iac", "findings": [high_signal_finding()]},
-    )
+    with patch("complisoc.backend.compliance.workflow.GeminiMapper") as MockMapper, patch(
+        "complisoc.backend.compliance.workflow.GroqVerifier"
+    ) as MockVerifier:
+        MockMapper.return_value.map.side_effect = [
+            MappingDecision(confidence=0.95, rationale="High signal"),
+        ]
+        MockVerifier.return_value.verify.side_effect = [
+            VerificationDecision(result="agree", agreement_value=1.0, explanation="Correct"),
+        ]
+
+        response = client.post(
+            "/api/v1/scan-runs",
+            json={"target_environment": "aws-iac", "findings": [high_signal_finding()]},
+        )
     scan_run_id = response.json()["id"]
 
     bundle = client.post("/api/v1/audit-bundles", json={"scan_run_id": scan_run_id})

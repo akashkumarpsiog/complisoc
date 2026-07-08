@@ -1,5 +1,6 @@
 import json
-from unittest.mock import patch
+import os
+from unittest.mock import MagicMock, patch
 
 import pytest
 from sqlalchemy import create_engine
@@ -122,3 +123,81 @@ def test_run_scanners_records_failure_when_binary_missing():
         findings, failures = runners.run_scanners(".", ["trivy"])
     assert findings == []
     assert failures and failures[0]["scanner_name"] == "trivy"
+
+
+def test_sonarqube_parser_extracts_issues():
+    report = {
+        "issues": [
+            {
+                "rule": "squid:S1234",
+                "type": "VULNERABILITY",
+                "severity": "BLOCKER",
+                "message": "Remove this hack.",
+                "component": "my-project:/src/main.py",
+            }
+        ],
+        "total": 1,
+    }
+    with patch.dict(os.environ, {"SONAR_HOST_URL": "http://sonarqube", "SONAR_TOKEN": "token"}):
+        mock_resp = MagicMock()
+        mock_resp.status_code = 200
+        mock_resp.json.return_value = report
+        with patch.object(runners._requests, "Session") as MockSession:
+            session_instance = MockSession.return_value
+            session_instance.get.return_value = mock_resp
+            session_instance.headers = {}
+            findings, error = runners.SonarQubeScanner().run("my-project")
+    assert error is None
+    assert len(findings) == 1
+    assert findings[0]["raw_json"]["finding_type"] == "squid:S1234"
+    assert findings[0]["raw_json"]["resource_identifier"] == "my-project:/src/main.py"
+
+
+def test_defender_parser_extracts_alerts():
+    alert = {
+        "properties": {
+            "alertDisplayName": "Suspicious login",
+            "alertType": "Signin",
+            "severity": "HIGH",
+            "description": "Suspicious sign-in detected.",
+            "resourceIdentities": [{"resourceId": "/subscriptions/sub/resource/r1"}],
+        }
+    }
+    token_resp = MagicMock()
+    token_resp.status_code = 200
+    token_resp.json.return_value = {"access_token": "abc"}
+    alerts_resp = MagicMock()
+    alerts_resp.status_code = 200
+    alerts_resp.json.return_value = {"value": [alert]}
+    with patch.dict(
+        os.environ,
+        {
+            "AZURE_TENANT_ID": "tenant",
+            "AZURE_CLIENT_ID": "client",
+            "AZURE_CLIENT_SECRET": "secret",
+            "AZURE_SUBSCRIPTION_ID": "sub",
+        },
+    ), patch.object(runners._requests, "post", return_value=token_resp) as mock_post, patch.object(
+        runners._requests, "Session"
+    ) as MockSession:
+        session_instance = MockSession.return_value
+        session_instance.get.return_value = alerts_resp
+        session_instance.headers = {}
+        findings, error = runners.DefenderScanner().run("target")
+    assert error is None
+    assert len(findings) == 1
+    assert findings[0]["raw_json"]["title"] == "Suspicious login"
+
+
+def test_sonarqube_missing_env_returns_failure():
+    with patch.dict(os.environ, {}, clear=True):
+        findings, failures = runners.run_scanners(".", ["sonarqube"])
+    assert findings == []
+    assert failures and failures[0]["scanner_name"] == "sonarqube"
+
+
+def test_defender_missing_env_returns_failure():
+    with patch.dict(os.environ, {}, clear=True):
+        findings, failures = runners.run_scanners(".", ["defender"])
+    assert findings == []
+    assert failures and failures[0]["scanner_name"] == "defender"

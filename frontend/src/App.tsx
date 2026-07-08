@@ -3,26 +3,36 @@ import { Layout } from "./components/Layout";
 import type { ViewId } from "./navigation";
 import { OverviewPage } from "./pages/OverviewPage";
 import { ScanRunsPage } from "./pages/ScanRunsPage";
-import { FindingsPage } from "./pages/FindingsPage";
-import { MappingsPage } from "./pages/MappingsPage";
+import { ScanDetailPage } from "./pages/ScanDetailPage";
 import { ControlsPage } from "./pages/ControlsPage";
 import { ReviewPage } from "./pages/ReviewPage";
-import { ReportsPage } from "./pages/ReportsPage";
-import { AuditBundlesPage } from "./pages/AuditBundlesPage";
 
 export function App() {
   const [view, setView] = useState<ViewId>("overview");
+  const [selectedScanId, setSelectedScanId] = useState<number | null>(null);
+
+  const handleViewChange = (id: ViewId) => {
+    setView(id);
+    if (id !== "scan-detail") {
+      setSelectedScanId(null);
+    }
+  };
+
+  const handleSelectScan = (id: number) => {
+    setSelectedScanId(id);
+    setView("scan-detail");
+  };
 
   return (
-    <Layout view={view} onViewChange={setView}>
+    <Layout view={view} onViewChange={handleViewChange}>
       {view === "overview" && <OverviewPage />}
-      {view === "scan-runs" && <ScanRunsPage />}
-      {view === "findings" && <FindingsPage />}
-      {view === "mappings" && <MappingsPage />}
+      {view === "scan-runs" && <ScanRunsPage onSelectScan={handleSelectScan} />}
+      {view === "scan-detail" && selectedScanId !== null && (
+        <ScanDetailPage scanRunId={selectedScanId} onBack={() => handleViewChange("scan-runs")} />
+      )}
+      {view === "scan-detail" && selectedScanId === null && <ScanRunsPage onSelectScan={handleSelectScan} />}
       {view === "controls" && <ControlsPage />}
       {view === "review" && <ReviewPage />}
-      {view === "reports" && <ReportsPage />}
-      {view === "bundles" && <AuditBundlesPage />}
     </Layout>
   );
 }

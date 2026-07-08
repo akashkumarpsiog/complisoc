@@ -11,9 +11,11 @@ import type {
   RawFindingInput,
   RemediationBacklog,
   ReviewQueueItem,
+  ScanRequest,
   ScanRun,
   ScanRunSummary,
   ScannerFailureInput,
+  ScannerInfo,
   VerificationRecord,
 } from "../types";
 

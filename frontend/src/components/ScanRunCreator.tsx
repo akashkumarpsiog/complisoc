@@ -175,3 +175,56 @@ function JsonEditor({
     </label>
   );
 }
+
+function SampleScanForm({ onCreated, onClose }: { onCreated: () => void; onClose: () => void }) {
+  const [targetEnvironment, setTargetEnvironment] = useState("sample-iac");
+  const [findingsJson, setFindingsJson] = useState(sampleFindings);
+  const [failuresJson, setFailuresJson] = useState(sampleFailures);
+  const [message, setMessage] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+
+  async function submit() {
+    setSubmitting(true);
+    setMessage(null);
+    try {
+      const findings = JSON.parse(findingsJson);
+      const failures = JSON.parse(failuresJson);
+      const result = await api.scanRuns.create({
+        target_environment: targetEnvironment,
+        findings,
+        scanner_failures: failures,
+      });
+      setMessage(`Created sample scan run ${result.id}.`);
+      onCreated();
+    } catch (err) {
+      setMessage(err instanceof Error ? err.message : "Unable to create sample scan.");
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <div className="grid gap-3">
+      <label className="text-sm font-medium">
+        Target environment
+        <input
+          className="control mt-1"
+          value={targetEnvironment}
+          onChange={(event) => setTargetEnvironment(event.target.value)}
+          placeholder="sample-iac"
+        />
+      </label>
+      <JsonEditor label="Findings JSON" rows={8} value={findingsJson} onChange={setFindingsJson} />
+      <JsonEditor label="Scanner failures JSON (optional)" rows={4} value={failuresJson} onChange={setFailuresJson} />
+      {message ? <div className="rounded-md bg-panel px-3 py-2 text-sm text-slate-700">{message}</div> : null}
+      <div className="flex items-center justify-end gap-2">
+        <button className="icon-button" onClick={onClose}>
+          Cancel
+        </button>
+        <button className="primary-button" disabled={submitting} onClick={submit}>
+          Run sample scan
+        </button>
+      </div>
+    </div>
+  );
+}

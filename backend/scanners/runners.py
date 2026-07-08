@@ -18,6 +18,13 @@ import subprocess
 from abc import ABC, abstractmethod
 from typing import Any
 
+try:
+    import requests as _requests
+
+    _HAS_REQUESTS = True
+except ImportError:
+    _HAS_REQUESTS = False
+
 
 def _fid(prefix: str, payload: dict[str, Any]) -> str:
     digest = hashlib.md5(
@@ -143,41 +150,137 @@ class CheckovScanner(BaseScanner):
         return findings, None
 
 
-class ExternalServiceScanner(BaseScanner):
-    """Scanners backed by external services.
-
-    Unavailable until the required environment variables are set. The run method
-    reports what is missing rather than raising, keeping the scan auditable.
-    """
-
-    def __init__(self, name: str, required_env: list[str], note: str) -> None:
-        self.name = name
-        self._required_env = required_env
-        self._note = note
+class SonarQubeScanner(BaseScanner):
+    name = "sonarqube"
 
     def is_available(self) -> bool:
-        return all(os.environ.get(env) for env in self._required_env)
+        return all(os.environ.get(env) for env in ["SONAR_HOST_URL", "SONAR_TOKEN"]) and _HAS_REQUESTS
 
     def run(self, target: str, timeout: int = 300) -> tuple[list[dict[str, Any]], str | None]:
-        missing = [env for env in self._required_env if not os.environ.get(env)]
+        missing = [env for env in ["SONAR_HOST_URL", "SONAR_TOKEN"] if not os.environ.get(env)]
         if missing:
-            return [], f"{self.name} requires {', '.join(missing)}; {self._note}"
-        return [], f"{self.name} client is not implemented yet; set {', '.join(self._required_env)} to enable."
+            return [], f"sonarqube requires {', '.join(missing)}"
+        if not _HAS_REQUESTS:
+            return [], "sonarqube requires the requests library; install it to enable."
+
+        host = os.environ["SONAR_HOST_URL"].rstrip("/")
+        token = os.environ["SONAR_TOKEN"]
+        auth = (token, "")
+        session = _requests.Session()
+        session.auth = auth
+        session.headers["Accept"] = "application/json"
+
+        findings: list[dict[str, Any]] = []
+        page = 1
+        while True:
+            try:
+                resp = session.get(
+                    f"{host}/api/issues/search",
+                    params={
+                        "componentKeys": target,
+                        "types": "VULNERABILITY,SECURITY_HOTSPOT",
+                        "ps": 100,
+                        "p": page,
+                    },
+                    timeout=timeout,
+                )
+            except _requests.RequestException as exc:
+                return findings, f"sonarqube request failed: {exc}"
+            if resp.status_code != 200:
+                return findings, f"sonarqube returned {resp.status_code}: {resp.text[:500]}"
+
+            body = resp.json()
+            issues = body.get("issues") or []
+            if not issues:
+                break
+
+            for issue in issues:
+                raw = {
+                    "finding_type": issue.get("rule", "sonarqube-issue"),
+                    "resource_type": issue.get("type", "issue"),
+                    "resource_identifier": issue.get("component", target),
+                    "severity": (issue.get("severity") or "medium").lower(),
+                    "title": issue.get("message") or issue.get("rule", "SonarQube issue"),
+                    "description": issue.get("message"),
+                }
+                findings.append(self._emit(raw))
+
+            if page * 100 >= (body.get("total") or 0):
+                break
+            page += 1
+
+        return findings, None
+
+
+class DefenderScanner(BaseScanner):
+    name = "defender"
+
+    def is_available(self) -> bool:
+        return all(os.environ.get(env) for env in ["AZURE_TENANT_ID", "AZURE_CLIENT_ID", "AZURE_CLIENT_SECRET", "AZURE_SUBSCRIPTION_ID"]) and _HAS_REQUESTS
+
+    def run(self, target: str, timeout: int = 300) -> tuple[list[dict[str, Any]], str | None]:
+        missing = [env for env in ["AZURE_TENANT_ID", "AZURE_CLIENT_ID", "AZURE_CLIENT_SECRET", "AZURE_SUBSCRIPTION_ID"] if not os.environ.get(env)]
+        if missing:
+            return [], f"defender requires {', '.join(missing)}"
+        if not _HAS_REQUESTS:
+            return [], "defender requires the requests library; install it to enable."
+
+        tenant = os.environ["AZURE_TENANT_ID"]
+        client_id = os.environ["AZURE_CLIENT_ID"]
+        client_secret = os.environ["AZURE_CLIENT_SECRET"]
+        subscription = os.environ["AZURE_SUBSCRIPTION_ID"]
+        token_url = f"https://login.microsoftonline.com/{tenant}/oauth2/v2.0/token"
+        token_data = {
+            "grant_type": "client_credentials",
+            "client_id": client_id,
+            "client_secret": client_secret,
+            "scope": "https://management.azure.com/.default",
+        }
+
+        try:
+            token_resp = _requests.post(token_url, data=token_data, timeout=timeout)
+        except _requests.RequestException as exc:
+            return [], f"defender token request failed: {exc}"
+        if token_resp.status_code != 200:
+            return [], f"defender token endpoint returned {token_resp.status_code}: {token_resp.text[:500]}"
+
+        access_token = token_resp.json().get("access_token")
+        if not access_token:
+            return [], "defender token response missing access_token"
+
+        headers = {"Authorization": f"Bearer {access_token}", "Accept": "application/json"}
+        findings: list[dict[str, Any]] = []
+        session = _requests.Session()
+        session.headers.update(headers)
+        url = f"https://management.azure.com/subscriptions/{subscription}/providers/Microsoft.Security/alerts?api-version=2020-01-01-preview"
+
+        try:
+            resp = session.get(url, timeout=timeout)
+        except _requests.RequestException as exc:
+            return findings, f"defender alerts request failed: {exc}"
+        if resp.status_code != 200:
+            return findings, f"defender returned {resp.status_code}: {resp.text[:500]}"
+
+        alerts = resp.json().get("value") or []
+        for alert in alerts:
+            props = alert.get("properties") or {}
+            raw = {
+                "finding_type": props.get("alertDisplayName") or props.get("alertType") or "defender-alert",
+                "resource_type": props.get("resourceType") or "azure-resource",
+                "resource_identifier": props.get("resourceIdentities", [{}])[0].get("resourceId") if props.get("resourceIdentities") else target,
+                "severity": (props.get("severity") or "medium").lower(),
+                "title": props.get("alertDisplayName") or "Microsoft Defender alert",
+                "description": props.get("description") or props.get("remediationSteps"),
+            }
+            findings.append(self._emit(raw))
+        return findings, None
 
 
 SCANNER_RUNNERS: dict[str, BaseScanner] = {
     "trivy": TrivyScanner(),
     "checkov": CheckovScanner(),
-    "sonarqube": ExternalServiceScanner(
-        "sonarqube",
-        ["SONAR_HOST_URL", "SONAR_TOKEN"],
-        "point it at a SonarQube server and implement the client",
-    ),
-    "defender": ExternalServiceScanner(
-        "defender",
-        ["AZURE_SUBSCRIPTION_ID"],
-        "configure Microsoft Defender for Cloud and implement the client",
-    ),
+    "sonarqube": SonarQubeScanner(),
+    "defender": DefenderScanner(),
 }
 
 

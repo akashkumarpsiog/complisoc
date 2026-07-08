@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { ListFilter } from "lucide-react";
+import { ArrowRight, ListFilter } from "lucide-react";
 import { api } from "../services/api";
 import { useResource } from "../hooks/useResource";
 import type { ScanRun, ScanRunSummary } from "../types";
@@ -9,24 +9,33 @@ import { DataTable, EmptyState, LoadingState, MetricCard, Section, StatusBadge }
 import { formatDate } from "../utils/format";
 import { ScanRunCreator } from "../components/ScanRunCreator";
 
-export function ScanRunsPage() {
+export function ScanRunsPage({ onSelectScan }: { onSelectScan: (id: number) => void }) {
   const scanRuns = useResource(api.scanRuns.list);
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const selected = scanRuns.data?.find((item) => item.id === selectedId) || null;
+  const [summary, setSummary] = useState<ScanRunSummary | null>(null);
+
+  useEffect(() => {
+    if (!selected) {
+      setSummary(null);
+      return;
+    }
+    void api.scanRuns.summary(selected.id).then(setSummary);
+  }, [selected]);
 
   return (
     <div className="grid gap-5 2xl:grid-cols-[1fr_420px]">
       <Section title="Scan Runs" actions={<ScanRunCreator onCreated={scanRuns.reload} />}>
         <ResourceBoundary resource={scanRuns}>
-          {(data) => <ScanRunTable data={data} onSelect={setSelectedId} />}
+          {(data) => <ScanRunTable data={data} onSelect={setSelectedId} onOpen={onSelectScan} />}
         </ResourceBoundary>
       </Section>
-      <ScanRunDetail scanRun={selected} />
+      <ScanRunDetail scanRun={selected} summary={summary} onOpen={onSelectScan} />
     </div>
   );
 }
 
-function ScanRunTable({ data, onSelect }: { data: ScanRun[]; onSelect: (id: number) => void }) {
+function ScanRunTable({ data, onSelect, onOpen }: { data: ScanRun[]; onSelect: (id: number) => void; onOpen: (id: number) => void }) {
   return (
     <DataTable
       columns={["ID", "Environment", "Status", "Created", "Open"]}
@@ -35,28 +44,18 @@ function ScanRunTable({ data, onSelect }: { data: ScanRun[]; onSelect: (id: numb
         scanRun.target_environment,
         <StatusBadge value={scanRun.status} />,
         formatDate(scanRun.created_at),
-        <button className="icon-button" onClick={() => onSelect(scanRun.id)}>
-          <ListFilter className="h-4 w-4" aria-hidden />
-          Detail
+        <button className="primary-button" onClick={() => onOpen(scanRun.id)}>
+          <ArrowRight className="h-4 w-4" aria-hidden />
+          View
         </button>,
       ])}
     />
   );
 }
 
-function ScanRunDetail({ scanRun }: { scanRun: ScanRun | null }) {
-  const [summary, setSummary] = useState<ScanRunSummary | null>(null);
-
-  useEffect(() => {
-    if (!scanRun) {
-      setSummary(null);
-      return;
-    }
-    void api.scanRuns.summary(scanRun.id).then(setSummary);
-  }, [scanRun]);
-
+function ScanRunDetail({ scanRun, summary, onOpen }: { scanRun: ScanRun | null; summary: ScanRunSummary | null; onOpen: (id: number) => void }) {
   return (
-    <Section title="Scan Run Detail">
+    <Section title="Scan Detail">
       {scanRun ? (
         <div className="space-y-3">
           <Detail label="Scan run" value={scanRun.id} />
@@ -68,14 +67,21 @@ function ScanRunDetail({ scanRun }: { scanRun: ScanRun | null }) {
               <MetricCard label="Raw" value={summary.raw_findings} />
               <MetricCard label="Normalized" value={summary.normalized_findings} />
               <MetricCard label="Mappings" value={summary.mappings} />
-              <MetricCard label="Published" value={summary.published_mappings} />
+              <MetricCard label="Published" value={summary.published_mappings} accent="emerald" />
+              <MetricCard label="Manual review" value={summary.manual_review_mappings} accent="amber" />
             </div>
           ) : (
             <LoadingState label="Loading summary" />
           )}
+          <div className="pt-2">
+            <button className="primary-button w-full justify-center" onClick={() => onOpen(scanRun.id)}>
+              Open scan workspace
+              <ArrowRight className="h-4 w-4" aria-hidden />
+            </button>
+          </div>
         </div>
       ) : (
-        <EmptyState label="Select a scan run." />
+        <EmptyState label="Select a scan run to see details." />
       )}
     </Section>
   );
