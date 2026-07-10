@@ -36,6 +36,12 @@ export function ScanDetailPage({ scanRunId, onBack }: { scanRunId: number; onBac
     return reviewResource.data.filter((item) => scanMappingIds.has(item.control_mapping_id));
   }, [reviewResource.data, mappingsResource.data]);
 
+  const refreshReview = async () => {
+    await reviewResource.reload();
+    await mappingsResource.reload();
+    await summaryResource.reload();
+  };
+
   return (
     <div className="space-y-5">
       <div className="flex items-center gap-3">
@@ -75,7 +81,7 @@ export function ScanDetailPage({ scanRunId, onBack }: { scanRunId: number; onBac
       {activeTab === "mappings" && (
         <MappingsTab mappings={scanMappings} resource={mappingsResource} scanRunId={scanRunId} />
       )}
-      {activeTab === "review" && <ReviewTab items={reviewForScan} resource={reviewResource} onRefresh={reviewResource.reload} />}
+      {activeTab === "review" && <ReviewTab items={reviewForScan} resource={reviewResource} onRefresh={refreshReview} />}
       {activeTab === "reports" && (
         <ReportsTab scanRunId={scanRunId} reports={reportsResource.data || []} resource={reportsResource} onRefresh={reportsResource.reload} />
       )}
