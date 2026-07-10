@@ -15,7 +15,9 @@ import json
 import os
 import shutil
 import subprocess
+import sys
 from abc import ABC, abstractmethod
+from pathlib import Path
 from typing import Any
 
 try:
@@ -33,6 +35,30 @@ def _fid(prefix: str, payload: dict[str, Any]) -> str:
     return f"{prefix}:{digest}"
 
 
+def _venv_executable_path(name: str) -> str | None:
+    if sys.prefix == sys.base_prefix:
+        return None
+    scripts = Path(sys.prefix) / ("Scripts" if os.name == "nt" else "bin")
+    if os.name == "nt":
+        candidates = [scripts / f"{name}.exe", scripts / f"{name}.cmd", scripts / name]
+    else:
+        candidates = [scripts / name]
+    for candidate in candidates:
+        if candidate.exists():
+            return str(candidate)
+    return None
+
+
+def _python_executable() -> str | None:
+    return sys.executable if sys.prefix != sys.base_prefix else None
+
+
+def _module_available(name: str) -> bool:
+    import importlib.util
+
+    return importlib.util.find_spec(name) is not None
+
+
 class BaseScanner(ABC):
     name: str
     kind = "local"
@@ -41,7 +67,7 @@ class BaseScanner(ABC):
     required_inputs: list[str] = []
 
     def is_available(self) -> bool:
-        return bool(shutil.which(self.name))
+        return bool(shutil.which(self.name)) or bool(_venv_executable_path(self.name))
 
     def missing_config(self) -> list[str]:
         return [] if self.is_available() else [f"{self.name} executable"]
@@ -136,13 +162,41 @@ class TrivyScanner(BaseScanner):
 class CheckovScanner(BaseScanner):
     name = "checkov"
     label = "Checkov"
-    description = "Scans local IaC directories for cloud configuration issues."
-    required_inputs = ["Target path containing Terraform, CloudFormation, Kubernetes, or other IaC files"]
+    description = "Scans local IaC directories for cloud configuration issues. Supports Terraform, Kubernetes, CloudFormation, and more."
+    required_inputs = ["Directory path containing Terraform, Kubernetes, CloudFormation, or other IaC files"]
+
+    def is_available(self) -> bool:
+        if super().is_available():
+            return True
+        if _module_available("checkov"):
+            return True
+        return False
+
+    def missing_config(self) -> list[str]:
+        if self.is_available():
+            return []
+        return ["checkov executable (pip install checkov) or ensure it is on PATH"]
+
+    def _command(self, target: str) -> list[str]:
+        venv_python = _python_executable()
+        scripts_dir = Path(sys.prefix) / ("Scripts" if os.name == "nt" else "bin")
+        script = None
+        if venv_python:
+            for candidate in [scripts_dir / self.name, scripts_dir / f"{self.name}.py"]:
+                if candidate.exists():
+                    script = candidate
+                    break
+        if venv_python and script:
+            return [venv_python, str(script), "-d", target, "--output", "json", "--compact"]
+        exe = shutil.which(self.name)
+        if exe:
+            return [exe, "-d", target, "--output", "json", "--compact"]
+        return ["checkov", "-d", target, "--output", "json", "--compact"]
 
     def run(self, target: str, timeout: int = 300) -> tuple[list[dict[str, Any]], str | None]:
         try:
             proc = subprocess.run(
-                ["checkov", "-d", target, "--output", "json", "--compact"],
+                self._command(target),
                 capture_output=True,
                 text=True,
                 timeout=timeout,
@@ -151,7 +205,6 @@ class CheckovScanner(BaseScanner):
         except (subprocess.SubprocessError, OSError) as exc:
             return [], f"checkov execution failed: {exc}"
 
-        # Checkov returns 1 when misconfigurations are found, which is expected.
         if proc.returncode not in (0, 1) and not proc.stdout.strip():
             return [], f"checkov exited with {proc.returncode}: {proc.stderr[:500]}"
 
