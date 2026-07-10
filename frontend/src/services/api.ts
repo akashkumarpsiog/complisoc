@@ -20,7 +20,7 @@ import type {
 } from "../types";
 
 export const API_BASE_URL =
-  import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000/api/v1";
+  import.meta.env.VITE_API_BASE_URL || (import.meta.env.DEV ? "/api/v1" : "http://127.0.0.1:8000/api/v1");
 
 export class ApiError extends Error {
   constructor(
@@ -33,14 +33,22 @@ export class ApiError extends Error {
 
 type QueryValue = string | number | undefined | null;
 
-function buildUrl(path: string, query?: Record<string, QueryValue>) {
-  const url = new URL(`${API_BASE_URL}${path}`);
-  Object.entries(query || {}).forEach(([key, value]) => {
+function buildUrl(path: string, query?: Record<string, QueryValue>): string {
+  const base = API_BASE_URL.endsWith("/") ? API_BASE_URL.slice(0, -1) : API_BASE_URL;
+  const prefix = base + path;
+
+  if (!query || Object.keys(query).length === 0) {
+    return prefix;
+  }
+
+  const params = new URLSearchParams();
+  Object.entries(query).forEach(([key, value]) => {
     if (value !== undefined && value !== null && value !== "") {
-      url.searchParams.set(key, String(value));
+      params.set(key, String(value));
     }
   });
-  return url.toString();
+  const queryString = params.toString();
+  return queryString ? `${prefix}?${queryString}` : prefix;
 }
 
 async function request<T>(

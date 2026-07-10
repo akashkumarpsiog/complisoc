@@ -199,21 +199,21 @@ def _generate_report_narrative(scan_run_id: int, mappings: list[ControlMapping],
 
 def _pdf_heading(pdf: FPDF, text: str) -> None:
     pdf.set_font("Helvetica", "B", 13)
-    pdf.cell(0, 8, text, ln=True)
+    pdf.cell(0, 8, text, new_x="LMARGIN", new_y="NEXT")
     pdf.ln(1)
 
 
 def _pdf_body(pdf: FPDF, text: str, size: int = 10) -> None:
     pdf.set_font("Helvetica", "", size)
     pdf.set_x(pdf.l_margin)
-    pdf.multi_cell(0, 6, str(text or "n/a"))
+    pdf.multi_cell(pdf.w - pdf.l_margin - pdf.r_margin, 6, str(text or "n/a"), new_x="LMARGIN", new_y="NEXT")
     pdf.ln(2)
 
 
 def _pdf_kv(pdf: FPDF, label: str, value: object) -> None:
     pdf.set_font("Helvetica", "", 10)
     pdf.set_x(pdf.l_margin)
-    pdf.multi_cell(0, 6, f"{label}: {value if value is not None else 'n/a'}")
+    pdf.multi_cell(pdf.w - pdf.l_margin - pdf.r_margin, 6, f"{label}: {value if value is not None else 'n/a'}", new_x="LMARGIN", new_y="NEXT")
 
 
 def _generate_pdf(
@@ -228,9 +228,9 @@ def _generate_pdf(
     pdf.set_auto_page_break(auto=True, margin=15)
     pdf.add_page()
     pdf.set_font("Helvetica", "B", 16)
-    pdf.cell(0, 10, title, ln=True)
+    pdf.cell(0, 10, title, new_x="LMARGIN", new_y="NEXT")
     pdf.set_font("Helvetica", "", 9)
-    pdf.cell(0, 6, f"Scan run {scan_run_id} | Generated {datetime.utcnow().isoformat(timespec='seconds')} UTC", ln=True)
+    pdf.cell(0, 6, f"Scan run {scan_run_id} | Generated {datetime.utcnow().isoformat(timespec='seconds')} UTC", new_x="LMARGIN", new_y="NEXT")
     pdf.ln(4)
 
     published = [mapping for mapping in mappings if mapping.mapping_status == "published"]
@@ -255,17 +255,18 @@ def _generate_pdf(
     _pdf_body(pdf, narrative["recommended_actions"])
 
     _pdf_heading(pdf, "Key Findings")
+    cell_width = pdf.w - pdf.l_margin - pdf.r_margin
     for mapping in _top_mappings(mappings):
         finding = mapping.normalized_finding
         control = mapping.control_catalog
         pdf.set_font("Helvetica", "B", 11)
-        pdf.multi_cell(0, 7, f"{finding.severity.upper()} - {finding.title}")
+        pdf.multi_cell(cell_width, 7, f"{finding.severity.upper()} - {finding.title}", new_x="LMARGIN", new_y="NEXT")
         pdf.set_font("Helvetica", "", 10)
-        pdf.multi_cell(0, 6, f"Resource: {finding.resource_identifier}")
-        pdf.multi_cell(0, 6, f"Control: {control.framework_name} {control.control_id} - {control.title}")
-        pdf.multi_cell(0, 6, f"Status: {mapping.mapping_status} | Confidence: {_safe_percent(mapping.final_confidence)}")
+        pdf.multi_cell(cell_width, 6, f"Resource: {finding.resource_identifier}", new_x="LMARGIN", new_y="NEXT")
+        pdf.multi_cell(cell_width, 6, f"Control: {control.framework_name} {control.control_id} - {control.title}", new_x="LMARGIN", new_y="NEXT")
+        pdf.multi_cell(cell_width, 6, f"Status: {mapping.mapping_status} | Confidence: {_safe_percent(mapping.final_confidence)}", new_x="LMARGIN", new_y="NEXT")
         if report_type == "engineering":
-            pdf.multi_cell(0, 6, f"Remediation: {_remediation_text(mapping)}")
+            pdf.multi_cell(cell_width, 6, f"Remediation: {_remediation_text(mapping)}", new_x="LMARGIN", new_y="NEXT")
         pdf.ln(4)
 
     if manual_review:
@@ -275,10 +276,12 @@ def _generate_pdf(
             control = mapping.control_catalog
             pdf.set_font("Helvetica", "", 10)
             pdf.multi_cell(
-                0,
+                cell_width,
                 6,
                 f"Mapping #{mapping.id}: {finding.title} -> {control.framework_name} {control.control_id} "
                 f"({_safe_percent(mapping.final_confidence)})",
+                new_x="LMARGIN",
+                new_y="NEXT",
             )
         pdf.ln(2)
 
@@ -288,11 +291,13 @@ def _generate_pdf(
         control = mapping.control_catalog
         pdf.set_font("Helvetica", "", 9)
         pdf.multi_cell(
-            0,
+            cell_width,
             5,
             f"#{mapping.id} | {finding.severity.upper()} | {finding.title} | "
             f"{control.framework_name} {control.control_id} | {mapping.mapping_status} | "
             f"{_safe_percent(mapping.final_confidence)}",
+            new_x="LMARGIN",
+            new_y="NEXT",
         )
 
     pdf.output(str(path))
