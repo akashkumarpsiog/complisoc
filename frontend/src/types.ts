@@ -55,6 +55,7 @@ export interface ControlMapping {
   prompt_version: string;
   rationale?: string | null;
   gemini_confidence?: number | null;
+  groq_agreement_value?: number | null;
   verification_status?: string | null;
   final_confidence?: number | null;
   mapping_status: string;
@@ -137,6 +138,8 @@ export interface RemediationBacklog {
     resource_identifier: string;
     control_id: string;
     control_title: string;
+    gemini_confidence: number | null;
+    groq_agreement_value: number | null;
   }>;
 }
 

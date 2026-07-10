@@ -107,6 +107,7 @@ def process_scan_run(
                 gemini_confidence=None,
                 verification_status=None,
                 final_confidence=None,
+                groq_agreement_value=None,
                 mapping_status="manual_review",
             )
             db.add(mapping)
@@ -132,6 +133,7 @@ def process_scan_run(
                 gemini_confidence=None,
                 verification_status=None,
                 final_confidence=None,
+                groq_agreement_value=None,
                 mapping_status="manual_review",
             )
             db.add(mapping)
@@ -158,6 +160,7 @@ def process_scan_run(
                 gemini_confidence=None,
                 verification_status=None,
                 final_confidence=None,
+                groq_agreement_value=None,
                 mapping_status="manual_review",
             )
             db.add(mapping)
@@ -200,6 +203,7 @@ def process_scan_run(
                 gemini_confidence=confidence,
                 verification_status=None,
                 final_confidence=confidence,
+                groq_agreement_value=None,
                 mapping_status=publication_status(confidence or 0.0),
             )
             db.add(mapping)
@@ -228,6 +232,8 @@ def process_scan_run(
             rationale=decision.rationale,
             gemini_confidence=decision.confidence,
             verification_status="pending",
+            final_confidence=None,
+            groq_agreement_value=None,
             mapping_status="validated",
         )
         db.add(mapping)
@@ -270,6 +276,7 @@ def process_scan_run(
         if verifier is None or groq_failed:
             mapping.verification_status = "failed"
             mapping.final_confidence = mapping.gemini_confidence
+            mapping.groq_agreement_value = 0.0
             mapping.mapping_status = publication_status(mapping.gemini_confidence or 0.0)
             db.add(
                 VerificationRecord(
@@ -293,6 +300,7 @@ def process_scan_run(
         if verdict is None:
             mapping.verification_status = "failed"
             mapping.final_confidence = mapping.gemini_confidence
+            mapping.groq_agreement_value = 0.0
             mapping.mapping_status = publication_status(mapping.gemini_confidence or 0.0)
             db.add(
                 VerificationRecord(
@@ -316,6 +324,7 @@ def process_scan_run(
         final_confidence = calculate_final_confidence(mapping.gemini_confidence or 0.0, verdict.agreement_value)
         mapping.verification_status = verdict.result
         mapping.final_confidence = final_confidence
+        mapping.groq_agreement_value = verdict.agreement_value
         mapping.mapping_status = publication_status(final_confidence)
         db.add(
             VerificationRecord(

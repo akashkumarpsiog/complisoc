@@ -185,6 +185,7 @@ class ControlMapping(Base):
     gemini_confidence = Column(Float)
     verification_status = Column(String(50))
     final_confidence = Column(Float)
+    groq_agreement_value = Column(Float)
     mapping_status = Column(String(50), nullable=False, default="generated")
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)

@@ -155,9 +155,13 @@ def test_process_scan_run_creates_full_lineage(db_session):
 
     published = db_session.query(ControlMapping).filter(ControlMapping.mapping_status == "published").one()
     assert published.final_confidence >= 0.70
+    assert published.gemini_confidence == pytest.approx(0.95)
+    assert published.groq_agreement_value == pytest.approx(1.0)
 
     manual_review = db_session.query(ControlMapping).filter(ControlMapping.mapping_status == "manual_review").one()
     assert manual_review.final_confidence < 0.70
+    assert manual_review.gemini_confidence == pytest.approx(0.40)
+    assert manual_review.groq_agreement_value == pytest.approx(0.0)
 
 
 def test_api_scan_run_and_reports(client):

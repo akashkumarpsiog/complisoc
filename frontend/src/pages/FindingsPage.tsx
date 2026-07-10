@@ -91,12 +91,15 @@ function FindingDetail({ finding }: { finding: NormalizedFinding | null }) {
           <h3 className="pt-2 text-sm font-semibold">Mappings</h3>
           {mappings ? (
             <DataTable
-              columns={["Mapping", "Control", "Status", "Confidence"]}
+              columns={["Mapping", "Control", "AI Verdict", "Gemini Score", "Groq Score", "Final Confidence", "Groq Verdict"]}
               rows={mappings.map((mapping) => [
                 mapping.id,
                 mapping.control_catalog_id,
                 <StatusBadge value={mapping.mapping_status} />,
+                formatPercent(mapping.gemini_confidence),
+                formatPercent(mapping.groq_agreement_value),
                 formatPercent(mapping.final_confidence),
+                <StatusBadge value={mapping.verification_status || "pending"} />,
               ])}
             />
           ) : (

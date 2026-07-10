@@ -409,4 +409,6 @@ def _mapping_backlog_item(mapping: ControlMapping):
         "resource_identifier": mapping.normalized_finding.resource_identifier,
         "control_id": mapping.control_catalog.control_id,
         "control_title": mapping.control_catalog.title,
+        "gemini_confidence": mapping.gemini_confidence,
+        "groq_agreement_value": mapping.groq_agreement_value,
     }

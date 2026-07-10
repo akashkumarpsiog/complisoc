@@ -42,13 +42,14 @@ function MappingStatusFilter({ value, onChange }: { value: string; onChange: (va
 function MappingTable({ data, onSelect }: { data: ControlMapping[]; onSelect: (id: number) => void }) {
   return (
     <DataTable
-      columns={["ID", "Finding", "Control", "Status", "Gemini", "Final", "Verification"]}
+      columns={["ID", "Finding", "Control", "AI Verdict", "Gemini Score", "Groq Score", "Final Confidence", "Groq Verdict"]}
       rows={data.map((mapping) => [
         mapping.id,
         mapping.normalized_finding_id,
         mapping.control_catalog_id,
         <StatusBadge value={mapping.mapping_status} />,
         formatPercent(mapping.gemini_confidence),
+        formatPercent(mapping.groq_agreement_value),
         formatPercent(mapping.final_confidence),
         <StatusBadge value={mapping.verification_status || "pending"} />,
       ])}
@@ -74,9 +75,11 @@ function MappingDetail({ mapping }: { mapping: ControlMapping | null }) {
           <Detail label="Mapping" value={mapping.id} />
           <Detail label="Finding" value={mapping.normalized_finding_id} />
           <Detail label="Control" value={mapping.control_catalog_id} />
-          <Detail label="Gemini" value={formatPercent(mapping.gemini_confidence)} />
-          <Detail label="Final" value={formatPercent(mapping.final_confidence)} />
-          <Detail label="Status" value={<StatusBadge value={mapping.mapping_status} />} />
+          <Detail label="AI Verdict" value={<StatusBadge value={mapping.mapping_status} />} />
+          <Detail label="Gemini Score" value={formatPercent(mapping.gemini_confidence)} />
+          <Detail label="Groq Score" value={formatPercent(mapping.groq_agreement_value)} />
+          <Detail label="Final Confidence" value={formatPercent(mapping.final_confidence)} />
+          <Detail label="Model" value={mapping.mapping_model} />
           <Detail label="Rationale" value={mapping.rationale || "n/a"} />
           <h3 className="pt-2 text-sm font-semibold">Verification</h3>
           {verification ? <VerificationTable data={verification} /> : <LoadingState label="Loading verification" />}

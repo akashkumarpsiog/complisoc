@@ -128,6 +128,7 @@ def test_control_mappings_schema():
         "gemini_confidence",
         "verification_status",
         "final_confidence",
+        "groq_agreement_value",
         "mapping_status",
         "created_at",
         "updated_at",

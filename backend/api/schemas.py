@@ -109,6 +109,7 @@ class ControlMappingRead(ORMModel):
     prompt_version: str
     rationale: str | None = None
     gemini_confidence: float | None = None
+    groq_agreement_value: float | None = None
     verification_status: str | None = None
     final_confidence: float | None = None
     mapping_status: str

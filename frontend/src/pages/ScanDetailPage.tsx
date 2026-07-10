@@ -201,7 +201,7 @@ function MappingsTab({ mappings, resource, scanRunId }: { mappings: ControlMappi
         <ResourceBoundary resource={{ ...resource, data: mappings }}>
           {(data) => (
             <DataTable
-              columns={["ID", "Finding", "Control", "Status", "Confidence", "Verification"]}
+              columns={["ID", "Finding", "Control", "Status", "Gemini Score", "Groq Score", "Final Confidence", "Groq Verdict"]}
               rows={data.map((mapping) => {
                 const finding = findingsByTitle.get(mapping.normalized_finding_id);
                 const control = controlsByTitle.get(mapping.control_catalog_id);
@@ -225,6 +225,8 @@ function MappingsTab({ mappings, resource, scanRunId }: { mappings: ControlMappi
                     <span className="text-slate-500">#{mapping.control_catalog_id}</span>
                   ),
                   <StatusBadge value={mapping.mapping_status} />,
+                  formatPercent(mapping.gemini_confidence),
+                  formatPercent(mapping.groq_agreement_value),
                   formatPercent(mapping.final_confidence),
                   <StatusBadge value={mapping.verification_status || "pending"} />,
                 ];
@@ -267,9 +269,10 @@ function MappingsTab({ mappings, resource, scanRunId }: { mappings: ControlMappi
                 <Detail label="Control" value={`#${selected.control_catalog_id}`} />
               );
             })()}
-            <Detail label="Gemini confidence" value={formatPercent(selected.gemini_confidence)} />
-            <Detail label="Final confidence" value={formatPercent(selected.final_confidence)} />
-            <Detail label="Status" value={<StatusBadge value={selected.mapping_status} />} />
+            <Detail label="Gemini Score" value={formatPercent(selected.gemini_confidence)} />
+            <Detail label="Groq Score" value={formatPercent(selected.groq_agreement_value)} />
+            <Detail label="Final Confidence" value={formatPercent(selected.final_confidence)} />
+            <Detail label="AI Verdict" value={<StatusBadge value={selected.mapping_status} />} />
             <Detail label="Model" value={selected.mapping_model} />
             <Detail label="Rationale" value={selected.rationale || "n/a"} />
             <h3 className="pt-2 text-sm font-semibold">Verification</h3>

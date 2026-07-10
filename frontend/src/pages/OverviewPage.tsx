@@ -2,6 +2,7 @@ import { api } from "../services/api";
 import { useResource } from "../hooks/useResource";
 import { ResourceBoundary } from "../components/ResourceBoundary";
 import { BarList, DataTable, MetricCard, ProgressBar, Section, StatusBadge } from "../components/Primitives";
+import { formatPercent } from "../utils/format";
 
 export function OverviewPage() {
   const coverage = useResource(api.dashboard.coverage);
@@ -88,13 +89,15 @@ export function OverviewPage() {
         <ResourceBoundary resource={backlog}>
           {(data) => (
             <DataTable
-              columns={["Mapping", "Status", "Severity", "Resource", "Control"]}
+              columns={["Mapping", "Status", "Severity", "Resource", "Control", "Gemini Score", "Groq Score"]}
               rows={data.items.map((item) => [
                 item.mapping_id,
                 <StatusBadge value={item.status} />,
                 item.severity,
                 item.resource_identifier,
                 `${item.control_id} ${item.control_title}`,
+                formatPercent(item.gemini_confidence),
+                formatPercent(item.groq_agreement_value),
               ])}
             />
           )}
