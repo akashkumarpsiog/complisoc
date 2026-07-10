@@ -34,7 +34,8 @@ def normalize_raw_finding(db: Session, raw_finding: RawFinding) -> NormalizedFin
         or payload.get("file")
         or payload.get("id")
     )
-    title = payload.get("title") or payload.get("message") or payload.get("description")
+    title = payload.get("title") or payload.get("name") or payload.get("message") or payload.get("check_name") or payload.get("description")
+    description = payload.get("description") or payload.get("message") or payload.get("short_description") or payload.get("check_name") or title
 
     if not finding_type or not resource_identifier or not title:
         raise ValueError("raw finding requires finding_type/type, resource/resource_identifier, and title/message")
@@ -47,7 +48,7 @@ def normalize_raw_finding(db: Session, raw_finding: RawFinding) -> NormalizedFin
         resource_identifier=str(resource_identifier)[:512],
         severity=normalize_severity(payload.get("severity")),
         title=str(title)[:512],
-        description=payload.get("description") or payload.get("message"),
+        description=str(description)[:1024] if description else None,
         metadata_json=payload,
     )
     db.add(normalized)
