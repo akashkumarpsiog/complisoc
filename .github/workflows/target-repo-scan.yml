@@ -1,0 +1,231 @@
+name: Complisoc Security Scan
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+  workflow_call:
+    secrets:
+      SONAR_HOST_URL:
+        required: false
+      SONAR_TOKEN:
+        required: false
+      COMPLISOC_API_URL:
+        required: true
+      COMPLISOC_API_KEY:
+        required: true
+
+jobs:
+  security-scan:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        scanner: [trivy, checkov]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Trivy
+        if: matrix.scanner == 'trivy'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y wget apt-transport-https gnupg lsb-release
+          wget -qO - https://aquasecurity.github.io/trivy-repo/deb/public.key | sudo apt-key add -
+          echo "deb https://aquasecurity.github.io/trivy-repo/deb $(lsb_release -sc) main" | sudo tee -a /etc/apt/sources.list.d/trivy.list
+          sudo apt-get update
+          sudo apt-get install -y trivy
+
+      - name: Install Checkov
+        if: matrix.scanner == 'checkov'
+        run: pip install checkov
+
+      - name: Run Trivy scan
+        if: matrix.scanner == 'trivy'
+        run: |
+          trivy fs --format json --output trivy-report.json .
+        continue-on-error: true
+
+      - name: Run Checkov scan
+        if: matrix.scanner == 'checkov'
+        run: |
+          checkov -d . --output json --compact > checkov-report.json
+        continue-on-error: true
+
+      - name: Upload Trivy report
+        if: matrix.scanner == 'trivy' && always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: trivy-report
+          path: trivy-report.json
+          retention-days: 30
+
+      - name: Upload Checkov report
+        if: matrix.scanner == 'checkov' && always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: checkov-report
+          path: checkov-report.json
+          retention-days: 30
+
+  optional-sonarqube:
+    runs-on: ubuntu-latest
+    needs: security-scan
+    if: ${{ secrets.SONAR_HOST_URL != '' && secrets.SONAR_TOKEN != '' }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: SonarQube Scan
+        uses: SonarSource/sonarqube-scan-action@v2
+        env:
+          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        continue-on-error: true
+
+  prepare-findings:
+    runs-on: ubuntu-latest
+    needs: [security-scan]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download Trivy report
+        uses: actions/download-artifact@v4
+        with:
+          name: trivy-report
+          path: .
+
+      - name: Download Checkov report
+        uses: actions/download-artifact@v4
+        with:
+          name: checkov-report
+          path: .
+
+      - name: Aggregate findings
+        id: aggregate
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          findings = []
+
+          trivy_path = Path("trivy-report.json")
+          if trivy_path.exists():
+              try:
+                  trivy = json.loads(trivy_path.read_text())
+                  for result in trivy.get("Results", []):
+                      for vuln in result.get("Vulnerabilities", []):
+                          findings.append({
+                              "scanner_name": "trivy",
+                              "scanner_finding_id": vuln.get("VulnerabilityID", "trivy-unknown"),
+                              "raw_json": {
+                                  "finding_type": vuln.get("VulnerabilityID", "vulnerability"),
+                                  "resource_type": result.get("Type", "package"),
+                                  "resource_identifier": f"{result.get('Target', '.')}::{vuln.get('PkgName', vuln.get('Resource', ''))}",
+                                  "severity": vuln.get("Severity", "medium"),
+                                  "title": vuln.get("Title") or vuln.get("VulnerabilityID", "Vulnerability"),
+                                  "description": vuln.get("Description"),
+                              },
+                          })
+                      for misc in result.get("Misconfigurations", []):
+                          cause = misc.get("CauseMetadata", {}) or {}
+                          findings.append({
+                              "scanner_name": "trivy",
+                              "scanner_finding_id": misc.get("ID", "trivy-unknown"),
+                              "raw_json": {
+                                  "finding_type": misc.get("ID", "misconfiguration"),
+                                  "resource_type": misc.get("Type", "iac"),
+                                  "resource_identifier": f"{cause.get('Filepath', result.get('Target', '.'))}::{cause.get('Resource', misc.get('Resource', ''))}",
+                                  "severity": misc.get("Severity", "medium"),
+                                  "title": misc.get("Title") or misc.get("ID", "Misconfiguration"),
+                                  "description": misc.get("Message"),
+                              },
+                          })
+              except Exception as exc:
+                  print(f"Trivy report parse error: {exc}")
+
+          checkov_path = Path("checkov-report.json")
+          if checkov_path.exists():
+              try:
+                  checkov = json.loads(checkov_path.read_text())
+                  for check in (checkov.get("results", {}) or {}).get("failed_checks", []) or []:
+                      findings.append({
+                          "scanner_name": "checkov",
+                          "scanner_finding_id": check.get("check_id", "checkov-unknown"),
+                          "raw_json": {
+                              "finding_type": check.get("check_id", "iac"),
+                              "resource_type": check.get("resource_type", "iac"),
+                              "resource_identifier": f"{check.get('file_path', '.')}::{check.get('resource', '')}",
+                              "severity": check.get("severity", "medium"),
+                              "title": check.get("check_name") or check.get("check_id", "Checkov finding"),
+                              "description": check.get("description") or check.get("check_name"),
+                          },
+                      })
+              except Exception as exc:
+                  print(f"Checkov report parse error: {exc}")
+
+          print(f"Total findings aggregated: {len(findings)}")
+          Path("findings.json").write_text(json.dumps(findings, indent=2))
+          PY
+
+      - name: Show aggregated findings
+        run: |
+          echo "Total findings: $(jq 'length' findings.json)"
+          jq '.[0:5]' findings.json || true
+
+      - name: Upload findings artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: findings-json
+          path: findings.json
+          retention-days: 30
+
+  ingest-to-complisoc:
+    runs-on: ubuntu-latest
+    needs: [prepare-findings]
+    if: ${{ secrets.COMPLISOC_API_URL != '' && secrets.COMPLISOC_API_KEY != '' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download findings artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: findings-json
+          path: .
+
+      - name: Send findings to Complisoc
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          import urllib.request
+          from pathlib import Path
+
+          api_url = os.environ["COMPLISOC_API_URL"].rstrip("/")
+          api_key = os.environ["COMPLISOC_API_KEY"]
+          findings_path = Path("findings.json")
+          if not findings_path.exists():
+              raise SystemExit("findings.json not found")
+
+          findings = json.loads(findings_path.read_text())
+          payload = {
+              "target_environment": os.environ.get("GITHUB_REPOSITORY", "."),
+              "findings": findings,
+              "scanner_failures": [],
+          }
+          req = urllib.request.Request(
+              f"{api_url}/api/v1/scan-runs",
+              data=json.dumps(payload).encode("utf-8"),
+              headers={
+                  "Content-Type": "application/json",
+                  "Authorization": f"Bearer {api_key}",
+              },
+              method="POST",
+          )
+          with urllib.request.urlopen(req, timeout=30) as resp:
+              body = json.loads(resp.read().decode("utf-8"))
+              print(f"Created scan run {body.get('id')}")
+          PY
+        env:
+          COMPLISOC_API_URL: ${{ secrets.COMPLISOC_API_URL }}
+          COMPLISOC_API_KEY: ${{ secrets.COMPLISOC_API_KEY }}
+        continue-on-error: true

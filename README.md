@@ -105,7 +105,10 @@ Set-ExecutionPolicy RemoteSigned -Scope CurrentUser -Force
 pip install sqlalchemy alembic pytest fastapi uvicorn
 uvicorn complisoc.backend.api.main:app --reload --port 8000
 ```
-
+## ngrok set up
+ngrok config add-authtoken YOUR_AUTHTOKEN
+ngrok config check
+ngrok http 8000
 **Terminal 2 (Frontend):**
 ```powershell
 npm install --prefix complisoc/frontend
