@@ -211,6 +211,7 @@ class VerificationRecord(Base):
     prompt_version = Column(String(128), nullable=False)
     result = Column(String(50), nullable=False)
     explanation = Column(Text)
+    agreement_value = Column(Float)
     timestamp = Column(DateTime, default=datetime.utcnow)
     created_at = Column(DateTime, default=datetime.utcnow)
 

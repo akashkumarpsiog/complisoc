@@ -145,6 +145,7 @@ def test_verification_records_schema():
         "prompt_version",
         "result",
         "explanation",
+        "agreement_value",
         "timestamp",
         "created_at",
     }

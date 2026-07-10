@@ -67,6 +67,7 @@ export interface VerificationRecord {
   prompt_version: string;
   result: string;
   explanation?: string | null;
+  agreement_value?: number | null;
   timestamp?: string | null;
 }
 
@@ -151,6 +152,11 @@ export interface DashboardTrend {
 export interface ScannerInfo {
   name: string;
   available: boolean;
+  kind?: string | null;
+  label?: string | null;
+  description?: string | null;
+  required_inputs?: string[] | null;
+  missing_config?: string[] | null;
 }
 
 export interface ScanRequest {

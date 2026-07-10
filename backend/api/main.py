@@ -81,7 +81,7 @@ def create_scan_run(payload: ScanRunCreate, db: Session = Depends(get_db)):
 
 @app.get("/api/v1/scanners", response_model=list[ScannerInfo])
 def list_available_scanners():
-    return [ScannerInfo(name=item["name"], available=item["available"]) for item in list_scanners()]
+    return [ScannerInfo(**item) for item in list_scanners()]
 
 
 @app.post("/api/v1/scans", response_model=ScanRunRead, status_code=201)

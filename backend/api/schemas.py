@@ -18,6 +18,11 @@ class ScannerFailureInput(BaseModel):
 class ScannerInfo(BaseModel):
     name: str
     available: bool
+    kind: str | None = None
+    label: str | None = None
+    description: str | None = None
+    required_inputs: list[str] | None = None
+    missing_config: list[str] | None = None
 
 
 class ScanRequest(BaseModel):
@@ -116,6 +121,7 @@ class VerificationRecordRead(ORMModel):
     prompt_version: str
     result: str
     explanation: str | None = None
+    agreement_value: float | None = None
     timestamp: datetime | None = None
 
 

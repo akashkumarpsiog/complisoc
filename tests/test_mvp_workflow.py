@@ -10,7 +10,7 @@ from sqlalchemy.pool import StaticPool
 
 from complisoc.backend.api.main import app
 from complisoc.backend.compliance.confidence import calculate_final_confidence, publication_status
-from complisoc.backend.compliance.mapping import MappingDecision
+from complisoc.backend.compliance.mapping import CandidateDecision, MappingDecision
 from complisoc.backend.compliance.verification import VerificationDecision
 from complisoc.backend.compliance.workflow import process_scan_run
 from complisoc.backend.database.base import Base
@@ -130,14 +130,14 @@ def test_process_scan_run_creates_full_lineage(db_session):
     with patch("complisoc.backend.compliance.workflow.GeminiMapper") as MockMapper, patch(
         "complisoc.backend.compliance.workflow.GroqVerifier"
     ) as MockVerifier:
-        MockMapper.return_value.map.side_effect = [
-            MappingDecision(confidence=0.95, rationale="High signal"),
-            MappingDecision(confidence=0.40, rationale="Low signal"),
-        ]
-        MockVerifier.return_value.verify.side_effect = [
-            VerificationDecision(result="agree", agreement_value=1.0, explanation="Correct", model="groq", prompt_version="mvp-v1"),
-            VerificationDecision(result="disagree", agreement_value=0.0, explanation="Incorrect", model="groq", prompt_version="mvp-v1"),
-        ]
+        MockMapper.return_value.map_batch.side_effect = lambda items: {
+            items[0][0].id: [CandidateDecision(control_id=items[0][1][0].control_catalog.control_id, maps=True, confidence=0.95, rationale="High signal")],
+            items[1][0].id: [CandidateDecision(control_id=items[1][1][0].control_catalog.control_id, maps=True, confidence=0.40, rationale="Low signal")],
+        }
+        MockVerifier.return_value.verify_batch.return_value = {
+            1: VerificationDecision(result="agree", agreement_value=1.0, explanation="Correct", model="groq", prompt_version="mvp-v1"),
+            2: VerificationDecision(result="disagree", agreement_value=0.0, explanation="Incorrect", model="groq", prompt_version="mvp-v1"),
+        }
 
         result = process_scan_run(
             db_session,
@@ -150,6 +150,8 @@ def test_process_scan_run_creates_full_lineage(db_session):
     assert db_session.query(NormalizedFinding).count() == 2
     assert db_session.query(ControlMapping).count() == 2
     assert db_session.query(ReviewQueueItem).count() == 1
+    assert MockMapper.return_value.map_batch.call_count == 1
+    assert MockVerifier.return_value.verify_batch.call_count == 1
 
     published = db_session.query(ControlMapping).filter(ControlMapping.mapping_status == "published").one()
     assert published.final_confidence >= 0.70
@@ -162,12 +164,12 @@ def test_api_scan_run_and_reports(client):
     with patch("complisoc.backend.compliance.workflow.GeminiMapper") as MockMapper, patch(
         "complisoc.backend.compliance.workflow.GroqVerifier"
     ) as MockVerifier:
-        MockMapper.return_value.map.side_effect = [
-            MappingDecision(confidence=0.95, rationale="High signal"),
-        ]
-        MockVerifier.return_value.verify.side_effect = [
-            VerificationDecision(result="agree", agreement_value=1.0, explanation="Correct"),
-        ]
+        MockMapper.return_value.map_batch.side_effect = lambda items: {
+            items[0][0].id: [CandidateDecision(control_id=items[0][1][0].control_catalog.control_id, maps=True, confidence=0.95, rationale="High signal")]
+        }
+        MockVerifier.return_value.verify_batch.return_value = {
+            1: VerificationDecision(result="agree", agreement_value=1.0, explanation="Correct"),
+        }
 
         response = client.post(
             "/api/v1/scan-runs",
@@ -233,14 +235,14 @@ def test_leadership_report_uses_published_posture_only(client):
     with patch("complisoc.backend.compliance.workflow.GeminiMapper") as MockMapper, patch(
         "complisoc.backend.compliance.workflow.GroqVerifier"
     ) as MockVerifier:
-        MockMapper.return_value.map.side_effect = [
-            MappingDecision(confidence=0.95, rationale="High signal"),
-            MappingDecision(confidence=0.40, rationale="Low signal"),
-        ]
-        MockVerifier.return_value.verify.side_effect = [
-            VerificationDecision(result="agree", agreement_value=1.0, explanation="Correct"),
-            VerificationDecision(result="disagree", agreement_value=0.0, explanation="Incorrect"),
-        ]
+        MockMapper.return_value.map_batch.side_effect = lambda items: {
+            items[0][0].id: [CandidateDecision(control_id=items[0][1][0].control_catalog.control_id, maps=True, confidence=0.95, rationale="High signal")],
+            items[1][0].id: [CandidateDecision(control_id=items[1][1][0].control_catalog.control_id, maps=True, confidence=0.40, rationale="Low signal")],
+        }
+        MockVerifier.return_value.verify_batch.return_value = {
+            1: VerificationDecision(result="agree", agreement_value=1.0, explanation="Correct"),
+            2: VerificationDecision(result="disagree", agreement_value=0.0, explanation="Incorrect"),
+        }
 
         response = client.post(
             "/api/v1/scan-runs",
@@ -261,12 +263,12 @@ def test_audit_bundle_contains_lineage_checksums(client):
     with patch("complisoc.backend.compliance.workflow.GeminiMapper") as MockMapper, patch(
         "complisoc.backend.compliance.workflow.GroqVerifier"
     ) as MockVerifier:
-        MockMapper.return_value.map.side_effect = [
-            MappingDecision(confidence=0.95, rationale="High signal"),
-        ]
-        MockVerifier.return_value.verify.side_effect = [
-            VerificationDecision(result="agree", agreement_value=1.0, explanation="Correct"),
-        ]
+        MockMapper.return_value.map_batch.side_effect = lambda items: {
+            items[0][0].id: [CandidateDecision(control_id=items[0][1][0].control_catalog.control_id, maps=True, confidence=0.95, rationale="High signal")]
+        }
+        MockVerifier.return_value.verify_batch.return_value = {
+            1: VerificationDecision(result="agree", agreement_value=1.0, explanation="Correct"),
+        }
 
         response = client.post(
             "/api/v1/scan-runs",

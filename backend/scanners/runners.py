@@ -35,9 +35,28 @@ def _fid(prefix: str, payload: dict[str, Any]) -> str:
 
 class BaseScanner(ABC):
     name: str
+    kind = "local"
+    label: str | None = None
+    description: str | None = None
+    required_inputs: list[str] = []
 
     def is_available(self) -> bool:
         return bool(shutil.which(self.name))
+
+    def missing_config(self) -> list[str]:
+        return [] if self.is_available() else [f"{self.name} executable"]
+
+    def metadata(self) -> dict[str, Any]:
+        missing = self.missing_config()
+        return {
+            "name": self.name,
+            "available": not missing,
+            "kind": self.kind,
+            "label": self.label or self.name,
+            "description": self.description or "",
+            "required_inputs": self.required_inputs,
+            "missing_config": missing,
+        }
 
     def _emit(self, raw: dict[str, Any]) -> dict[str, Any]:
         return {
@@ -53,6 +72,9 @@ class BaseScanner(ABC):
 
 class TrivyScanner(BaseScanner):
     name = "trivy"
+    label = "Trivy"
+    description = "Scans local repositories, filesystem paths, containers, and IaC for vulnerabilities and misconfigurations."
+    required_inputs = ["Target path, for example . or C:/repo"]
 
     def run(self, target: str, timeout: int = 300) -> tuple[list[dict[str, Any]], str | None]:
         try:
@@ -113,6 +135,9 @@ class TrivyScanner(BaseScanner):
 
 class CheckovScanner(BaseScanner):
     name = "checkov"
+    label = "Checkov"
+    description = "Scans local IaC directories for cloud configuration issues."
+    required_inputs = ["Target path containing Terraform, CloudFormation, Kubernetes, or other IaC files"]
 
     def run(self, target: str, timeout: int = 300) -> tuple[list[dict[str, Any]], str | None]:
         try:
@@ -152,9 +177,19 @@ class CheckovScanner(BaseScanner):
 
 class SonarQubeScanner(BaseScanner):
     name = "sonarqube"
+    kind = "cloud"
+    label = "SonarQube"
+    description = "Reads security issues from a configured SonarQube project."
+    required_inputs = ["Project key in Target", "SONAR_HOST_URL", "SONAR_TOKEN"]
 
     def is_available(self) -> bool:
         return all(os.environ.get(env) for env in ["SONAR_HOST_URL", "SONAR_TOKEN"]) and _HAS_REQUESTS
+
+    def missing_config(self) -> list[str]:
+        missing = [env for env in ["SONAR_HOST_URL", "SONAR_TOKEN"] if not os.environ.get(env)]
+        if not _HAS_REQUESTS:
+            missing.append("requests library")
+        return missing
 
     def run(self, target: str, timeout: int = 300) -> tuple[list[dict[str, Any]], str | None]:
         missing = [env for env in ["SONAR_HOST_URL", "SONAR_TOKEN"] if not os.environ.get(env)]
@@ -214,9 +249,25 @@ class SonarQubeScanner(BaseScanner):
 
 class DefenderScanner(BaseScanner):
     name = "defender"
+    kind = "cloud"
+    label = "Azure Defender"
+    description = "Reads Microsoft Defender for Cloud alerts from the configured Azure subscription."
+    required_inputs = [
+        "Azure subscription/resource scope in Target",
+        "AZURE_TENANT_ID",
+        "AZURE_CLIENT_ID",
+        "AZURE_CLIENT_SECRET",
+        "AZURE_SUBSCRIPTION_ID",
+    ]
 
     def is_available(self) -> bool:
         return all(os.environ.get(env) for env in ["AZURE_TENANT_ID", "AZURE_CLIENT_ID", "AZURE_CLIENT_SECRET", "AZURE_SUBSCRIPTION_ID"]) and _HAS_REQUESTS
+
+    def missing_config(self) -> list[str]:
+        missing = [env for env in ["AZURE_TENANT_ID", "AZURE_CLIENT_ID", "AZURE_CLIENT_SECRET", "AZURE_SUBSCRIPTION_ID"] if not os.environ.get(env)]
+        if not _HAS_REQUESTS:
+            missing.append("requests library")
+        return missing
 
     def run(self, target: str, timeout: int = 300) -> tuple[list[dict[str, Any]], str | None]:
         missing = [env for env in ["AZURE_TENANT_ID", "AZURE_CLIENT_ID", "AZURE_CLIENT_SECRET", "AZURE_SUBSCRIPTION_ID"] if not os.environ.get(env)]
@@ -285,7 +336,7 @@ SCANNER_RUNNERS: dict[str, BaseScanner] = {
 
 
 def list_scanners() -> list[dict[str, Any]]:
-    return [{"name": name, "available": runner.is_available()} for name, runner in SCANNER_RUNNERS.items()]
+    return [runner.metadata() for runner in SCANNER_RUNNERS.values()]
 
 
 def run_scanners(

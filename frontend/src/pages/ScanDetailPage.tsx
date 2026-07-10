@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { Loader2 } from "lucide-react";
 import { api } from "../services/api";
 import { useResource } from "../hooks/useResource";
 import type { AuditBundle, ComplianceReport, ControlMapping, NormalizedFinding, ReviewQueueItem, ScanRunSummary, VerificationRecord } from "../types";
@@ -274,8 +275,8 @@ function MappingsTab({ mappings, resource, scanRunId }: { mappings: ControlMappi
             <h3 className="pt-2 text-sm font-semibold">Verification</h3>
             {verification ? (
               <DataTable
-                columns={["ID", "Result", "Model", "Explanation"]}
-                rows={verification.map((record) => [record.id, <StatusBadge value={record.result} />, record.verification_model, record.explanation || "n/a"])}
+                columns={["ID", "Result", "Agreement", "Model", "Explanation"]}
+                rows={verification.map((record) => [record.id, <StatusBadge value={record.result} />, formatPercent(record.agreement_value), record.verification_model, record.explanation || "n/a"])}
               />
             ) : (
               <LoadingState label="Loading verification" />
@@ -339,10 +340,19 @@ function ReviewTab({ items, resource, onRefresh }: { items: ReviewQueueItem[]; r
 
 function ReportsTab({ scanRunId, reports, resource, onRefresh }: { scanRunId: number; reports: ComplianceReport[]; resource: ReturnType<typeof useResource<ComplianceReport[]>>; onRefresh: () => void }) {
   const scanReports = reports.filter((r) => r.scan_run_id === scanRunId);
+  const [creating, setCreating] = useState<"engineering" | "leadership" | null>(null);
+  const [cooldowns, setCooldowns] = useState<Record<string, number>>({});
 
   async function create(type: "engineering" | "leadership") {
-    await api.reports.create(type, scanRunId);
-    await onRefresh();
+    if (creating || Date.now() < (cooldowns[type] || 0)) return;
+    setCreating(type);
+    try {
+      await api.reports.create(type, scanRunId);
+      setCooldowns((prev) => ({ ...prev, [type]: Date.now() + 5000 }));
+      await onRefresh();
+    } finally {
+      setCreating(null);
+    }
   }
 
   return (
@@ -351,11 +361,13 @@ function ReportsTab({ scanRunId, reports, resource, onRefresh }: { scanRunId: nu
       description="Generate engineering or leadership reports for this scan."
       actions={
         <div className="flex gap-2">
-          <button className="icon-button" onClick={() => create("engineering")}>
-            Generate engineering
+          <button className="icon-button" disabled={Boolean(creating) || Date.now() < (cooldowns.engineering || 0)} onClick={() => create("engineering")}>
+            {creating === "engineering" ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : null}
+            {creating === "engineering" ? "Generating..." : "Generate engineering"}
           </button>
-          <button className="icon-button" onClick={() => create("leadership")}>
-            Generate leadership
+          <button className="icon-button" disabled={Boolean(creating) || Date.now() < (cooldowns.leadership || 0)} onClick={() => create("leadership")}>
+            {creating === "leadership" ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : null}
+            {creating === "leadership" ? "Generating..." : "Generate leadership"}
           </button>
         </div>
       }

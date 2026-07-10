@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Loader2 } from "lucide-react";
 import { api } from "../services/api";
 import { useResource } from "../hooks/useResource";
 import type { ComplianceReport, ScanRun } from "../types";
@@ -10,17 +11,35 @@ export function ReportsPage() {
   const reports = useResource(api.reports.list);
   const scanRuns = useResource(api.scanRuns.list);
   const [scanRunId, setScanRunId] = useState("");
+  const [creating, setCreating] = useState<"engineering" | "leadership" | null>(null);
+  const [cooldowns, setCooldowns] = useState<Record<string, number>>({});
 
   async function create(type: "engineering" | "leadership") {
-    if (!scanRunId) return;
-    await api.reports.create(type, Number(scanRunId));
-    await reports.reload();
+    const key = `${scanRunId}:${type}`;
+    if (!scanRunId || creating || Date.now() < (cooldowns[key] || 0)) return;
+    setCreating(type);
+    try {
+      await api.reports.create(type, Number(scanRunId));
+      setCooldowns((prev) => ({ ...prev, [key]: Date.now() + 5000 }));
+      await reports.reload();
+    } finally {
+      setCreating(null);
+    }
   }
 
   return (
     <Section
       title="Reports"
-      actions={<ReportActions scanRuns={scanRuns.data || []} scanRunId={scanRunId} setScanRunId={setScanRunId} onCreate={create} />}
+      actions={
+        <ReportActions
+          cooldowns={cooldowns}
+          creating={creating}
+          scanRuns={scanRuns.data || []}
+          scanRunId={scanRunId}
+          setScanRunId={setScanRunId}
+          onCreate={create}
+        />
+      }
     >
       <ResourceBoundary resource={reports}>
         {(data) => <ReportTable data={data} />}
@@ -30,19 +49,25 @@ export function ReportsPage() {
 }
 
 function ReportActions({
+  cooldowns,
+  creating,
   scanRuns,
   scanRunId,
   setScanRunId,
   onCreate,
 }: {
+  cooldowns: Record<string, number>;
+  creating: "engineering" | "leadership" | null;
   scanRuns: ScanRun[];
   scanRunId: string;
   setScanRunId: (value: string) => void;
   onCreate: (type: "engineering" | "leadership") => void;
 }) {
+  const engineeringCooling = Date.now() < (cooldowns[`${scanRunId}:engineering`] || 0);
+  const leadershipCooling = Date.now() < (cooldowns[`${scanRunId}:leadership`] || 0);
   return (
     <>
-      <select className="control" value={scanRunId} onChange={(event) => setScanRunId(event.target.value)}>
+      <select className="control" disabled={Boolean(creating)} value={scanRunId} onChange={(event) => setScanRunId(event.target.value)}>
         <option value="">Scan run</option>
         {scanRuns.map((scanRun) => (
           <option key={scanRun.id} value={scanRun.id}>
@@ -50,11 +75,13 @@ function ReportActions({
           </option>
         ))}
       </select>
-      <button className="icon-button" disabled={!scanRunId} onClick={() => onCreate("engineering")}>
-        Engineering
+      <button className="icon-button" disabled={!scanRunId || Boolean(creating) || engineeringCooling} onClick={() => onCreate("engineering")}>
+        {creating === "engineering" ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : null}
+        {creating === "engineering" ? "Generating..." : "Engineering"}
       </button>
-      <button className="icon-button" disabled={!scanRunId} onClick={() => onCreate("leadership")}>
-        Leadership
+      <button className="icon-button" disabled={!scanRunId || Boolean(creating) || leadershipCooling} onClick={() => onCreate("leadership")}>
+        {creating === "leadership" ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : null}
+        {creating === "leadership" ? "Generating..." : "Leadership"}
       </button>
     </>
   );

@@ -42,16 +42,15 @@ function MappingStatusFilter({ value, onChange }: { value: string; onChange: (va
 function MappingTable({ data, onSelect }: { data: ControlMapping[]; onSelect: (id: number) => void }) {
   return (
     <DataTable
-      columns={["ID", "Finding", "Control", "Status", "Confidence", "Open"]}
+      columns={["ID", "Finding", "Control", "Status", "Gemini", "Final", "Verification"]}
       rows={data.map((mapping) => [
         mapping.id,
         mapping.normalized_finding_id,
         mapping.control_catalog_id,
         <StatusBadge value={mapping.mapping_status} />,
+        formatPercent(mapping.gemini_confidence),
         formatPercent(mapping.final_confidence),
-        <button className="icon-button" onClick={() => onSelect(mapping.id)}>
-          Detail
-        </button>,
+        <StatusBadge value={mapping.verification_status || "pending"} />,
       ])}
     />
   );
@@ -92,8 +91,8 @@ function MappingDetail({ mapping }: { mapping: ControlMapping | null }) {
 function VerificationTable({ data }: { data: VerificationRecord[] }) {
   return (
     <DataTable
-      columns={["ID", "Result", "Model", "Explanation"]}
-      rows={data.map((record) => [record.id, <StatusBadge value={record.result} />, record.verification_model, record.explanation || "n/a"])}
+      columns={["ID", "Result", "Agreement", "Model", "Explanation"]}
+      rows={data.map((record) => [record.id, <StatusBadge value={record.result} />, formatPercent(record.agreement_value), record.verification_model, record.explanation || "n/a"])}
     />
   );
 }
