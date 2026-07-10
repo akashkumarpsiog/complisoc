@@ -67,19 +67,6 @@ jobs:
           path: checkov-report.json
           retention-days: 30
 
-  optional-sonarqube:
-    runs-on: ubuntu-latest
-    needs: security-scan
-    if: ${{ secrets.SONAR_HOST_URL != '' && secrets.SONAR_TOKEN != '' }}
-    steps:
-      - uses: actions/checkout@v4
-      - name: SonarQube Scan
-        uses: SonarSource/sonarqube-scan-action@v2
-        env:
-          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
-          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-        continue-on-error: true
-
   prepare-findings:
     runs-on: ubuntu-latest
     needs: [security-scan]
@@ -99,7 +86,6 @@ jobs:
           path: .
 
       - name: Aggregate findings
-        id: aggregate
         run: |
           python - <<'PY'
           import json
@@ -182,7 +168,6 @@ jobs:
   ingest-to-complisoc:
     runs-on: ubuntu-latest
     needs: [prepare-findings]
-    if: ${{ secrets.COMPLISOC_API_URL != '' && secrets.COMPLISOC_API_KEY != '' }}
     steps:
       - uses: actions/checkout@v4
 
