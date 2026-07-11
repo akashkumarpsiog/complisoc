@@ -44,13 +44,13 @@ jobs:
       - name: Run Trivy scan
         if: matrix.scanner == 'trivy'
         run: |
-          trivy fs --format json --output trivy-report.json .
+          trivy fs --scanners vuln,secret,misconfig --severity LOW,MEDIUM,HIGH,CRITICAL --format json --output trivy-report.json .
         continue-on-error: true
 
       - name: Run Checkov scan
         if: matrix.scanner == 'checkov'
         run: |
-          checkov -d . --output json --compact > checkov-report.json
+          checkov -d . --output json --compact --output-file-path checkov-report.json --quiet
         continue-on-error: true
 
       - name: Upload Trivy report
@@ -163,22 +163,44 @@ jobs:
           checkov_path = Path("checkov-report.json")
           if checkov_path.exists():
               try:
-                  checkov = json.loads(checkov_path.read_text())
-                  for check in (checkov.get("results", {}) or {}).get("failed_checks", []) or []:
-                      findings.append({
-                          "scanner_name": "checkov",
-                          "scanner_finding_id": check.get("check_id", "checkov-unknown"),
-                          "raw_json": {
-                              "finding_type": check.get("check_id", "iac"),
-                              "resource_type": check.get("resource_type", "iac"),
-                              "resource_identifier": f"{check.get('file_path', '.')}::{check.get('resource', '')}",
-                              "severity": check.get("severity", "medium"),
-                              "title": check.get("check_name") or check.get("check_id", "Checkov finding"),
-                              "description": check.get("description") or check.get("check_name"),
-                          },
-                      })
+                  raw = checkov_path.read_text()
+                  checkov = json.loads(raw)
+                  checkov_results = checkov.get("results", {}) if isinstance(checkov, dict) else {}
+                  if not checkov_results and isinstance(checkov, list):
+                      for entry in checkov:
+                          if isinstance(entry, dict):
+                              inner = entry.get("results", {}) or {}
+                              for check in inner.get("failed_checks", []) or []:
+                                  findings.append({
+                                      "scanner_name": "checkov",
+                                      "scanner_finding_id": check.get("check_id", "checkov-unknown"),
+                                      "raw_json": {
+                                          "finding_type": check.get("check_id", "iac"),
+                                          "resource_type": check.get("resource_type", "iac"),
+                                          "resource_identifier": f"{check.get('file_path', '.')}::{check.get('resource', '')}",
+                                          "severity": check.get("severity") or "medium",
+                                          "title": check.get("check_name") or check.get("check_id", "Checkov finding"),
+                                          "description": check.get("description") or check.get("check_name"),
+                                      },
+                                  })
+                  else:
+                      for check in checkov_results.get("failed_checks", []) or []:
+                          findings.append({
+                              "scanner_name": "checkov",
+                              "scanner_finding_id": check.get("check_id", "checkov-unknown"),
+                              "raw_json": {
+                                  "finding_type": check.get("check_id", "iac"),
+                                  "resource_type": check.get("resource_type", "iac"),
+                                  "resource_identifier": f"{check.get('file_path', '.')}::{check.get('resource', '')}",
+                                  "severity": check.get("severity") or "medium",
+                                  "title": check.get("check_name") or check.get("check_id", "Checkov finding"),
+                                  "description": check.get("description") or check.get("check_name"),
+                              },
+                          })
               except Exception as exc:
-                  print(f"Checkov report parse error: {exc}")
+                  print(f"::error::Checkov report parse error: {exc}")
+                  if checkov_path.exists():
+                      print(checkov_path.read_text()[:500])
 
           print(f"Total findings aggregated: {len(findings)}")
           Path("findings.json").write_text(json.dumps(findings, indent=2))
