@@ -85,15 +85,6 @@ jobs:
             exit 0
           fi
 
-      - name: Install sonar-scanner
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y wget unzip
-          SONAR_SCANNER_VERSION=6.2.1.5474
-          wget -q https://binaries.sonarsource.com/Distribution/sonar-scanner-cli/sonar-scanner-cli-${SONAR_SCANNER_VERSION}-linux.zip
-          sudo unzip -q sonar-scanner-cli-${SONAR_SCANNER_VERSION}-linux.zip -d /opt
-          echo "/opt/sonar-scanner-${SONAR_SCANNER_VERSION}-linux/bin" >> $GITHUB_PATH
-
       - name: Verify sonar-project.properties
         run: |
           if [ ! -f sonar-project.properties ]; then
@@ -101,14 +92,11 @@ jobs:
             exit 1
           fi
 
-      - name: Run SonarQube analysis
+      - name: Run SonarQube Scan
+        uses: SonarSource/sonarqube-scan-action@v5
         env:
-          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-        run: |
-          sonar-scanner \
-            -Dsonar.host.url="${{ secrets.SONAR_HOST_URL }}" \
-            -Dsonar.login="${{ secrets.SONAR_TOKEN }}"
+          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
 
       - name: Poll SonarQube processing status
         env:
