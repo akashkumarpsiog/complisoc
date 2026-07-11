@@ -24,6 +24,7 @@ from complisoc.backend.api.schemas import (
     VerificationRecordRead,
 )
 from complisoc.backend.compliance.workflow import process_scan_run
+from complisoc.backend.compliance.langchain_pipeline import run_pipeline
 from complisoc.backend.scanners.runners import list_scanners, run_scanners
 from complisoc.backend.models import (
     AuditBundle,
@@ -40,6 +41,30 @@ from complisoc.backend.models import (
 from complisoc.backend.reporting.reports import generate_audit_bundle, generate_compliance_report
 
 app = FastAPI(title="Complisoc API")
+
+
+def _run_compliance_pipeline(
+    db: Session,
+    *,
+    target_environment: str,
+    findings: list[dict],
+    scanner_failures: list[dict] | None = None,
+    framework: str | None = None,
+) -> dict:
+    """Run the compliance pipeline.
+
+    The single orchestration implementation is the LangChain / LCEL chain in
+    ``complisoc.backend.compliance.langchain_pipeline.run_pipeline`` (exposed
+    here as ``process_scan_run`` via the workflow module). It returns the same
+    dict shape the rest of the API relies on.
+    """
+    return run_pipeline(
+        db,
+        target_environment=target_environment,
+        findings=findings,
+        scanner_failures=scanner_failures,
+        framework=framework,
+    )
 
 app.add_middleware(
     CORSMiddleware,
@@ -70,7 +95,7 @@ def readiness(db: Session = Depends(get_db)):
 
 @app.post("/api/v1/scan-runs", response_model=ScanRunRead, status_code=201)
 def create_scan_run(payload: ScanRunCreate, db: Session = Depends(get_db)):
-    result = process_scan_run(
+    result = _run_compliance_pipeline(
         db,
         target_environment=payload.target_environment,
         findings=[finding.model_dump() for finding in payload.findings],
@@ -87,7 +112,7 @@ def list_available_scanners():
 @app.post("/api/v1/scans", response_model=ScanRunRead, status_code=201)
 def run_scan(payload: ScanRequest, db: Session = Depends(get_db)):
     findings, scanner_failures = run_scanners(payload.target, payload.scanners)
-    result = process_scan_run(
+    result = _run_compliance_pipeline(
         db,
         target_environment=payload.target,
         findings=findings,

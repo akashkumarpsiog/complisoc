@@ -178,6 +178,8 @@ class CheckovScanner(BaseScanner):
         return ["checkov executable (pip install checkov) or ensure it is on PATH"]
 
     def _command(self, target: str) -> list[str]:
+        # Checkov scans a directory with `-d` but a single file with `-f`.
+        flag = "-f" if os.path.isfile(target) else "-d"
         venv_python = _python_executable()
         scripts_dir = Path(sys.prefix) / ("Scripts" if os.name == "nt" else "bin")
         script = None
@@ -187,11 +189,11 @@ class CheckovScanner(BaseScanner):
                     script = candidate
                     break
         if venv_python and script:
-            return [venv_python, str(script), "-d", target, "--output", "json", "--compact"]
+            return [venv_python, str(script), flag, target, "--output", "json", "--compact"]
         exe = shutil.which(self.name)
         if exe:
-            return [exe, "-d", target, "--output", "json", "--compact"]
-        return ["checkov", "-d", target, "--output", "json", "--compact"]
+            return [exe, flag, target, "--output", "json", "--compact"]
+        return ["checkov", flag, target, "--output", "json", "--compact"]
 
     def run(self, target: str, timeout: int = 300) -> tuple[list[dict[str, Any]], str | None]:
         try:

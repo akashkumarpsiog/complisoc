@@ -10,7 +10,7 @@ from sqlalchemy.pool import StaticPool
 
 from complisoc.backend.api.main import app
 from complisoc.backend.compliance.confidence import calculate_final_confidence, publication_status
-from complisoc.backend.compliance.mapping import CandidateDecision, MappingDecision
+from complisoc.backend.compliance.mapping import CandidateDecision
 from complisoc.backend.compliance.verification import VerificationDecision
 from complisoc.backend.compliance.workflow import process_scan_run
 from complisoc.backend.database.base import Base
@@ -127,8 +127,8 @@ def test_normalization_rejects_invalid_severity():
 
 
 def test_process_scan_run_creates_full_lineage(db_session):
-    with patch("complisoc.backend.compliance.workflow.GeminiMapper") as MockMapper, patch(
-        "complisoc.backend.compliance.workflow.GroqVerifier"
+    with patch("complisoc.backend.compliance.langchain_pipeline.GeminiMapper") as MockMapper, patch(
+        "complisoc.backend.compliance.langchain_pipeline.GroqVerifier"
     ) as MockVerifier:
         MockMapper.return_value.map_batch.side_effect = lambda items: {
             items[0][0].id: [CandidateDecision(control_id=items[0][1][0].control_catalog.control_id, maps=True, confidence=0.95, rationale="High signal")],
@@ -165,8 +165,8 @@ def test_process_scan_run_creates_full_lineage(db_session):
 
 
 def test_api_scan_run_and_reports(client):
-    with patch("complisoc.backend.compliance.workflow.GeminiMapper") as MockMapper, patch(
-        "complisoc.backend.compliance.workflow.GroqVerifier"
+    with patch("complisoc.backend.compliance.langchain_pipeline.GeminiMapper") as MockMapper, patch(
+        "complisoc.backend.compliance.langchain_pipeline.GroqVerifier"
     ) as MockVerifier:
         MockMapper.return_value.map_batch.side_effect = lambda items: {
             items[0][0].id: [CandidateDecision(control_id=items[0][1][0].control_catalog.control_id, maps=True, confidence=0.95, rationale="High signal")]
@@ -236,8 +236,8 @@ def test_api_rejects_malformed_scan_run(client):
 
 
 def test_leadership_report_uses_published_posture_only(client):
-    with patch("complisoc.backend.compliance.workflow.GeminiMapper") as MockMapper, patch(
-        "complisoc.backend.compliance.workflow.GroqVerifier"
+    with patch("complisoc.backend.compliance.langchain_pipeline.GeminiMapper") as MockMapper, patch(
+        "complisoc.backend.compliance.langchain_pipeline.GroqVerifier"
     ) as MockVerifier:
         MockMapper.return_value.map_batch.side_effect = lambda items: {
             items[0][0].id: [CandidateDecision(control_id=items[0][1][0].control_catalog.control_id, maps=True, confidence=0.95, rationale="High signal")],
@@ -264,8 +264,8 @@ def test_leadership_report_uses_published_posture_only(client):
 
 
 def test_audit_bundle_contains_lineage_checksums(client):
-    with patch("complisoc.backend.compliance.workflow.GeminiMapper") as MockMapper, patch(
-        "complisoc.backend.compliance.workflow.GroqVerifier"
+    with patch("complisoc.backend.compliance.langchain_pipeline.GeminiMapper") as MockMapper, patch(
+        "complisoc.backend.compliance.langchain_pipeline.GroqVerifier"
     ) as MockVerifier:
         MockMapper.return_value.map_batch.side_effect = lambda items: {
             items[0][0].id: [CandidateDecision(control_id=items[0][1][0].control_catalog.control_id, maps=True, confidence=0.95, rationale="High signal")]

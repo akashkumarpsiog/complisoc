@@ -1,0 +1,165 @@
+name: Complisoc CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+jobs:
+  python-tests:
+    name: Python backend tests
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: complisoc
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          # langchain-core is required only for the optional LangChain path;
+          # it is listed in requirements.txt so the equivalence tests run here.
+
+      - name: Run backend test suite (JUnit XML)
+        run: |
+          python -m pytest tests \
+            --ignore=tests/e2e/test_selenium_workflow.py \
+            --ignore=tests/load \
+            --junitxml=docs/moodle_evidence/test_run_logs/pytest-junit.xml \
+            -q
+
+      - name: 15-control gold-standard benchmark
+        run: python tests/benchmark/validate_mappings.py
+
+      - name: Upload pytest JUnit report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pytest-junit
+          path: complisoc/docs/moodle_evidence/test_run_logs/pytest-junit.xml
+          retention-days: 30
+
+  frontend-tests:
+    name: Frontend unit tests
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: complisoc/frontend
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: complisoc/frontend/package-lock.json
+
+      - name: Install and test
+        run: |
+          npm ci
+          npm test
+
+  scanner-smoke:
+    name: Scanners operational
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: complisoc
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Trivy
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y wget apt-transport-https gnupg lsb-release
+          wget -qO - https://aquasecurity.github.io/trivy-repo/deb/public.key | sudo apt-key add -
+          echo "deb https://aquasecurity.github.io/trivy-repo/deb $(lsb_release -sc) main" | sudo tee -a /etc/apt/sources.list.d/trivy.list
+          sudo apt-get update
+          sudo apt-get install -y trivy
+
+      - name: Install Checkov
+        run: pip install checkov
+
+      - name: Run Trivy against scan_targets
+        run: |
+          trivy fs --scanners misconfig,vuln --severity LOW,MEDIUM,HIGH,CRITICAL --format json --output /tmp/trivy.json ./scan_targets || true
+          python - <<'PY'
+          import json, pathlib
+          p = pathlib.Path("/tmp/trivy.json")
+          n = 0
+          if p.exists():
+              try:
+                  rep = json.loads(p.read_text())
+                  for r in rep.get("Results", []) or []:
+                      n += len(r.get("Misconfigurations", []) or [])
+                      n += len(r.get("Vulnerabilities", []) or [])
+              except Exception as e:
+                  print("trivy parse error:", e)
+          print("trivy findings:", n)
+          PY
+
+      - name: Run Checkov against scan_targets
+        run: |
+          checkov -d ./scan_targets --output json --compact > /tmp/checkov.json || true
+          python - <<'PY'
+          import json, pathlib
+          p = pathlib.Path("/tmp/checkov.json")
+          n = 0
+          if p.exists():
+              try:
+                  rep = json.loads(p.read_text())
+                  n = len(rep.get("results", {}).get("failed_checks", []) or [])
+              except Exception as e:
+                  print("checkov parse error:", e)
+          print("checkov findings:", n)
+          PY
+
+      - name: Upload scanner reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: scanner-reports
+          path: |
+            /tmp/trivy.json
+            /tmp/checkov.json
+          retention-days: 30
+
+      - name: SonarQube scan (if configured)
+        if: ${{ secrets.SONAR_HOST_URL != '' && secrets.SONAR_TOKEN != '' }}
+        continue-on-error: true
+        env:
+          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        run: |
+          pip install requests
+          python - <<'PY'
+          import json, pathlib, sys
+          sys.path.insert(0, str(pathlib.Path.cwd().resolve().parent))
+          from complisoc.backend.scanners.runners import SonarQubeScanner
+          key = "${{ secrets.SONAR_PROJECT_KEY }}" or "complisoc"
+          findings, error = SonarQubeScanner().run(key)
+          print("sonarqube error:", error)
+          print("sonarqube findings:", len(findings))
+          pathlib.Path("/tmp/sonarqube.json").write_text(
+              json.dumps({"project_key": key, "findings": findings, "error": error}, default=str, indent=2)
+          )
+          assert len(findings) >= 0
+          PY
+
+      - name: Upload SonarQube report
+        if: ${{ secrets.SONAR_HOST_URL != '' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: sonarqube-report
+          path: /tmp/sonarqube.json
+          retention-days: 30

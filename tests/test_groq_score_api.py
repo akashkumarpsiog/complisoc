@@ -41,7 +41,7 @@ client = TestClient(app)
 
 
 def test_groq_agreement_value_exposed_in_api():
-    with patch("complisoc.backend.compliance.workflow.GeminiMapper") as MockMapper, patch("complisoc.backend.compliance.workflow.GroqVerifier") as MockVerifier:
+    with patch("complisoc.backend.compliance.langchain_pipeline.GeminiMapper") as MockMapper, patch("complisoc.backend.compliance.langchain_pipeline.GroqVerifier") as MockVerifier:
         MockMapper.return_value.map_batch.side_effect = lambda items: {
             items[0][0].id: [CandidateDecision(control_id=items[0][1][0].control_catalog.control_id, maps=True, confidence=0.95, rationale="High signal")],
         }

@@ -1,0 +1,400 @@
+{
+  "version": "gold-1",
+  "description": "Canonical 15-control benchmark used by validate_mappings.py. Each entry pairs a synthetic scanner finding with the single compliance control it must map to. Controls use disjoint keywords/scanner_signals so the deterministic candidate narrowing selects exactly the intended control as its top candidate. The validation script ingests these findings through the real pipeline (with the AI mapping mocked to accept the top candidate) and compares predicted control ids against the gold expectations, reporting precision/recall.",
+  "framework": "ISO/IEC 27001:2022 Annex A",
+  "framework_version": "2022",
+  "controls": [
+    {
+      "control_id": "A.5.15",
+      "control_family": "Access Control",
+      "title": "Access control",
+      "description": "Rules to control access to information and other associated assets.",
+      "objective": "Limit access to information and systems based on business and security requirements.",
+      "evidence_examples": ["access_review_report"],
+      "scanner_signals": ["iam", "public_access", "permission"],
+      "keywords": ["access", "iam", "permission", "public"],
+      "source_url": "https://example.test/iso-a-5-15"
+    },
+    {
+      "control_id": "A.8.1",
+      "control_family": "Cryptography",
+      "title": "Encryption of information",
+      "description": "Protection of the confidentiality, authenticity and/or integrity of information.",
+      "objective": "Ensure safe use of cryptography to protect the confidentiality of information.",
+      "evidence_examples": ["encryption_report"],
+      "scanner_signals": ["encryption", "tls", "at_rest"],
+      "keywords": ["encryption", "tls", "at_rest", "cipher"],
+      "source_url": "https://example.test/iso-a-8-1"
+    },
+    {
+      "control_id": "A.8.2",
+      "control_family": "Cryptography",
+      "title": "Key management",
+      "description": "Policies and procedures for the management of cryptographic keys.",
+      "objective": "Ensure proper management of keys through their life cycle.",
+      "evidence_examples": ["kms_audit"],
+      "scanner_signals": ["kms", "key_rotation", "secrets"],
+      "keywords": ["kms", "key_rotation", "secrets", "credential"],
+      "source_url": "https://example.test/iso-a-8-2"
+    },
+    {
+      "control_id": "A.9.1",
+      "control_family": "Logging",
+      "title": "Logging and monitoring",
+      "description": "Activity logging and continuous monitoring of anomalous behaviour.",
+      "objective": "Record events and generate evidence for the detection of anomalous activities.",
+      "evidence_examples": ["audit_log"],
+      "scanner_signals": ["logging", "audit", "trail"],
+      "keywords": ["logging", "audit", "trail", "monitor"],
+      "source_url": "https://example.test/iso-a-9-1"
+    },
+    {
+      "control_id": "A.12.1",
+      "control_family": "Network Security",
+      "title": "Network controls",
+      "description": "Networks and network services are securely managed.",
+      "objective": "Protect information in networks and protect the supporting infrastructure.",
+      "evidence_examples": ["firewall_rules"],
+      "scanner_signals": ["network", "firewall", "ingress"],
+      "keywords": ["network", "firewall", "ingress", "port"],
+      "source_url": "https://example.test/iso-a-12-1"
+    },
+    {
+      "control_id": "A.13.1",
+      "control_family": "Business Continuity",
+      "title": "Information backup",
+      "description": "Procedures for backup and recovery of information.",
+      "objective": "Maintain the continuity of operations during incidents.",
+      "evidence_examples": ["backup_report"],
+      "scanner_signals": ["backup", "restore", "failover"],
+      "keywords": ["backup", "restore", "continuity", "failover"],
+      "source_url": "https://example.test/iso-a-13-1"
+    },
+    {
+      "control_id": "A.5.18",
+      "control_family": "Access Control",
+      "title": "Access rights",
+      "description": "Provisioning and review of access rights for all users.",
+      "objective": "Prevent privilege escalation and unauthorized use of privileged functions.",
+      "evidence_examples": ["privilege_review"],
+      "scanner_signals": ["privilege", "admin", "sudo"],
+      "keywords": ["privilege", "admin", "sudo", "root"],
+      "source_url": "https://example.test/iso-a-5-18"
+    },
+    {
+      "control_id": "A.8.8",
+      "control_family": "Secure Development",
+      "title": "Management of technical vulnerabilities",
+      "description": "Technical vulnerabilities are identified and remediated in due time.",
+      "objective": "Prevent exploitation of technical vulnerabilities.",
+      "evidence_examples": ["dependency_scan"],
+      "scanner_signals": ["dependency", "vulnerability", "patch"],
+      "keywords": ["dependency", "vulnerability", "patch", "cve"],
+      "source_url": "https://example.test/iso-a-8-8"
+    },
+    {
+      "control_id": "A.5.17",
+      "control_family": "Access Control",
+      "title": "Authentication",
+      "description": "Processes for verifying identity of users and entities.",
+      "objective": "Ensure users and services are authenticated appropriately.",
+      "evidence_examples": ["mfa_report"],
+      "scanner_signals": ["mfa", "authentication", "password"],
+      "keywords": ["mfa", "authentication", "password", "credential"],
+      "source_url": "https://example.test/iso-a-5-17"
+    },
+    {
+      "control_id": "A.8.9",
+      "control_family": "Secure Development",
+      "title": "Configuration management",
+      "description": "Hardware, software, services and networks are hardened.",
+      "objective": "Establish secure configuration baselines and detect drift.",
+      "evidence_examples": ["hardening_baseline"],
+      "scanner_signals": ["baseline", "hardening", "misconfiguration"],
+      "keywords": ["baseline", "hardening", "misconfiguration", "config"],
+      "source_url": "https://example.test/iso-a-8-9"
+    },
+    {
+      "control_id": "A.5.20",
+      "control_family": "Secure Architecture",
+      "title": "Network segmentation",
+      "description": "Networks are segmented according to the access control policy.",
+      "objective": "Limit the impact of a security incident through separation of environments.",
+      "evidence_examples": ["segmentation_diagram"],
+      "scanner_signals": ["boundary", "segmentation", "dmz"],
+      "keywords": ["boundary", "segmentation", "dmz", "zoning"],
+      "source_url": "https://example.test/iso-a-5-20"
+    },
+    {
+      "control_id": "A.7.1",
+      "control_family": "Physical Security",
+      "title": "Physical security perimeters",
+      "description": "Physical barriers protect areas containing information and assets.",
+      "objective": "Prevent unauthorized physical access to facilities and equipment.",
+      "evidence_examples": ["datacenter_access_log"],
+      "scanner_signals": ["datacenter", "badge", "physical"],
+      "keywords": ["datacenter", "badge", "physical", "locks"],
+      "source_url": "https://example.test/iso-a-7-1"
+    },
+    {
+      "control_id": "A.16.1",
+      "control_family": "Incident Management",
+      "title": "Incident management planning",
+      "description": "Procedures for responding to and managing information security incidents.",
+      "objective": "Ensure a consistent and effective approach to incident handling.",
+      "evidence_examples": ["soc_runbook"],
+      "scanner_signals": ["incident", "response", "alerting"],
+      "keywords": ["incident", "response", "soc", "alerting"],
+      "source_url": "https://example.test/iso-a-16-1"
+    },
+    {
+      "control_id": "A.18.1",
+      "control_family": "Compliance",
+      "title": "Protection of records",
+      "description": "Records are protected from loss, destruction or falsification.",
+      "objective": "Comply with statutory, regulatory and contractual obligations.",
+      "evidence_examples": ["privacy_register"],
+      "scanner_signals": ["gdpr", "pii", "retention"],
+      "keywords": ["gdpr", "pii", "retention", "privacy"],
+      "source_url": "https://example.test/iso-a-18-1"
+    },
+    {
+      "control_id": "A.15.1",
+      "control_family": "Supplier Relationships",
+      "title": "Supplier assessment",
+      "description": "Risks from the use of products and services supplied externally.",
+      "objective": "Ensure risks from supplier relationships are identified and managed.",
+      "evidence_examples": ["vendor_assessment"],
+      "scanner_signals": ["vendor", "third_party", "supply_chain"],
+      "keywords": ["vendor", "third_party", "supply_chain", "sla"],
+      "source_url": "https://example.test/iso-a-15-1"
+    }
+  ],
+  "mappings": [
+    {
+      "id": 1,
+      "scanner_name": "checkov",
+      "scanner_finding_id": "GOLD-1",
+      "expected_control_id": "A.5.15",
+      "expected_framework": "ISO/IEC 27001:2022 Annex A",
+      "raw_json": {
+        "finding_type": "iam public access permission",
+        "resource_type": "aws_iam_policy",
+        "resource_identifier": "aws_iam_policy.access_public_permission",
+        "severity": "high",
+        "title": "access iam permission public issue detected",
+        "description": "access iam permission public needs attention on this policy"
+      }
+    },
+    {
+      "id": 2,
+      "scanner_name": "trivy",
+      "scanner_finding_id": "GOLD-2",
+      "expected_control_id": "A.8.1",
+      "expected_framework": "ISO/IEC 27001:2022 Annex A",
+      "raw_json": {
+        "finding_type": "encryption tls at_rest cipher",
+        "resource_type": "aws_s3_bucket",
+        "resource_identifier": "aws_s3_bucket.encryption_tls_at_rest_cipher",
+        "severity": "high",
+        "title": "encryption tls at_rest cipher missing",
+        "description": "encryption tls at_rest cipher should be enabled"
+      }
+    },
+    {
+      "id": 3,
+      "scanner_name": "checkov",
+      "scanner_finding_id": "GOLD-3",
+      "expected_control_id": "A.8.2",
+      "expected_framework": "ISO/IEC 27001:2022 Annex A",
+      "raw_json": {
+        "finding_type": "kms key_rotation secrets credential",
+        "resource_type": "aws_kms_key",
+        "resource_identifier": "aws_kms_key.kms_key_rotation_secrets_credential",
+        "severity": "medium",
+        "title": "kms key_rotation secrets credential not rotated",
+        "description": "kms key_rotation secrets credential require rotation"
+      }
+    },
+    {
+      "id": 4,
+      "scanner_name": "trivy",
+      "scanner_finding_id": "GOLD-4",
+      "expected_control_id": "A.9.1",
+      "expected_framework": "ISO/IEC 27001:2022 Annex A",
+      "raw_json": {
+        "finding_type": "logging audit trail monitor",
+        "resource_type": "aws_cloudtrail",
+        "resource_identifier": "aws_cloudtrail.logging_audit_trail_monitor",
+        "severity": "medium",
+        "title": "logging audit trail monitor disabled",
+        "description": "logging audit trail monitor must be enabled"
+      }
+    },
+    {
+      "id": 5,
+      "scanner_name": "checkov",
+      "scanner_finding_id": "GOLD-5",
+      "expected_control_id": "A.12.1",
+      "expected_framework": "ISO/IEC 27001:2022 Annex A",
+      "raw_json": {
+        "finding_type": "network firewall ingress port",
+        "resource_type": "aws_security_group",
+        "resource_identifier": "aws_security_group.network_firewall_ingress_port",
+        "severity": "high",
+        "title": "network firewall ingress port open",
+        "description": "network firewall ingress port should be restricted"
+      }
+    },
+    {
+      "id": 6,
+      "scanner_name": "checkov",
+      "scanner_finding_id": "GOLD-6",
+      "expected_control_id": "A.13.1",
+      "expected_framework": "ISO/IEC 27001:2022 Annex A",
+      "raw_json": {
+        "finding_type": "backup restore continuity failover",
+        "resource_type": "aws_rds_instance",
+        "resource_identifier": "aws_rds_instance.backup_restore_continuity_failover",
+        "severity": "medium",
+        "title": "backup restore continuity failover missing",
+        "description": "backup restore continuity failover configuration absent"
+      }
+    },
+    {
+      "id": 7,
+      "scanner_name": "trivy",
+      "scanner_finding_id": "GOLD-7",
+      "expected_control_id": "A.5.18",
+      "expected_framework": "ISO/IEC 27001:2022 Annex A",
+      "raw_json": {
+        "finding_type": "privilege admin sudo root",
+        "resource_type": "aws_iam_role",
+        "resource_identifier": "aws_iam_role.privilege_admin_sudo_root",
+        "severity": "high",
+        "title": "privilege admin sudo root granted",
+        "description": "privilege admin sudo root assignment is over-permissive"
+      }
+    },
+    {
+      "id": 8,
+      "scanner_name": "trivy",
+      "scanner_finding_id": "GOLD-8",
+      "expected_control_id": "A.8.8",
+      "expected_framework": "ISO/IEC 27001:2022 Annex A",
+      "raw_json": {
+        "finding_type": "dependency vulnerability patch cve",
+        "resource_type": "npm_package",
+        "resource_identifier": "npm_package.dependency_vulnerability_patch_cve",
+        "severity": "high",
+        "title": "dependency vulnerability patch cve present",
+        "description": "dependency vulnerability patch cve should be remediated"
+      }
+    },
+    {
+      "id": 9,
+      "scanner_name": "checkov",
+      "scanner_finding_id": "GOLD-9",
+      "expected_control_id": "A.5.17",
+      "expected_framework": "ISO/IEC 27001:2022 Annex A",
+      "raw_json": {
+        "finding_type": "mfa authentication password credential",
+        "resource_type": "aws_iam_user",
+        "resource_identifier": "aws_iam_user.mfa_authentication_password_credential",
+        "severity": "high",
+        "title": "mfa authentication password credential weak",
+        "description": "mfa authentication password credential policy is weak"
+      }
+    },
+    {
+      "id": 10,
+      "scanner_name": "checkov",
+      "scanner_finding_id": "GOLD-10",
+      "expected_control_id": "A.8.9",
+      "expected_framework": "ISO/IEC 27001:2022 Annex A",
+      "raw_json": {
+        "finding_type": "baseline hardening misconfiguration config",
+        "resource_type": "aws_ec2_instance",
+        "resource_identifier": "aws_ec2_instance.baseline_hardening_misconfiguration_config",
+        "severity": "medium",
+        "title": "baseline hardening misconfiguration config drift",
+        "description": "baseline hardening misconfiguration config detected"
+      }
+    },
+    {
+      "id": 11,
+      "scanner_name": "checkov",
+      "scanner_finding_id": "GOLD-11",
+      "expected_control_id": "A.5.20",
+      "expected_framework": "ISO/IEC 27001:2022 Annex A",
+      "raw_json": {
+        "finding_type": "boundary segmentation dmz zoning",
+        "resource_type": "aws_vpc",
+        "resource_identifier": "aws_vpc.boundary_segmentation_dmz_zoning",
+        "severity": "medium",
+        "title": "boundary segmentation dmz zoning missing",
+        "description": "boundary segmentation dmz zoning is not configured"
+      }
+    },
+    {
+      "id": 12,
+      "scanner_name": "trivy",
+      "scanner_finding_id": "GOLD-12",
+      "expected_control_id": "A.7.1",
+      "expected_framework": "ISO/IEC 27001:2022 Annex A",
+      "raw_json": {
+        "finding_type": "datacenter badge physical locks",
+        "resource_type": "aws_datacenter",
+        "resource_identifier": "aws_datacenter.datacenter_badge_physical_locks",
+        "severity": "low",
+        "title": "datacenter badge physical locks absent",
+        "description": "datacenter badge physical locks controls missing"
+      }
+    },
+    {
+      "id": 13,
+      "scanner_name": "checkov",
+      "scanner_finding_id": "GOLD-13",
+      "expected_control_id": "A.16.1",
+      "expected_framework": "ISO/IEC 27001:2022 Annex A",
+      "raw_json": {
+        "finding_type": "incident response soc alerting",
+        "resource_type": "aws_guardduty",
+        "resource_identifier": "aws_guardduty.incident_response_soc_alerting",
+        "severity": "medium",
+        "title": "incident response soc alerting not wired",
+        "description": "incident response soc alerting pipeline absent"
+      }
+    },
+    {
+      "id": 14,
+      "scanner_name": "trivy",
+      "scanner_finding_id": "GOLD-14",
+      "expected_control_id": "A.18.1",
+      "expected_framework": "ISO/IEC 27001:2022 Annex A",
+      "raw_json": {
+        "finding_type": "gdpr pii retention privacy",
+        "resource_type": "aws_s3_bucket",
+        "resource_identifier": "aws_s3_bucket.gdpr_pii_retention_privacy",
+        "severity": "high",
+        "title": "gdpr pii retention privacy violation",
+        "description": "gdpr pii retention privacy controls not enforced"
+      }
+    },
+    {
+      "id": 15,
+      "scanner_name": "checkov",
+      "scanner_finding_id": "GOLD-15",
+      "expected_control_id": "A.15.1",
+      "expected_framework": "ISO/IEC 27001:2022 Annex A",
+      "raw_json": {
+        "finding_type": "vendor third_party supply_chain sla",
+        "resource_type": "aws_third_party",
+        "resource_identifier": "aws_third_party.vendor_third_party_supply_chain_sla",
+        "severity": "low",
+        "title": "vendor third_party supply_chain sla risk",
+        "description": "vendor third_party supply_chain sla not assessed"
+      }
+    }
+  ]
+}

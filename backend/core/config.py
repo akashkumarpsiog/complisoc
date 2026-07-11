@@ -1,8 +1,12 @@
 import os
+from pathlib import Path
 
 from dotenv import load_dotenv
 
-load_dotenv()
+# Load .env from the project root (complisoc/.env) by explicit path so the
+# keys are resolved regardless of the current working directory.
+_ENV_FILE = Path(__file__).resolve().parent.parent.parent / ".env"
+load_dotenv(dotenv_path=_ENV_FILE, override=False)
 
 
 def _read_secret(name: str) -> str | None:

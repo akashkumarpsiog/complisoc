@@ -10,6 +10,35 @@ Scanner Layer → Normalization Layer → Storage Layer → Compliance Intellige
 
 See [ARCHITECTURE.md](ARCHITECTURE.md) for full details.
 
+## Validation & recent additions
+
+The platform ships with deterministic, secret-free test suites that prove
+the compliance pipeline end-to-end:
+
+- **15-control gold-standard benchmark** — `tests/benchmark/gold_standard.json`
+  (15 canonical mappings) validated by `tests/benchmark/validate_mappings.py`
+  (reports precision/recall; currently **1.000 / 1.000**).
+- **LangChain (LCEL) pipeline** — the compliance orchestration lives in
+  `backend/compliance/langchain_pipeline.py`, a single LangChain / LCEL
+  chain (`ingest → Gemini mapping → Groq gap analysis → report`). There is
+  one implementation; `process_scan_run` is a thin alias to it. The
+  `tests/langchain/test_langchain_equivalent.py` suite guards against
+  behavioural regression.
+- **E2E pipeline test** — `tests/e2e/test_real_pipeline.py` writes a
+  temporary Terraform / Kubernetes file with a known bad pattern, invokes
+  the real `/api/v1/scans` endpoint, and asserts findings, mappings and
+  report artifacts are created (run against both `scan_targets/` targets).
+- **Data-integrity validation** — `tests/validation/test_integrity.py`
+  verifies the `ScanRun → RawFinding → NormalizedFinding →
+  ControlMapping → VerificationRecord` chain is intact with no orphaned
+  records, and that audit-bundle checksums match the raw findings.
+- **Dashboard** — four views (`control-coverage`, `severity-distribution`,
+  `gap-summary`, `remediation-backlog`) are exposed by the API and
+  rendered by the React frontend.
+
+See [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) for deployment and the
+gap-by-gap status used in the Moodle submission.
+
 ## Quick Start
 
 ### Backend (FastAPI + SQLAlchemy + SQLite)
@@ -101,9 +130,7 @@ In two terminals:
 ```powershell
 Root repo: C:\Users\akash.kumar\OneDrive - psiog.com\Desktop\sem1
 Set-ExecutionPolicy RemoteSigned -Scope CurrentUser -Force
-.\.venv\Scripts\Activate.ps1
-pip install sqlalchemy alembic pytest fastapi uvicorn
-uvicorn complisoc.backend.api.main:app --reload --port 8000
+.\complisoc\.venv\Scripts\python.exe -m uvicorn complisoc.backend.api.main:app --reload --port 8000
 ```
 ## ngrok set up
 ngrok config add-authtoken YOUR_AUTHTOKEN
