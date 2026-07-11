@@ -111,7 +111,11 @@ def list_available_scanners():
 
 @app.post("/api/v1/scans", response_model=ScanRunRead, status_code=201)
 def run_scan(payload: ScanRequest, db: Session = Depends(get_db)):
-    findings, scanner_failures = run_scanners(payload.target, payload.scanners)
+    findings, scanner_failures = run_scanners(
+        payload.target,
+        scanners=payload.scanners,
+        scan_profile=payload.scan_profile,
+    )
     result = _run_compliance_pipeline(
         db,
         target_environment=payload.target,

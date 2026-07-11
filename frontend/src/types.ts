@@ -164,6 +164,6 @@ export interface ScannerInfo {
 
 export interface ScanRequest {
   target: string;
-  scanners?: string[];
+  scan_profile?: string;
   framework?: string;
 }

@@ -27,6 +27,7 @@ class ScannerInfo(BaseModel):
 
 class ScanRequest(BaseModel):
     target: str = Field(min_length=1, max_length=512)
+    scan_profile: str | None = Field(default=None, max_length=64)
     scanners: list[str] | None = None
     framework: str | None = None
 

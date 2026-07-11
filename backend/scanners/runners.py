@@ -389,17 +389,34 @@ SCANNER_RUNNERS: dict[str, BaseScanner] = {
     "defender": DefenderScanner(),
 }
 
+SCAN_PROFILE_SCANNERS: dict[str, list[str]] = {
+    "local": ["checkov", "trivy", "sonarqube"],
+    "aws": ["checkov", "trivy", "sonarqube"],
+    "azure": ["defender", "checkov", "trivy", "sonarqube"],
+    "git": ["checkov", "trivy", "sonarqube"],
+}
+
 
 def list_scanners() -> list[dict[str, Any]]:
     return [runner.metadata() for runner in SCANNER_RUNNERS.values()]
 
 
+def scanners_for_profile(profile: str | None) -> list[str] | None:
+    if profile is None:
+        return None
+    if profile not in SCAN_PROFILE_SCANNERS:
+        return None
+    return SCAN_PROFILE_SCANNERS[profile]
+
+
 def run_scanners(
     target: str,
     scanners: list[str] | None = None,
+    scan_profile: str | None = None,
     timeout: int = 300,
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
-    selected = scanners or list(SCANNER_RUNNERS.keys())
+    profile_scanners = scanners_for_profile(scan_profile)
+    selected = profile_scanners or scanners or list(SCANNER_RUNNERS.keys())
     findings: list[dict[str, Any]] = []
     failures: list[dict[str, Any]] = []
     for name in selected:

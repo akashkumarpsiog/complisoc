@@ -1,11 +1,18 @@
 import { useEffect, useState, type ReactNode } from "react";
-import { Cloud, Folder, Loader2, Play, Terminal, X } from "lucide-react";
+import { ChevronDown, ChevronRight, Cloud, Folder, GitBranch, Loader2, Play, Terminal, X } from "lucide-react";
 import { api } from "../services/api";
 import type { ScannerInfo } from "../types";
 import { sampleFailures, sampleFindings } from "../services/json";
 
 type Mode = "live" | "sample";
-type EnvironmentPreset = "local" | "aws" | "azure";
+type TargetType = "local" | "git" | "aws" | "azure";
+
+const TARGET_OPTIONS: { value: TargetType; label: string; icon: ReactNode }[] = [
+  { value: "local", label: "Local Folder", icon: <Folder className="h-4 w-4" aria-hidden /> },
+  { value: "git", label: "Git Repository", icon: <GitBranch className="h-4 w-4" aria-hidden /> },
+  { value: "aws", label: "AWS Account", icon: <Cloud className="h-4 w-4" aria-hidden /> },
+  { value: "azure", label: "Azure Subscription", icon: <Cloud className="h-4 w-4" aria-hidden /> },
+];
 
 export function ScanRunCreator({ onCreated }: { onCreated: () => void }) {
   const [open, setOpen] = useState(false);
@@ -76,23 +83,39 @@ function LiveScanForm({
   onClose: () => void;
 }) {
   const [scanners, setScanners] = useState<ScannerInfo[]>([]);
-  const [selected, setSelected] = useState<Set<string>>(new Set());
-  const [preset, setPreset] = useState<EnvironmentPreset>("local");
+  const [targetType, setTargetType] = useState<TargetType>("local");
   const [target, setTarget] = useState(".");
   const [framework, setFramework] = useState("");
   const [message, setMessage] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [showProviders, setShowProviders] = useState(false);
 
   useEffect(() => {
-    void api.scanners.list().then((items) => {
-      setScanners(items);
-      setSelected(new Set(items.filter((item) => item.available && item.kind !== "cloud").map((item) => item.name)));
-    });
+    void api.scanners.list().then(setScanners);
   }, []);
 
   useEffect(() => {
     onBusyChange(submitting);
   }, [onBusyChange, submitting]);
+
+  useEffect(() => {
+    if (targetType === "local") setTarget(".");
+    if (targetType === "aws") setTarget("aws-iac-container");
+    if (targetType === "azure") setTarget("azure-subscription");
+    if (targetType === "git") setTarget("");
+  }, [targetType]);
+
+  const scannerMap = Object.fromEntries(scanners.map((s) => [s.name, s]));
+  const availableCount = scanners.filter((s) => s.available).length;
+
+  const infrastructure = scannerMap.checkov;
+  const vulnerability = scannerMap.trivy;
+  const staticAnalysis = scannerMap.sonarqube;
+  const cloudFindings = scannerMap.defender;
+
+  const isStaticConfigured = staticAnalysis?.available ?? false;
+  const isInfraAvailable = infrastructure?.available ?? false;
+  const isVulnAvailable = vulnerability?.available ?? false;
 
   async function submit() {
     if (submitting) return;
@@ -101,10 +124,10 @@ function LiveScanForm({
     try {
       const result = await api.scans.run({
         target,
-        scanners: selected.size ? [...selected] : undefined,
+        scan_profile: targetType,
         framework: framework.trim() || undefined,
       });
-      setMessage(`Created scan run ${result.id} from live scanners.`);
+      setMessage(`Created scan run ${result.id} from live scan.`);
       onCreated();
     } catch (err) {
       setMessage(err instanceof Error ? err.message : "Unable to run scan.");
@@ -113,44 +136,44 @@ function LiveScanForm({
     }
   }
 
-  function toggle(name: string, available: boolean) {
-    if (!available || submitting) return;
-    setSelected((prev) => {
-      const next = new Set(prev);
-      if (next.has(name)) next.delete(name);
-      else next.add(name);
-      return next;
-    });
-  }
-
-  function applyPreset(nextPreset: EnvironmentPreset) {
-    if (submitting) return;
-    setPreset(nextPreset);
-    const names =
-      nextPreset === "aws"
-        ? ["checkov", "trivy", "sonarqube"]
-        : nextPreset === "azure"
-          ? ["defender", "checkov"]
-          : scanners.filter((item) => item.kind !== "cloud").map((item) => item.name);
-    setSelected(new Set(scanners.filter((item) => item.available && names.includes(item.name)).map((item) => item.name)));
-    if (nextPreset === "local") setTarget(".");
-    if (nextPreset === "aws") setTarget("aws-iac-container");
-    if (nextPreset === "azure") setTarget("azure-subscription");
-  }
-
   const targetLabel =
-    preset === "azure" ? "Azure subscription or resource scope" : preset === "aws" ? "AWS IaC/container target" : "Target path";
+    targetType === "azure"
+      ? "Azure subscription or resource scope"
+      : targetType === "aws"
+        ? "AWS IaC/container target"
+        : targetType === "git"
+          ? "Repository URL or local path"
+          : "Target path";
   const targetPlaceholder =
-    preset === "azure" ? "azure-subscription or resource group label" : preset === "aws" ? "C:/repo, ./terraform, or image/project label" : ". or C:/repo";
+    targetType === "azure"
+      ? "azure-subscription or resource group label"
+      : targetType === "aws"
+        ? "terraform dir, docker image, or project label"
+        : targetType === "git"
+          ? "owner/repo or C:/path/to/repo"
+          : ". or C:/repo";
 
   return (
-    <div className="grid gap-3">
+    <div className="grid gap-4">
       <div>
-        <div className="mb-1 text-sm font-medium">Environment</div>
-        <div className="grid gap-2 md:grid-cols-3">
-          <PresetButton active={preset === "local"} disabled={submitting} icon={<Folder className="h-4 w-4" />} label="Local" onClick={() => applyPreset("local")} />
-          <PresetButton active={preset === "aws"} disabled={submitting} icon={<Cloud className="h-4 w-4" />} label="AWS IaC" onClick={() => applyPreset("aws")} />
-          <PresetButton active={preset === "azure"} disabled={submitting} icon={<Cloud className="h-4 w-4" />} label="Azure" onClick={() => applyPreset("azure")} />
+        <div className="mb-2 text-sm font-medium">Target</div>
+        <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
+          {TARGET_OPTIONS.map((option) => (
+            <button
+              key={option.value}
+              type="button"
+              disabled={submitting}
+              onClick={() => setTargetType(option.value)}
+              className={`inline-flex items-center justify-center gap-2 rounded-md border px-3 py-2 text-sm font-medium transition ${
+                targetType === option.value
+                  ? "border-brand-200 bg-brand-50 text-brand-700"
+                  : "border-line bg-white text-slate-600 hover:bg-slate-50"
+              }`}
+            >
+              {option.icon}
+              {option.label}
+            </button>
+          ))}
         </div>
       </div>
 
@@ -159,47 +182,38 @@ function LiveScanForm({
         <input className="control mt-1" disabled={submitting} value={target} onChange={(event) => setTarget(event.target.value)} placeholder={targetPlaceholder} />
       </label>
 
-      <div>
-        <div className="mb-1 text-sm font-medium">Scanners</div>
-        <div className="grid gap-2 md:grid-cols-2">
-          {scanners.map((item) => {
-            const checked = selected.has(item.name);
-            return (
-              <button
-                key={item.name}
-                type="button"
-                disabled={submitting || !item.available}
-                onClick={() => toggle(item.name, item.available)}
-                className={`rounded-md border px-3 py-2 text-left text-sm transition ${
-                  !item.available
-                    ? "cursor-not-allowed border-line bg-panel text-slate-400"
-                    : checked
-                      ? "border-brand-200 bg-brand-50 text-brand-700"
-                      : "border-line bg-white text-slate-600"
-                }`}
-              >
-                <span className="flex items-center gap-2 font-medium">
-                  <span className={`h-2 w-2 rounded-full ${item.available ? "bg-emerald-500" : "bg-slate-300"}`} />
-                  {item.label || item.name}
-                  <span className="text-xs uppercase text-slate-400">{item.kind || "local"}</span>
-                </span>
-                {item.description ? <span className="mt-1 block text-xs font-normal text-slate-500">{item.description}</span> : null}
-                {!item.available && item.missing_config?.length ? (
-                  <span className="mt-1 block text-xs font-normal text-slate-400">Needs: {item.missing_config.join(", ")}</span>
-                ) : null}
-              </button>
-            );
-          })}
-          {scanners.length === 0 ? <span className="text-sm text-slate-500">Loading scanners...</span> : null}
-        </div>
-        {preset === "aws" ? (
-          <p className="mt-2 text-xs text-slate-500">AWS support follows the requirements: scan IaC/container assets with Checkov, Trivy, and SonarQube.</p>
-        ) : null}
-        {preset === "azure" ? (
-          <p className="mt-2 text-xs text-slate-500">
-            Azure support uses Microsoft Defender when AZURE_TENANT_ID, AZURE_CLIENT_ID, AZURE_CLIENT_SECRET, and AZURE_SUBSCRIPTION_ID are configured.
+      <div className="rounded-md border border-line bg-panel p-3">
+        <button
+          type="button"
+          onClick={() => setShowProviders((prev) => !prev)}
+          className="flex w-full items-center justify-between text-sm font-medium text-slate-700"
+        >
+          <span>Security providers used in this scan</span>
+          {showProviders ? <ChevronDown className="h-4 w-4 text-slate-400" aria-hidden /> : <ChevronRight className="h-4 w-4 text-slate-400" aria-hidden />}
+        </button>
+        {showProviders ? (
+          <div className="mt-3 grid gap-2">
+            <ProviderRow label="Infrastructure Analysis" provider="Checkov" available={isInfraAvailable} missing={infrastructure?.missing_config} />
+            <ProviderRow label="Vulnerability Analysis" provider="Trivy" available={isVulnAvailable} missing={vulnerability?.missing_config} />
+            <ProviderRow label="Static Analysis" provider="SonarQube" available={isStaticConfigured} missing={staticAnalysis?.missing_config} />
+            {(targetType === "azure") && (
+              <ProviderRow label="Cloud Findings" provider="Azure Defender" available={cloudFindings?.available ?? false} missing={cloudFindings?.missing_config} />
+            )}
+            <p className="text-xs text-slate-500">
+              {targetType === "aws"
+                ? "AWS scans use Checkov for IaC, Trivy for vulnerabilities, and SonarQube for static code analysis."
+                : targetType === "azure"
+                  ? "Azure scans use Defender for cloud alerts, Checkov for IaC, Trivy for vulnerabilities, and SonarQube for static code analysis."
+                  : targetType === "git"
+                    ? "Repository scans use Trivy and Checkov, plus SonarQube if a project is configured."
+                    : "Local scans use Checkov and Trivy, plus SonarQube if a project is configured."}
+            </p>
+          </div>
+        ) : (
+          <p className="mt-1 text-xs text-slate-500">
+            {availableCount} of {scanners.length} providers available. SonarQube and Azure Defender require environment configuration.
           </p>
-        ) : null}
+        )}
       </div>
 
       <label className="text-sm font-medium">
@@ -211,7 +225,7 @@ function LiveScanForm({
       {submitting ? (
         <div className="flex items-center gap-2 rounded-md border border-brand-100 bg-brand-50 px-3 py-2 text-sm text-brand-700">
           <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
-          Running scanners, mapping findings, and generating compliance decisions...
+          Running security scan and generating compliance decisions...
         </div>
       ) : null}
 
@@ -220,7 +234,11 @@ function LiveScanForm({
           Cancel
         </button>
         <button className="primary-button" disabled={submitting} onClick={submit}>
-          {submitting ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : <Terminal className="h-4 w-4" aria-hidden />}
+          {submitting ? (
+            <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
+          ) : (
+            <Terminal className="h-4 w-4" aria-hidden />
+          )}
           {submitting ? "Running..." : "Run scan"}
         </button>
       </div>
@@ -228,31 +246,34 @@ function LiveScanForm({
   );
 }
 
-function PresetButton({
-  active,
-  disabled,
-  icon,
+function ProviderRow({
   label,
-  onClick,
+  provider,
+  available,
+  missing,
 }: {
-  active: boolean;
-  disabled: boolean;
-  icon: ReactNode;
   label: string;
-  onClick: () => void;
+  provider: string;
+  available: boolean;
+  missing?: string[] | null;
 }) {
   return (
-    <button
-      type="button"
-      disabled={disabled}
-      onClick={onClick}
-      className={`inline-flex items-center justify-center gap-2 rounded-md border px-3 py-2 text-sm font-medium ${
-        active ? "border-brand-200 bg-brand-50 text-brand-700" : "border-line bg-white text-slate-600"
-      }`}
-    >
-      {icon}
-      {label}
-    </button>
+    <div className="flex items-center justify-between rounded-md border border-line bg-white px-3 py-2 text-sm">
+      <div className="flex flex-col">
+        <span className="font-medium text-slate-700">{label}</span>
+        <span className="text-xs text-slate-500">{provider}</span>
+      </div>
+      {available ? (
+        <span className="inline-flex items-center gap-1.5 text-xs font-medium text-emerald-700">
+          <span className="h-2 w-2 rounded-full bg-emerald-500" aria-hidden />
+          Connected
+        </span>
+      ) : (
+        <span className="text-xs text-slate-400">
+          {missing && missing.length > 0 ? `Not configured: ${missing.join(", ")}` : "Not available"}
+        </span>
+      )}
+    </div>
   );
 }
 
