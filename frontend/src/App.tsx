@@ -6,6 +6,8 @@ import { ScanRunsPage } from "./pages/ScanRunsPage";
 import { ScanDetailPage } from "./pages/ScanDetailPage";
 import { ControlsPage } from "./pages/ControlsPage";
 import { ReviewPage } from "./pages/ReviewPage";
+import { ReportsPage } from "./pages/ReportsPage";
+import { AuditBundlesPage } from "./pages/AuditBundlesPage";
 
 export function App() {
   const [view, setView] = useState<ViewId>("overview");
@@ -33,6 +35,8 @@ export function App() {
       {view === "scan-detail" && selectedScanId === null && <ScanRunsPage onSelectScan={handleSelectScan} />}
       {view === "controls" && <ControlsPage />}
       {view === "review" && <ReviewPage />}
+      {view === "reports" && <ReportsPage />}
+      {view === "audit-bundles" && <AuditBundlesPage />}
     </Layout>
   );
 }

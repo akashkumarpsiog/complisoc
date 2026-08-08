@@ -125,9 +125,18 @@ export interface DashboardSeverity {
   severity_counts: Record<string, number>;
 }
 
+export interface FailedControlDrilldown {
+  control_catalog_id?: number;
+  control_id: string;
+  control_title: string;
+  count: number;
+  status: string;
+}
+
 export interface DashboardGap {
   manual_review_mappings: number;
   rejected_mappings: number;
+  failed_controls?: FailedControlDrilldown[];
 }
 
 export interface RemediationBacklog {
@@ -140,6 +149,7 @@ export interface RemediationBacklog {
     control_title: string;
     gemini_confidence: number | null;
     groq_agreement_value: number | null;
+    suggested_remediation?: string;
   }>;
 }
 

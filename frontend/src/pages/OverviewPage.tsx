@@ -72,14 +72,31 @@ export function OverviewPage() {
       <Section title="Compliance Gap Summary" description="Where mapping decisions are unresolved">
         <ResourceBoundary resource={gap}>
           {(data) => (
-            <div className="grid gap-4 md:grid-cols-2">
-              <div>
-                <DataTable columns={["Manual Review", "Rejected"]} rows={[[data.manual_review_mappings, data.rejected_mappings]]} />
+            <div className="space-y-5">
+              <div className="grid gap-4 md:grid-cols-2">
+                <div>
+                  <DataTable columns={["Manual Review", "Rejected"]} rows={[[data.manual_review_mappings, data.rejected_mappings]]} />
+                </div>
+                <div className="space-y-3">
+                  <GapMeter label="Manual review" value={data.manual_review_mappings} tone="amber" />
+                  <GapMeter label="Rejected" value={data.rejected_mappings} tone="rose" />
+                </div>
               </div>
-              <div className="space-y-3">
-                <GapMeter label="Manual review" value={data.manual_review_mappings} tone="amber" />
-                <GapMeter label="Rejected" value={data.rejected_mappings} tone="rose" />
-              </div>
+
+              {data.failed_controls && data.failed_controls.length > 0 ? (
+                <div>
+                  <h3 className="mb-2 text-sm font-semibold uppercase tracking-wide text-slate-500">Failed controls by status</h3>
+                  <DataTable
+                    columns={["Status", "Control ID", "Control Title", "Count"]}
+                    rows={data.failed_controls.map((item) => [
+                      <StatusBadge value={item.status} />,
+                      item.control_id,
+                      item.control_title,
+                      item.count,
+                    ])}
+                  />
+                </div>
+              ) : null}
             </div>
           )}
         </ResourceBoundary>
@@ -88,18 +105,37 @@ export function OverviewPage() {
       <Section title="Remediation Backlog" description="Mappings routed to remediation">
         <ResourceBoundary resource={backlog}>
           {(data) => (
-            <DataTable
-              columns={["Mapping", "Status", "Severity", "Resource", "Control", "Gemini Score", "Groq Score"]}
-              rows={data.items.map((item) => [
-                item.mapping_id,
-                <StatusBadge value={item.status} />,
-                item.severity,
-                item.resource_identifier,
-                `${item.control_id} ${item.control_title}`,
-                formatPercent(item.gemini_confidence),
-                formatPercent(item.groq_agreement_value),
-              ])}
-            />
+            <div className="space-y-4">
+              <DataTable
+                columns={["Mapping", "Status", "Severity", "Resource", "Control", "Gemini Score", "Groq Score"]}
+                rows={data.items.map((item) => [
+                  item.mapping_id,
+                  <StatusBadge value={item.status} />,
+                  item.severity,
+                  item.resource_identifier,
+                  `${item.control_id} ${item.control_title}`,
+                  formatPercent(item.gemini_confidence),
+                  formatPercent(item.groq_agreement_value),
+                ])}
+              />
+
+              {data.items.length > 0 ? (
+                <div className="rounded-lg border border-line bg-slate-50 p-4">
+                  <h3 className="mb-2 text-sm font-semibold uppercase tracking-wide text-slate-500">Suggested remediation</h3>
+                  <ul className="space-y-2 text-sm text-slate-700">
+                    {data.items.map((item) => (
+                      <li key={item.mapping_id} className="rounded-md border border-slate-200 bg-white p-3">
+                        <div className="mb-1 flex items-center justify-between gap-2">
+                          <span className="font-medium text-slate-800">{item.control_id}</span>
+                          <StatusBadge value={item.status} />
+                        </div>
+                        <div>{item.suggested_remediation || "No remediation suggestion available."}</div>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ) : null}
+            </div>
           )}
         </ResourceBoundary>
       </Section>

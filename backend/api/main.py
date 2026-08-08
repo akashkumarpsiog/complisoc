@@ -4,6 +4,7 @@ from pathlib import Path
 from fastapi import Depends, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from complisoc.backend.database.session import get_db
@@ -322,38 +323,82 @@ def download_audit_bundle(bundle_id: int, db: Session = Depends(get_db)):
     return _file_response(bundle.bundle_path, f"audit-bundle-{bundle_id}.json", "application/json")
 
 
-@app.get("/api/v1/dashboard/control-coverage")
-def dashboard_control_coverage(db: Session = Depends(get_db)):
+def _dashboard_control_coverage(db: Session) -> dict[str, int]:
     mappings = db.query(ControlMapping).filter(ControlMapping.mapping_status == "published").all()
     covered = {mapping.control_catalog_id for mapping in mappings}
     total = db.query(ControlCatalog).filter(ControlCatalog.active_status.is_(True)).count()
     return {"covered_controls": len(covered), "total_controls": total}
 
 
-@app.get("/api/v1/dashboard/severity-distribution")
-def dashboard_severity_distribution(db: Session = Depends(get_db)):
+@app.get("/api/v1/dashboard/control-coverage")
+def dashboard_control_coverage(db: Session = Depends(get_db)):
+    return _dashboard_control_coverage(db)
+
+
+def _dashboard_severity_distribution(db: Session) -> dict[str, dict[str, int]]:
     counts: dict[str, int] = {}
     for finding in db.query(NormalizedFinding).all():
         counts[finding.severity] = counts.get(finding.severity, 0) + 1
     return {"severity_counts": counts}
 
 
-@app.get("/api/v1/dashboard/gap-summary")
-def dashboard_gap_summary(db: Session = Depends(get_db)):
+@app.get("/api/v1/dashboard/severity-distribution")
+def dashboard_severity_distribution(db: Session = Depends(get_db)):
+    return _dashboard_severity_distribution(db)
+
+
+def _dashboard_gap_summary(db: Session) -> dict[str, int | list[dict[str, object]]]:
+    failed_controls: list[dict[str, object]] = []
+    for status in ("manual_review", "rejected"):
+        rows = (
+            db.query(
+                ControlMapping.control_catalog_id,
+                ControlCatalog.control_id,
+                ControlCatalog.title,
+                func.count(ControlMapping.id).label("count"),
+            )
+            .join(ControlCatalog, ControlMapping.control_catalog_id == ControlCatalog.id)
+            .filter(ControlMapping.mapping_status == status)
+            .group_by(ControlMapping.control_catalog_id, ControlCatalog.control_id, ControlCatalog.title)
+            .all()
+        )
+        for control_catalog_id, control_id, title, count in rows:
+            failed_controls.append(
+                {
+                    "control_id": control_id,
+                    "control_title": title,
+                    "count": int(count),
+                    "status": status,
+                    "control_catalog_id": int(control_catalog_id),
+                }
+            )
+
     return {
         "manual_review_mappings": db.query(ControlMapping).filter(ControlMapping.mapping_status == "manual_review").count(),
         "rejected_mappings": db.query(ControlMapping).filter(ControlMapping.mapping_status == "rejected").count(),
+        "failed_controls": sorted(
+            failed_controls,
+            key=lambda item: (item["status"], str(item["control_id"])),
+        ),
     }
 
 
-@app.get("/api/v1/dashboard/remediation-backlog")
-def dashboard_remediation_backlog(db: Session = Depends(get_db)):
+@app.get("/api/v1/dashboard/gap-summary")
+def dashboard_gap_summary(db: Session = Depends(get_db)):
+    return _dashboard_gap_summary(db)
+
+
+def _dashboard_remediation_backlog(db: Session):
     mappings = db.query(ControlMapping).filter(ControlMapping.mapping_status.in_(["manual_review", "rejected"])).all()
     return {"items": [_mapping_backlog_item(mapping) for mapping in mappings]}
 
 
-@app.get("/api/v1/dashboard/trends")
-def dashboard_trends(db: Session = Depends(get_db)):
+@app.get("/api/v1/dashboard/remediation-backlog")
+def dashboard_remediation_backlog(db: Session = Depends(get_db)):
+    return _dashboard_remediation_backlog(db)
+
+
+def _dashboard_trends(db: Session):
     trends = []
     for scan_run in db.query(ScanRun).order_by(ScanRun.created_at).all():
         mappings = _mappings_for_scan_run(db, scan_run.id)
@@ -366,6 +411,11 @@ def dashboard_trends(db: Session = Depends(get_db)):
             }
         )
     return {"trends": trends}
+
+
+@app.get("/api/v1/dashboard/trends")
+def dashboard_trends(db: Session = Depends(get_db)):
+    return _dashboard_trends(db)
 
 
 def _ensure_scan_run(db: Session, scan_run_id: int):
@@ -431,13 +481,21 @@ def _mappings_for_scan_run(db: Session, scan_run_id: int) -> list[ControlMapping
 
 
 def _mapping_backlog_item(mapping: ControlMapping):
+    finding = mapping.normalized_finding
+    control = mapping.control_catalog
+    remediation = (
+        f"Review {finding.resource_identifier} for {finding.title}. "
+        f"Apply the required control update for {control.framework_name} {control.control_id}: {control.title}. "
+        f"Capture evidence for the affected resource and confirm the issue is remediated before re-running validation."
+    )
     return {
         "mapping_id": mapping.id,
         "status": mapping.mapping_status,
-        "severity": mapping.normalized_finding.severity,
-        "resource_identifier": mapping.normalized_finding.resource_identifier,
-        "control_id": mapping.control_catalog.control_id,
-        "control_title": mapping.control_catalog.title,
+        "severity": finding.severity,
+        "resource_identifier": finding.resource_identifier,
+        "control_id": control.control_id,
+        "control_title": control.title,
         "gemini_confidence": mapping.gemini_confidence,
         "groq_agreement_value": mapping.groq_agreement_value,
+        "suggested_remediation": remediation,
     }
