@@ -33,4 +33,38 @@ describe("api client", () => {
     expect(String(fetchMock.mock.calls[0][0])).toContain("/review-queue/7/approve");
     expect(fetchMock.mock.calls[0][1].method).toBe("POST");
   });
+
+  it("posts scenario reports to the scenario endpoint", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ id: 1, report_type: "scenario:container" }),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = await api.reports.scenario(42, "container");
+
+    expect(String(fetchMock.mock.calls[0][0])).toContain("/reports/scenario");
+    expect(fetchMock.mock.calls[0][1].method).toBe("POST");
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toEqual({
+      scan_run_id: 42,
+      scenario: "container",
+    });
+    expect(result.report_type).toBe("scenario:container");
+  });
+
+  it("posts IaC scenario reports", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ id: 2, report_type: "scenario:iac" }),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = await api.reports.scenario(42, "iac");
+
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toEqual({
+      scan_run_id: 42,
+      scenario: "iac",
+    });
+    expect(result.report_type).toBe("scenario:iac");
+  });
 });

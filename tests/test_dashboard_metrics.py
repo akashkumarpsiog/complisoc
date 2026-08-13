@@ -310,5 +310,7 @@ def test_dashboard_backlog_includes_control_drilldown_metadata():
     assert backlog["items"][0]["resource_identifier"] == "arn:aws:iam::123:policy/demo"
     assert backlog["items"][0]["severity"] == "high"
 
+    assert isinstance(backlog["items"][0].get("suggested_remediation_steps", []), list)
+    assert len(backlog["items"][0]["suggested_remediation_steps"]) >= 2
     assert "CC6.1" in backlog["items"][0]["suggested_remediation"]
     assert "arn:aws:iam::123:policy/demo" in backlog["items"][0]["suggested_remediation"]

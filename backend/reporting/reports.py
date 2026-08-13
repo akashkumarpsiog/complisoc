@@ -6,10 +6,11 @@ from typing import Any
 
 from fpdf import FPDF
 from groq import Groq
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from complisoc.backend.core.config import GROQ_API_KEY, GROQ_MODEL
-from complisoc.backend.models import AuditBundle, ComplianceReport, ControlMapping, NormalizedFinding, RawFinding, ScanRun, ScannerExecution
+from complisoc.backend.models import AuditBundle, ComplianceReport, ControlMapping, ControlCatalog, NormalizedFinding, RawFinding, ScanRun, ScannerExecution
 
 
 ARTIFACT_ROOT = Path("artifacts")
@@ -439,3 +440,167 @@ def generate_audit_bundle(db: Session, *, scan_run_id: int) -> AuditBundle:
     db.commit()
     db.refresh(bundle)
     return bundle
+
+
+SCENARIO_FILTERS = {
+    "container": {"trivy"},
+    "iac": {"checkov"},
+    "code-security": {"sonarqube"},
+}
+
+SCENARIO_TITLES = {
+    "container": "Container Image Security Gap Report",
+    "iac": "Infrastructure-as-Code Security Gap Report",
+    "code-security": "Code Security Gap Report",
+}
+
+
+def _scan_mappings_by_scanners(db: Session, scan_run_id: int, scanner_names: set[str]) -> list[ControlMapping]:
+    rows = (
+        db.query(ControlMapping)
+        .join(ControlMapping.normalized_finding)
+        .join(NormalizedFinding.raw_finding)
+        .join(RawFinding.scanner_execution)
+        .join(ControlCatalog, ControlMapping.control_catalog_id == ControlCatalog.id)
+        .filter(ScannerExecution.scan_run_id == scan_run_id)
+        .filter(NormalizedFinding.scanner_name.in_(list(scanner_names)))
+        .all()
+    )
+    return list(rows)
+
+
+def _generate_scenario_pdf(
+    path: Path,
+    title: str,
+    narrative: dict[str, str],
+    mappings: list[ControlMapping],
+    scenario: str,
+    scan_run_id: int,
+) -> None:
+    pdf = FPDF()
+    pdf.set_auto_page_break(auto=True, margin=15)
+    pdf.add_page()
+    pdf.set_font("Helvetica", "B", 16)
+    pdf.cell(0, 10, title, new_x="LMARGIN", new_y="NEXT")
+    pdf.set_font("Helvetica", "", 9)
+    pdf.cell(0, 6, f"Scan run {scan_run_id} | Scenario: {scenario} | Generated {datetime.utcnow().isoformat(timespec='seconds')} UTC", new_x="LMARGIN", new_y="NEXT")
+    pdf.ln(4)
+
+    published = [mapping for mapping in mappings if mapping.mapping_status == "published"]
+
+    _pdf_heading(pdf, "Executive Summary")
+    _pdf_body(pdf, narrative["executive_summary"], 11)
+
+    _pdf_heading(pdf, "Summary Metrics")
+    _pdf_kv(pdf, "Total findings in scenario", len(mappings))
+    _pdf_kv(pdf, "Mapped to controls", len(published))
+    _pdf_kv(pdf, "Unmapped / manual review", len([m for m in mappings if m.mapping_status != "published"]))
+    _pdf_kv(pdf, "Severity", _severity_counts(mappings))
+    _pdf_kv(pdf, "Frameworks", _framework_counts(mappings))
+    pdf.ln(3)
+
+    _pdf_heading(pdf, "Risk and Compliance Impact")
+    _pdf_body(pdf, narrative["risk_summary"])
+    _pdf_body(pdf, narrative["audience_note"])
+
+    _pdf_heading(pdf, "Recommended Actions")
+    _pdf_body(pdf, narrative["recommended_actions"])
+
+    _pdf_heading(pdf, "Key Findings")
+    cell_width = pdf.w - pdf.l_margin - pdf.r_margin
+    for mapping in _top_mappings(mappings):
+        finding = mapping.normalized_finding
+        control = mapping.control_catalog
+        pdf.set_font("Helvetica", "B", 11)
+        pdf.multi_cell(cell_width, 7, f"{finding.severity.upper()} - {finding.title}", new_x="LMARGIN", new_y="NEXT")
+        pdf.set_font("Helvetica", "", 10)
+        pdf.multi_cell(cell_width, 6, f"Resource: {finding.resource_identifier}", new_x="LMARGIN", new_y="NEXT")
+        pdf.multi_cell(cell_width, 6, f"Control: {control.framework_name} {control.control_id} - {control.title}", new_x="LMARGIN", new_y="NEXT")
+        pdf.multi_cell(cell_width, 6, f"Status: {mapping.mapping_status} | Confidence: {_safe_percent(mapping.final_confidence)}", new_x="LMARGIN", new_y="NEXT")
+        pdf.multi_cell(cell_width, 6, f"Remediation: {_remediation_text(mapping)}", new_x="LMARGIN", new_y="NEXT")
+        pdf.ln(4)
+
+    _pdf_heading(pdf, "Scenario Mapping Appendix")
+    for mapping in mappings:
+        finding = mapping.normalized_finding
+        control = mapping.control_catalog
+        pdf.set_font("Helvetica", "", 9)
+        pdf.multi_cell(
+            cell_width,
+            5,
+            f"#{mapping.id} | {finding.severity.upper()} | {finding.title} | "
+            f"{control.framework_name} {control.control_id} | {mapping.mapping_status} | "
+            f"{_safe_percent(mapping.final_confidence)}",
+            new_x="LMARGIN",
+            new_y="NEXT",
+        )
+
+    pdf.output(str(path))
+
+
+def generate_scenario_report(
+    db: Session, *, scan_run_id: int, scenario: str
+) -> ComplianceReport:
+    if scenario not in SCENARIO_FILTERS:
+        raise ValueError(f"scenario must be one of {set(SCENARIO_FILTERS)}, got {scenario!r}")
+
+    scanner_names = SCENARIO_FILTERS[scenario]
+    mappings = _scan_mappings_by_scanners(db, scan_run_id, scanner_names)
+
+    if not mappings:
+        raise ValueError(f"No findings found for scenario '{scenario}' in scan run {scan_run_id}.")
+
+    catalog_ids = {m.control_catalog_id for m in mappings}
+    existing_catalog_ids = {c.id for c in db.query(ControlCatalog.id).filter(ControlCatalog.id.in_(catalog_ids)).all()}
+    missing = catalog_ids - existing_catalog_ids
+    if missing:
+        raise ValueError(f"Scenario report references {len(missing)} control catalog IDs that do not exist: {missing}")
+
+    published = [mapping for mapping in mappings if mapping.mapping_status == "published"]
+    manual_review = [mapping for mapping in mappings if mapping.mapping_status == "manual_review"]
+    narrative = _generate_report_narrative(scan_run_id, mappings, f"scenario:{scenario}")
+    narrative["audience_note"] = f"This report is scoped to the '{scenario}' scenario. {narrative['audience_note']}"
+
+    directory = ARTIFACT_ROOT / "reports"
+    directory.mkdir(parents=True, exist_ok=True)
+    pdf_path = directory / f"scenario-{scenario}-scan-{scan_run_id}.pdf"
+    _generate_scenario_pdf(
+        pdf_path,
+        f"{SCENARIO_TITLES[scenario]} - Scan #{scan_run_id}",
+        narrative,
+        mappings,
+        scenario,
+        scan_run_id,
+    )
+
+    payload = {
+        "scan_run_id": scan_run_id,
+        "report_type": "scenario",
+        "scenario": scenario,
+        "summary": {
+            "total_mappings": len(mappings),
+            "published_mappings": len(published),
+            "manual_review_mappings": len(manual_review),
+            "severity_counts": _severity_counts(mappings),
+            "framework_counts": _framework_counts(mappings),
+            "scanner_names": sorted(scanner_names),
+        },
+        "narrative": narrative,
+        "control_ids_referenced": sorted(
+            {mapping.control_catalog.control_id for mapping in mappings}
+        ),
+        "findings": [_mapping_payload(mapping) for mapping in mappings],
+    }
+    _, digest = _write_artifact("reports", f"scenario-{scenario}-scan-{scan_run_id}", payload)
+
+    report = ComplianceReport(
+        scan_run_id=scan_run_id,
+        report_type=f"scenario:{scenario}",
+        generated_by="complisoc-ai-scenario-report",
+        content_path=str(pdf_path),
+        content_hash=digest,
+    )
+    db.add(report)
+    db.commit()
+    db.refresh(report)
+    return report

@@ -395,6 +395,231 @@
         "title": "vendor third_party supply_chain sla risk",
         "description": "vendor third_party supply_chain sla not assessed"
       }
+    },
+    {
+      "id": 16,
+      "scanner_name": "checkov",
+      "scanner_finding_id": "GOLD-16",
+      "expected_control_id": "A.5.15",
+      "expected_framework": "ISO/IEC 27001:2022 Annex A",
+      "raw_json": {
+        "finding_type": "iam public_access permission",
+        "resource_type": "aws_iam_policy",
+        "resource_identifier": "aws_iam_policy.access_public_permission_v2",
+        "severity": "critical",
+        "title": "access iam permission public issue detected v2",
+        "description": "access iam permission public needs attention on this second policy"
+      }
+    },
+    {
+      "id": 17,
+      "scanner_name": "trivy",
+      "scanner_finding_id": "GOLD-17",
+      "expected_control_id": "A.8.1",
+      "expected_framework": "ISO/IEC 27001:2022 Annex A",
+      "raw_json": {
+        "finding_type": "encryption tls at_rest cipher",
+        "resource_type": "aws_s3_bucket",
+        "resource_identifier": "aws_s3_bucket.encryption_tls_at_rest_cipher_v2",
+        "severity": "high",
+        "title": "encryption tls at_rest cipher missing v2",
+        "description": "encryption tls at_rest cipher should be enabled on bucket v2"
+      }
+    },
+    {
+      "id": 18,
+      "scanner_name": "checkov",
+      "scanner_finding_id": "GOLD-18",
+      "expected_control_id": "A.8.2",
+      "expected_framework": "ISO/IEC 27001:2022 Annex A",
+      "raw_json": {
+        "finding_type": "kms key_rotation secrets credential",
+        "resource_type": "aws_kms_key",
+        "resource_identifier": "aws_kms_key.kms_key_rotation_secrets_credential_v2",
+        "severity": "medium",
+        "title": "kms key_rotation secrets credential not rotated v2",
+        "description": "kms key_rotation secrets credential require rotation v2"
+      }
+    },
+    {
+      "id": 19,
+      "scanner_name": "trivy",
+      "scanner_finding_id": "GOLD-19",
+      "expected_control_id": "A.9.1",
+      "expected_framework": "ISO/IEC 27001:2022 Annex A",
+      "raw_json": {
+        "finding_type": "logging audit trail monitor",
+        "resource_type": "aws_cloudtrail",
+        "resource_identifier": "aws_cloudtrail.logging_audit_trail_monitor_v2",
+        "severity": "medium",
+        "title": "logging audit trail monitor disabled v2",
+        "description": "logging audit trail monitor must be enabled v2"
+      }
+    },
+    {
+      "id": 20,
+      "scanner_name": "checkov",
+      "scanner_finding_id": "GOLD-20",
+      "expected_control_id": "A.12.1",
+      "expected_framework": "ISO/IEC 27001:2022 Annex A",
+      "raw_json": {
+        "finding_type": "network firewall ingress port",
+        "resource_type": "aws_security_group",
+        "resource_identifier": "aws_security_group.network_firewall_ingress_port_v2",
+        "severity": "high",
+        "title": "network firewall ingress port open v2",
+        "description": "network firewall ingress port should be restricted v2"
+      }
+    },
+    {
+      "id": 21,
+      "scanner_name": "checkov",
+      "scanner_finding_id": "GOLD-21",
+      "expected_control_id": "A.13.1",
+      "expected_framework": "ISO/IEC 27001:2022 Annex A",
+      "raw_json": {
+        "finding_type": "backup restore continuity failover",
+        "resource_type": "aws_rds_instance",
+        "resource_identifier": "aws_rds_instance.backup_restore_continuity_failover_v2",
+        "severity": "low",
+        "title": "backup restore continuity failover missing v2",
+        "description": "backup restore continuity failover configuration absent v2"
+      }
+    },
+    {
+      "id": 22,
+      "scanner_name": "trivy",
+      "scanner_finding_id": "GOLD-22",
+      "expected_control_id": "A.5.18",
+      "expected_framework": "ISO/IEC 27001:2022 Annex A",
+      "raw_json": {
+        "finding_type": "privilege admin sudo root",
+        "resource_type": "aws_iam_role",
+        "resource_identifier": "aws_iam_role.privilege_admin_sudo_root_v2",
+        "severity": "high",
+        "title": "privilege admin sudo root granted v2",
+        "description": "privilege admin sudo root assignment is over-permissive v2"
+      }
+    },
+    {
+      "id": 23,
+      "scanner_name": "trivy",
+      "scanner_finding_id": "GOLD-23",
+      "expected_control_id": "A.8.8",
+      "expected_framework": "ISO/IEC 27001:2022 Annex A",
+      "raw_json": {
+        "finding_type": "dependency vulnerability patch cve",
+        "resource_type": "npm_package",
+        "resource_identifier": "npm_package.dependency_vulnerability_patch_cve_v2",
+        "severity": "critical",
+        "title": "dependency vulnerability patch cve present v2",
+        "description": "dependency vulnerability patch cve should be remediated v2"
+      }
+    },
+    {
+      "id": 24,
+      "scanner_name": "checkov",
+      "scanner_finding_id": "GOLD-24",
+      "expected_control_id": "A.5.17",
+      "expected_framework": "ISO/IEC 27001:2022 Annex A",
+      "raw_json": {
+        "finding_type": "mfa authentication password credential",
+        "resource_type": "aws_iam_user",
+        "resource_identifier": "aws_iam_user.mfa_authentication_password_credential_v2",
+        "severity": "high",
+        "title": "mfa authentication password credential weak v2",
+        "description": "mfa authentication password credential policy is weak v2"
+      }
+    },
+    {
+      "id": 25,
+      "scanner_name": "checkov",
+      "scanner_finding_id": "GOLD-25",
+      "expected_control_id": "A.8.9",
+      "expected_framework": "ISO/IEC 27001:2022 Annex A",
+      "raw_json": {
+        "finding_type": "baseline hardening misconfiguration config",
+        "resource_type": "aws_ec2_instance",
+        "resource_identifier": "aws_ec2_instance.baseline_hardening_misconfiguration_config_v2",
+        "severity": "medium",
+        "title": "baseline hardening misconfiguration config drift v2",
+        "description": "baseline hardening misconfiguration config detected v2"
+      }
+    },
+    {
+      "id": 26,
+      "scanner_name": "checkov",
+      "scanner_finding_id": "GOLD-26",
+      "expected_control_id": "A.5.20",
+      "expected_framework": "ISO/IEC 27001:2022 Annex A",
+      "raw_json": {
+        "finding_type": "boundary segmentation dmz zoning",
+        "resource_type": "aws_vpc",
+        "resource_identifier": "aws_vpc.boundary_segmentation_dmz_zoning_v2",
+        "severity": "medium",
+        "title": "boundary segmentation dmz zoning missing v2",
+        "description": "boundary segmentation dmz zoning is not configured v2"
+      }
+    },
+    {
+      "id": 27,
+      "scanner_name": "trivy",
+      "scanner_finding_id": "GOLD-27",
+      "expected_control_id": "A.7.1",
+      "expected_framework": "ISO/IEC 27001:2022 Annex A",
+      "raw_json": {
+        "finding_type": "datacenter badge physical locks",
+        "resource_type": "aws_datacenter",
+        "resource_identifier": "aws_datacenter.datacenter_badge_physical_locks_v2",
+        "severity": "low",
+        "title": "datacenter badge physical locks absent v2",
+        "description": "datacenter badge physical locks controls missing v2"
+      }
+    },
+    {
+      "id": 28,
+      "scanner_name": "checkov",
+      "scanner_finding_id": "GOLD-28",
+      "expected_control_id": "A.16.1",
+      "expected_framework": "ISO/IEC 27001:2022 Annex A",
+      "raw_json": {
+        "finding_type": "incident response soc alerting",
+        "resource_type": "aws_guardduty",
+        "resource_identifier": "aws_guardduty.incident_response_soc_alerting_v2",
+        "severity": "medium",
+        "title": "incident response soc alerting not wired v2",
+        "description": "incident response soc alerting pipeline absent v2"
+      }
+    },
+    {
+      "id": 29,
+      "scanner_name": "trivy",
+      "scanner_finding_id": "GOLD-29",
+      "expected_control_id": "A.18.1",
+      "expected_framework": "ISO/IEC 27001:2022 Annex A",
+      "raw_json": {
+        "finding_type": "gdpr pii retention privacy",
+        "resource_type": "aws_s3_bucket",
+        "resource_identifier": "aws_s3_bucket.gdpr_pii_retention_privacy_v2",
+        "severity": "high",
+        "title": "gdpr pii retention privacy violation v2",
+        "description": "gdpr pii retention privacy controls not enforced v2"
+      }
+    },
+    {
+      "id": 30,
+      "scanner_name": "checkov",
+      "scanner_finding_id": "GOLD-30",
+      "expected_control_id": "A.15.1",
+      "expected_framework": "ISO/IEC 27001:2022 Annex A",
+      "raw_json": {
+        "finding_type": "vendor third_party supply_chain sla",
+        "resource_type": "aws_third_party",
+        "resource_identifier": "aws_third_party.vendor_third_party_supply_chain_sla_v2",
+        "severity": "high",
+        "title": "vendor third_party supply_chain sla risk v2",
+        "description": "vendor third_party supply_chain sla not assessed v2"
+      }
     }
   ]
 }

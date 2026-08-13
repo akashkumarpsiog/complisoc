@@ -4,8 +4,12 @@ from pathlib import Path
 from fastapi import Depends, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
+from groq import Groq
 from sqlalchemy import func
 from sqlalchemy.orm import Session
+
+from complisoc.backend.core.config import GROQ_API_KEY, GROQ_MODEL
+from complisoc.backend.core.json_extract import extract_json
 
 from complisoc.backend.database.session import get_db
 
@@ -18,6 +22,7 @@ from complisoc.backend.api.schemas import (
     ReportCreate,
     ReviewDecision,
     ReviewQueueItemRead,
+    ScenarioReportCreate,
     ScanRequest,
     ScanRunCreate,
     ScanRunRead,
@@ -39,7 +44,7 @@ from complisoc.backend.models import (
     ScannerExecution,
     VerificationRecord,
 )
-from complisoc.backend.reporting.reports import generate_audit_bundle, generate_compliance_report
+from complisoc.backend.reporting.reports import generate_audit_bundle, generate_compliance_report, generate_scenario_report
 
 app = FastAPI(title="Complisoc API")
 
@@ -288,6 +293,15 @@ def create_leadership_report(payload: ReportCreate, db: Session = Depends(get_db
     return generate_compliance_report(db, scan_run_id=payload.scan_run_id, report_type="leadership")
 
 
+@app.post("/api/v1/reports/scenario", response_model=ComplianceReportRead, status_code=201)
+def create_scenario_report(payload: ScenarioReportCreate, db: Session = Depends(get_db)):
+    _ensure_scan_run(db, payload.scan_run_id)
+    try:
+        return generate_scenario_report(db, scan_run_id=payload.scan_run_id, scenario=payload.scenario)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
+
 @app.get("/api/v1/reports/{report_id}/pdf")
 def download_report(report_id: int, db: Session = Depends(get_db)):
     report = db.get(ComplianceReport, report_id)
@@ -480,14 +494,100 @@ def _mappings_for_scan_run(db: Session, scan_run_id: int) -> list[ControlMapping
     return _mappings_for_scan_run_query(db, scan_run_id).all()
 
 
+def _coerce_remediation_steps(payload: object) -> list[str]:
+    if isinstance(payload, list):
+        steps: list[str] = []
+        for item in payload:
+            if isinstance(item, dict):
+                for key in ("step", "text", "action", "detail", "description", "instruction"):
+                    value = item.get(key)
+                    if value:
+                        text = str(value).strip()
+                        if text:
+                            steps.append(text)
+                            break
+            else:
+                text = str(item).strip()
+                if text:
+                    steps.append(text)
+        return steps
+
+    if isinstance(payload, dict):
+        if isinstance(payload.get("steps"), list):
+            return _coerce_remediation_steps(payload["steps"])
+        if isinstance(payload.get("remediation_steps"), list):
+            return _coerce_remediation_steps(payload["remediation_steps"])
+
+        merged: list[str] = []
+        for key in ("action", "detail", "suggestion", "summary", "step", "text"):
+            value = payload.get(key)
+            if value:
+                string_value = str(value).strip()
+                if string_value:
+                    merged.append(string_value)
+        if merged:
+            return merged
+
+    return []
+
+
+def _suggested_remediation_steps(mapping: ControlMapping) -> list[str]:
+    finding = mapping.normalized_finding
+    control = mapping.control_catalog
+    steps = [
+        f"Review {finding.resource_identifier} and remove the root cause behind {finding.title}.",
+        f"Apply the required {control.framework_name} {control.control_id} control update to the affected resource or configuration path.",
+        "Capture evidence from the fix and re-run validation to confirm the issue is no longer reported.",
+    ]
+
+    if not GROQ_API_KEY:
+        return steps
+
+    try:
+        client = Groq(api_key=GROQ_API_KEY)
+        response = client.chat.completions.create(
+            model=GROQ_MODEL,
+            messages=[
+                {
+                    "role": "system",
+                    "content": "You are a remediation advisor. Return only JSON with a 'steps' array of 2-3 brief, concrete remediation steps.",
+                },
+                {
+                    "role": "user",
+                    "content": (
+                        f"Finding: {finding.title}\n"
+                        f"Resource: {finding.resource_identifier}\n"
+                        f"Severity: {finding.severity}\n"
+                        f"Control: {control.framework_name} {control.control_id} ({control.title})\n"
+                        "Provide 2-3 concrete, code-level or configuration-level remediation steps."
+                    ),
+                },
+            ],
+            response_format={"type": "json_object"},
+            temperature=0.2,
+            max_tokens=500,
+        )
+        data = extract_json(response.choices[0].message.content)
+        parsed = data.get("steps") or data.get("remediation_steps") or data
+        normalized = _coerce_remediation_steps(parsed)
+        if len(normalized) >= 2:
+            return normalized[:3]
+    except Exception:
+        pass
+    return steps
+
+
 def _mapping_backlog_item(mapping: ControlMapping):
     finding = mapping.normalized_finding
     control = mapping.control_catalog
-    remediation = (
-        f"Review {finding.resource_identifier} for {finding.title}. "
-        f"Apply the required control update for {control.framework_name} {control.control_id}: {control.title}. "
-        f"Capture evidence for the affected resource and confirm the issue is remediated before re-running validation."
-    )
+    remediation_steps = _suggested_remediation_steps(mapping)
+    remediation = " ".join(str(step).strip() for step in remediation_steps if str(step).strip())
+    if control.control_id not in remediation:
+        remediation = (
+            f"Review {finding.resource_identifier} for {finding.title}. "
+            f"Apply the required control update for {control.framework_name} {control.control_id}: {control.title}. "
+            f"{remediation}"
+        )
     return {
         "mapping_id": mapping.id,
         "status": mapping.mapping_status,
@@ -498,4 +598,5 @@ def _mapping_backlog_item(mapping: ControlMapping):
         "gemini_confidence": mapping.gemini_confidence,
         "groq_agreement_value": mapping.groq_agreement_value,
         "suggested_remediation": remediation,
+        "suggested_remediation_steps": remediation_steps,
     }

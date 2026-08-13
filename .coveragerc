@@ -1,0 +1,18 @@
+[run]
+source = complisoc/backend
+branch = True
+parallel = False
+omit =
+    */repositories/repositories.py
+    */repositories/__init__.py
+    */database/inspect_db.py
+    */database/inspect_db_paths.py
+    */database/verify_schema.py
+
+[report]
+show_missing = True
+skip_covered = False
+exclude_lines =
+    pragma: no cover
+    raise NotImplementedError
+    if __name__ == .__main__.:

@@ -150,6 +150,7 @@ export interface RemediationBacklog {
     gemini_confidence: number | null;
     groq_agreement_value: number | null;
     suggested_remediation?: string;
+    suggested_remediation_steps?: string[];
   }>;
 }
 

@@ -16,11 +16,18 @@ from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
 from complisoc.backend.api.main import run_scan
+from complisoc.backend.api import main as api_main
+from complisoc.backend.compliance.mapping import CandidateDecision
+from complisoc.backend.compliance.verification import VerificationDecision
 from complisoc.backend.database.base import Base
 from complisoc.backend.database.session import get_db
-from complisoc.backend.models import RawFinding, ScanRun, ScannerExecution
+from complisoc.backend.models import (
+    ControlCatalog,
+    RawFinding,
+    ScanRun,
+    ScannerExecution,
+)
 from complisoc.backend.scanners import runners
-from complisoc.backend.api import main as api_main
 from complisoc.backend.api.schemas import ScanRequest
 
 
@@ -179,6 +186,21 @@ class TestDefenderIntegration:
 
 class TestScanRunDBLineage:
     def test_full_scan_creates_lineage_in_db(self, app_db):
+        db_session = app_db
+        db_session.add(ControlCatalog(
+            framework_name="ISO/IEC 27001:2022 Annex A",
+            framework_version="2022",
+            control_id="A.5.15",
+            control_family="Access Control",
+            title="Access Control",
+            description="Limit access.",
+            source_url="https://example.test/iso-a-5-15",
+            active_status=True,
+            scanner_signals=["public_access", "iam", "permission"],
+            keywords=["public_access", "iam", "permission"],
+        ))
+        db_session.commit()
+
         fake_findings = [
             {
                 "scanner_name": "trivy",
@@ -192,7 +214,24 @@ class TestScanRunDBLineage:
                 },
             }
         ]
-        with patch.object(api_main, "run_scanners", return_value=(fake_findings, [])):
+        with patch.object(api_main, "run_scanners", return_value=(fake_findings, [])), patch(
+            "complisoc.backend.compliance.langchain_pipeline.GeminiMapper"
+        ) as MockMapper, patch(
+            "complisoc.backend.compliance.langchain_pipeline.GroqVerifier"
+        ) as MockVerifier:
+            MockMapper.return_value.map_batch.side_effect = lambda items: {
+                items[0][0].id: [
+                    CandidateDecision(
+                        control_id=items[0][1][0].control_catalog.control_id,
+                        maps=True,
+                        confidence=0.95,
+                        rationale="High signal",
+                    )
+                ]
+            }
+            MockVerifier.return_value.verify_batch.return_value = {
+                1: VerificationDecision(result="agree", agreement_value=1.0, explanation="Correct")
+            }
             scan_run = run_scan(ScanRequest(target="."), app_db)
         app_db.commit()
         raw_findings = app_db.query(RawFinding).filter(RawFinding.scanner_execution_id == scan_run.id).all()

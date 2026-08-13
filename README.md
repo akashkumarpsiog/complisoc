@@ -114,7 +114,7 @@ npm install --prefix complisoc/frontend
 npm run dev --prefix complisoc/frontend
 ```
 
-Then open `http://127.0.0.1:5173`.
+Vite will use the next available port if `5173` is already occupied. Open the URL printed in the terminal, often `http://127.0.0.1:5174/`.
 
 3. Build for production:
 

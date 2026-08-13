@@ -7,14 +7,16 @@ export function Section({
   description,
   actions,
   children,
+  className,
 }: {
   title: string;
   description?: string;
   actions?: ReactNode;
   children: ReactNode;
+  className?: string;
 }) {
   return (
-    <section className="panel">
+    <section className={`panel shadow-sm ${className || ""}`}>
       <div className="flex flex-col gap-3 border-b border-line px-4 py-3 md:flex-row md:items-center md:justify-between">
         <div>
           <h2 className="text-base font-semibold text-ink">{title}</h2>
@@ -26,6 +28,59 @@ export function Section({
     </section>
   );
 }
+
+export function DonutChart({
+  value,
+  total,
+  label,
+  accent = "brand",
+  size = 120,
+}: {
+  value: number;
+  total: number;
+  label: string;
+  accent?: Accent;
+  size?: number;
+}) {
+  const pct = total > 0 ? value / total : 0;
+  const radius = 42;
+  const circumference = 2 * Math.PI * radius;
+  const offset = circumference * (1 - pct);
+  const center = size / 2;
+  const strokeColor = accentColor[accent];
+
+  return (
+    <div className="flex flex-col items-center gap-2">
+      <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
+        <circle cx={center} cy={center} r={radius} fill="none" stroke="#f1f5f9" strokeWidth="6" />
+        <circle
+          cx={center}
+          cy={center}
+          r={radius}
+          fill="none"
+          stroke={strokeColor}
+          strokeWidth="6"
+          strokeDasharray={circumference}
+          strokeDashoffset={offset}
+          strokeLinecap="round"
+          transform={`rotate(-90 ${center} ${center})`}
+        />
+        <text x={center} y={center + 4} textAnchor="middle" className="fill-ink text-lg font-semibold">
+          {Math.round(pct * 100)}%
+        </text>
+      </svg>
+      <span className="text-xs font-medium text-slate-600">{label}</span>
+    </div>
+  );
+}
+
+const accentColor: Record<Accent, string> = {
+  brand: "#3b6df6",
+  emerald: "#10b981",
+  amber: "#fbbf24",
+  rose: "#f43f5e",
+  slate: "#94a3b8",
+};
 
 export function MetricCard({
   label,

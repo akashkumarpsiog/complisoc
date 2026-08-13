@@ -9,7 +9,10 @@ from sqlalchemy.pool import StaticPool
 
 from complisoc.backend.api.schemas import ScanRequest
 from complisoc.backend.api.main import list_available_scanners, run_scan
+from complisoc.backend.compliance.mapping import CandidateDecision
+from complisoc.backend.compliance.verification import VerificationDecision
 from complisoc.backend.database.base import Base
+from complisoc.backend.models import ControlCatalog
 from complisoc.backend.scanners import runners
 
 
@@ -41,6 +44,22 @@ def test_list_scanners_exposes_all_runners():
 
 
 def test_run_scan_ingests_findings(db_session):
+    db_session.add(
+        ControlCatalog(
+            framework_name="ISO/IEC 27001:2022 Annex A",
+            framework_version="2022",
+            control_id="A.5.15",
+            control_family="Access Control",
+            title="Access Control",
+            description="Limit access to information and systems.",
+            source_url="https://example.test/iso-a-5-15",
+            active_status=True,
+            scanner_signals=["public_access", "iam", "permission"],
+            keywords=["public_access", "iam", "permission"],
+        )
+    )
+    db_session.commit()
+
     fake_findings = [
         {
             "scanner_name": "trivy",
@@ -54,7 +73,24 @@ def test_run_scan_ingests_findings(db_session):
             },
         }
     ]
-    with patch.object(runners, "run_scanners", return_value=(fake_findings, [])):
+    with patch("complisoc.backend.api.main.run_scanners", return_value=(fake_findings, [])), patch(
+        "complisoc.backend.compliance.langchain_pipeline.GeminiMapper"
+    ) as MockMapper, patch(
+        "complisoc.backend.compliance.langchain_pipeline.GroqVerifier"
+    ) as MockVerifier:
+        MockMapper.return_value.map_batch.side_effect = lambda items: {
+            items[0][0].id: [
+                CandidateDecision(
+                    control_id=items[0][1][0].control_catalog.control_id,
+                    maps=True,
+                    confidence=0.95,
+                    rationale="High signal",
+                )
+            ]
+        }
+        MockVerifier.return_value.verify_batch.return_value = {
+            1: VerificationDecision(result="agree", agreement_value=1.0, explanation="Correct")
+        }
         scan_run = run_scan(ScanRequest(target="."), db_session)
     assert scan_run.target_environment == "."
 

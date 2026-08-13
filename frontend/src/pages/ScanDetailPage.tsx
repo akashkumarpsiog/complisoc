@@ -349,39 +349,83 @@ function ReviewTab({ items, resource, onRefresh }: { items: ReviewQueueItem[]; r
 
 function ReportsTab({ scanRunId, reports, resource, onRefresh }: { scanRunId: number; reports: ComplianceReport[]; resource: ReturnType<typeof useResource<ComplianceReport[]>>; onRefresh: () => void }) {
   const scanReports = reports.filter((r) => r.scan_run_id === scanRunId);
-  const [creating, setCreating] = useState<"engineering" | "leadership" | null>(null);
+  const [creating, setCreating] = useState<"engineering" | "leadership" | "container" | "iac" | "code-security" | null>(null);
   const [cooldowns, setCooldowns] = useState<Record<string, number>>({});
+  const [error, setError] = useState<string | null>(null);
 
-  async function create(type: "engineering" | "leadership") {
+  async function createReport(type: "engineering" | "leadership" | "container" | "iac" | "code-security") {
     if (creating || Date.now() < (cooldowns[type] || 0)) return;
     setCreating(type);
+    setError(null);
     try {
-      await api.reports.create(type, scanRunId);
+      if (type === "container" || type === "iac" || type === "code-security") {
+        await api.reports.scenario(scanRunId, type);
+      } else {
+        await api.reports.create(type, scanRunId);
+      }
       setCooldowns((prev) => ({ ...prev, [type]: Date.now() + 5000 }));
       await onRefresh();
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Failed to generate report");
     } finally {
       setCreating(null);
     }
   }
 
+  const scenarioReports = scanReports.filter((r) => r.report_type.startsWith("scenario:"));
+  const complianceReports = scanReports.filter((r) => !r.report_type.startsWith("scenario:"));
+
   return (
     <Section
       title="Reports"
-      description="Generate engineering or leadership reports for this scan."
+      description="Generate compliance reports for this scan."
       actions={
-        <div className="flex gap-2">
-          <button className="icon-button" disabled={Boolean(creating) || Date.now() < (cooldowns.engineering || 0)} onClick={() => create("engineering")}>
+        <div className="flex flex-wrap gap-2">
+          <button
+            className="icon-button"
+            disabled={Boolean(creating) || Date.now() < (cooldowns.engineering || 0)}
+            onClick={() => createReport("engineering")}
+          >
             {creating === "engineering" ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : null}
-            {creating === "engineering" ? "Generating..." : "Generate engineering"}
+            {creating === "engineering" ? "Generating..." : "Engineering report"}
           </button>
-          <button className="icon-button" disabled={Boolean(creating) || Date.now() < (cooldowns.leadership || 0)} onClick={() => create("leadership")}>
+          <button
+            className="icon-button"
+            disabled={Boolean(creating) || Date.now() < (cooldowns.leadership || 0)}
+            onClick={() => createReport("leadership")}
+          >
             {creating === "leadership" ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : null}
-            {creating === "leadership" ? "Generating..." : "Generate leadership"}
+            {creating === "leadership" ? "Generating..." : "Leadership report"}
+          </button>
+          <button
+            className="icon-button"
+            disabled={Boolean(creating) || Date.now() < (cooldowns.container || 0)}
+            onClick={() => createReport("container")}
+          >
+            {creating === "container" ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : null}
+            Container scenario
+          </button>
+          <button
+            className="icon-button"
+            disabled={Boolean(creating) || Date.now() < (cooldowns.iac || 0)}
+            onClick={() => createReport("iac")}
+          >
+            {creating === "iac" ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : null}
+            IaC scenario
+          </button>
+          <button
+            className="icon-button"
+            disabled={Boolean(creating) || Date.now() < (cooldowns["code-security"] || 0)}
+            onClick={() => createReport("code-security")}
+          >
+            {creating === "code-security" ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : null}
+            Code-security scenario
           </button>
         </div>
       }
     >
-      <ResourceBoundary resource={{ ...resource, data: scanReports }}>
+      {error ? <div className="mb-3 rounded-md bg-rose-50 border border-rose-200 p-3 text-sm text-rose-800">{error}</div> : null}
+      <ResourceBoundary resource={{ ...resource, data: complianceReports }}>
         {(data) => (
           <DataTable
             columns={["ID", "Type", "Generated", "Hash", "Download"]}
@@ -397,6 +441,28 @@ function ReportsTab({ scanRunId, reports, resource, onRefresh }: { scanRunId: nu
           />
         )}
       </ResourceBoundary>
+
+      {scenarioReports.length > 0 ? (
+        <div className="mt-6 space-y-3">
+          <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-500">Scenario Reports</h3>
+          <DataTable
+            columns={["ID", "Scenario", "Generated", "Hash", "Download"]}
+            rows={scenarioReports.map((report) => [
+              report.id,
+              report.report_type.replace("scenario:", ""),
+              formatDate(report.generated_at),
+              report.content_hash || "n/a",
+              <a className="icon-button" href={api.reports.downloadUrl(report.id)}>
+                Download
+              </a>,
+            ])}
+          />
+        </div>
+      ) : creating !== null ? (
+        <p className="mt-4 text-sm text-slate-500">Generating scenario report...</p>
+      ) : (
+        <p className="mt-4 text-sm text-slate-500">No scenario reports generated yet. Click one of the scenario buttons above.</p>
+      )}
     </Section>
   );
 }

@@ -133,6 +133,11 @@ export const api = {
         method: "POST",
         body: JSON.stringify({ scan_run_id: scanRunId }),
       }),
+    scenario: (scanRunId: number, scenario: "container" | "iac" | "code-security") =>
+      request<ComplianceReport>("/reports/scenario", {
+        method: "POST",
+        body: JSON.stringify({ scan_run_id: scanRunId, scenario }),
+      }),
     downloadUrl: (id: number) => buildUrl(`/reports/${id}/pdf`),
   },
   auditBundles: {

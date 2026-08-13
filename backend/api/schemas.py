@@ -47,6 +47,11 @@ class ReportCreate(BaseModel):
     scan_run_id: int
 
 
+class ScenarioReportCreate(BaseModel):
+    scan_run_id: int
+    scenario: str = Field(min_length=1, max_length=64)
+
+
 class ORMModel(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
