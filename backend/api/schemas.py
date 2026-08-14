@@ -64,6 +64,7 @@ class ScanRunRead(ORMModel):
     completed_at: datetime | None = None
     created_at: datetime | None = None
     updated_at: datetime | None = None
+    archived_at: datetime | None = None
 
 
 class RawFindingRead(ORMModel):

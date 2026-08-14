@@ -33,6 +33,9 @@ class ScanRun(Base):
     completed_at = Column(DateTime, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    # Archiving is a presentation/lifecycle state only; scan evidence and all
+    # linked findings, mappings, reports, and audit bundles remain immutable.
+    archived_at = Column(DateTime, nullable=True, index=True)
 
     scanner_executions = relationship("ScannerExecution", back_populates="scan_run", cascade="all, delete-orphan")
     compliance_reports = relationship("ComplianceReport", back_populates="scan_run", cascade="all, delete-orphan")

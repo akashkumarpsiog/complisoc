@@ -133,8 +133,13 @@ def run_scan(payload: ScanRequest, db: Session = Depends(get_db)):
 
 
 @app.get("/api/v1/scan-runs", response_model=list[ScanRunRead])
-def list_scan_runs(db: Session = Depends(get_db)):
-    return db.query(ScanRun).order_by(ScanRun.id.desc()).all()
+def list_scan_runs(include_archived: bool = False, archived_only: bool = False, db: Session = Depends(get_db)):
+    query = db.query(ScanRun)
+    if archived_only:
+        query = query.filter(ScanRun.archived_at.is_not(None))
+    elif not include_archived:
+        query = query.filter(ScanRun.archived_at.is_(None))
+    return query.order_by(ScanRun.id.desc()).all()
 
 
 @app.get("/api/v1/scan-runs/{scan_run_id}", response_model=ScanRunRead)
@@ -142,6 +147,29 @@ def get_scan_run(scan_run_id: int, db: Session = Depends(get_db)):
     scan_run = db.get(ScanRun, scan_run_id)
     if scan_run is None:
         not_found("Scan run")
+    return scan_run
+
+
+@app.post("/api/v1/scan-runs/{scan_run_id}/archive", response_model=ScanRunRead)
+def archive_scan_run(scan_run_id: int, db: Session = Depends(get_db)):
+    scan_run = db.get(ScanRun, scan_run_id)
+    if scan_run is None:
+        not_found("Scan run")
+    if scan_run.archived_at is None:
+        scan_run.archived_at = datetime.utcnow()
+        db.commit()
+        db.refresh(scan_run)
+    return scan_run
+
+
+@app.post("/api/v1/scan-runs/{scan_run_id}/restore", response_model=ScanRunRead)
+def restore_scan_run(scan_run_id: int, db: Session = Depends(get_db)):
+    scan_run = db.get(ScanRun, scan_run_id)
+    if scan_run is None:
+        not_found("Scan run")
+    scan_run.archived_at = None
+    db.commit()
+    db.refresh(scan_run)
     return scan_run
 
 
@@ -457,7 +485,7 @@ def dashboard_remediation_suggestion(mapping_id: int, db: Session = Depends(get_
 
 def _dashboard_trends(db: Session):
     trends = []
-    for scan_run in db.query(ScanRun).order_by(ScanRun.created_at).all():
+    for scan_run in db.query(ScanRun).filter(ScanRun.archived_at.is_(None)).order_by(ScanRun.created_at).all():
         mappings = _mappings_for_scan_run(db, scan_run.id)
         trends.append(
             {

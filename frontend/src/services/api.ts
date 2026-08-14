@@ -91,13 +91,15 @@ export const api = {
     trends: () => request<DashboardTrend>("/dashboard/trends"),
   },
   scanRuns: {
-    list: () => request<ScanRun[]>("/scan-runs"),
+    list: (archivedOnly = false) => request<ScanRun[]>("/scan-runs", {}, { archived_only: archivedOnly ? "true" : undefined }),
     create: (payload: {
       target_environment: string;
       findings: RawFindingInput[];
       scanner_failures: ScannerFailureInput[];
     }) => request<ScanRun>("/scan-runs", { method: "POST", body: JSON.stringify(payload) }),
     summary: (id: number) => request<ScanRunSummary>(`/scan-runs/${id}/summary`),
+    archive: (id: number) => request<ScanRun>(`/scan-runs/${id}/archive`, { method: "POST" }),
+    restore: (id: number) => request<ScanRun>(`/scan-runs/${id}/restore`, { method: "POST" }),
   },
   scanners: {
     list: () => request<ScannerInfo[]>("/scanners"),
