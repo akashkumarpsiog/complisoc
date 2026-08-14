@@ -1,10 +1,13 @@
+import { useState } from "react";
 import { api } from "../services/api";
 import { useResource } from "../hooks/useResource";
 import { ResourceBoundary } from "../components/ResourceBoundary";
 import { BarList, DataTable, DonutChart, MetricCard, ProgressBar, Section, StatusBadge } from "../components/Primitives";
+import { ControlDrillDownDrawer, RemediationSuggestionPanel } from "../components/DashboardDetails";
 import { formatPercent } from "../utils/format";
 
 export function OverviewPage() {
+  const [selectedControlId, setSelectedControlId] = useState<number | null>(null);
   const coverage = useResource(api.dashboard.coverage);
   const severity = useResource(api.dashboard.severity);
   const gap = useResource(api.dashboard.gap);
@@ -79,7 +82,7 @@ export function OverviewPage() {
       </div>
 
       <div className="grid gap-5 xl:grid-cols-2">
-        <Section title="Historical Trends" description="Published vs. manual-review per scan" className="xl:col-span-1">
+        <Section title="Historical Trends" description="Published vs. manual-review per scan" className="xl:col-span-1" collapsible>
           <ResourceBoundary resource={trends}>
             {(data) => (
               <div className="space-y-3">
@@ -127,7 +130,7 @@ export function OverviewPage() {
                       columns={["Status", "Control ID", "Control Title", "Count"]}
                       rows={data.failed_controls.map((item) => [
                         <StatusBadge value={item.status} />,
-                        item.control_id,
+                        <button className="font-medium text-brand-700 underline-offset-2 hover:underline focus:outline-none focus:ring-2 focus:ring-brand-500" onClick={() => setSelectedControlId(item.control_catalog_id ?? null)}>{item.control_id}</button>,
                         item.control_title,
                         item.count,
                       ])}
@@ -140,58 +143,32 @@ export function OverviewPage() {
         </Section>
       </div>
 
-      <Section title="Remediation Backlog" description="Mappings routed to remediation">
+      <Section title="Remediation Backlog" description="Mappings routed to remediation" collapsible>
         <ResourceBoundary resource={backlog}>
           {(data) => (
             <div className="space-y-4">
               {data.items.length > 0 ? (
                 <DataTable
-                  columns={["Mapping", "Status", "Severity", "Resource", "Control", "Gemini", "Groq"]}
+                  columns={["Mapping", "Status", "Severity", "Resource", "Control", "Gemini", "Groq", "Guidance"]}
                   rows={data.items.map((item) => [
                     item.mapping_id,
                     <StatusBadge value={item.status} />,
                     item.severity,
                     item.resource_identifier,
-                    `${item.control_id} ${item.control_title}`,
+                    <button className="text-left font-medium text-brand-700 underline-offset-2 hover:underline focus:outline-none focus:ring-2 focus:ring-brand-500" onClick={() => setSelectedControlId(item.control_catalog_id)}>{item.control_id} {item.control_title}</button>,
                     formatPercent(item.gemini_confidence),
                     formatPercent(item.groq_agreement_value),
+                    <RemediationSuggestionPanel item={item} />,
                   ])}
                 />
               ) : (
                 <p className="text-sm text-slate-500">No remediation items in the backlog.</p>
               )}
-
-              {data.items.length > 0 ? (
-                <div className="space-y-4">
-                  <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-500">Suggested remediation steps</h3>
-                  {data.items.map((item) => (
-                    <div key={item.mapping_id} className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm transition-shadow hover:shadow-md">
-                      <div className="mb-2 flex items-center justify-between gap-2">
-                        <span className="font-medium text-slate-800">{item.control_id}</span>
-                        <StatusBadge value={item.status} />
-                      </div>
-                      {item.suggested_remediation_steps && item.suggested_remediation_steps.length > 0 ? (
-                        <ol className="space-y-2">
-                          {item.suggested_remediation_steps.map((step, index) => (
-                            <li key={`${item.mapping_id}-step-${index}`} className="flex gap-3">
-                              <span className="mt-0.5 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-brand-100 text-xs font-semibold text-brand-700">
-                                {index + 1}
-                              </span>
-                              <span className="text-sm text-slate-700">{step}</span>
-                            </li>
-                          ))}
-                        </ol>
-                      ) : (
-                        <p className="text-sm text-slate-500">{item.suggested_remediation || "No remediation suggestion available."}</p>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              ) : null}
             </div>
           )}
         </ResourceBoundary>
       </Section>
+      <ControlDrillDownDrawer key={selectedControlId ?? "closed"} controlId={selectedControlId} onClose={() => setSelectedControlId(null)} />
     </>
   );
 }

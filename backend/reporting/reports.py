@@ -188,6 +188,7 @@ def _generate_report_narrative(scan_run_id: int, mappings: list[ControlMapping],
             ],
             temperature=0.3,
             max_tokens=900,
+            timeout=2.5,
         )
         text = response.choices[0].message.content.strip()
         data = json.loads(text[text.find("{") : text.rfind("}") + 1])

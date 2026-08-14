@@ -142,6 +142,7 @@ export interface DashboardGap {
 export interface RemediationBacklog {
   items: Array<{
     mapping_id: number;
+    control_catalog_id: number;
     status: string;
     severity: string;
     resource_identifier: string;
@@ -149,9 +150,24 @@ export interface RemediationBacklog {
     control_title: string;
     gemini_confidence: number | null;
     groq_agreement_value: number | null;
-    suggested_remediation?: string;
-    suggested_remediation_steps?: string[];
   }>;
+}
+
+export interface RemediationSuggestion {
+  mapping_id: number;
+  steps: string[];
+  source: "groq" | "deterministic_fallback";
+}
+
+export interface ControlDrillDown {
+  control: {
+    id: number;
+    framework_name: string;
+    control_id: string;
+    title: string;
+    description: string;
+  };
+  items: RemediationBacklog["items"];
 }
 
 export interface DashboardTrend {

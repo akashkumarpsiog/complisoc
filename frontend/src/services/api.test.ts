@@ -67,4 +67,16 @@ describe("api client", () => {
     });
     expect(result.report_type).toBe("scenario:iac");
   });
+
+  it("uses focused dashboard endpoints for drill-down and on-demand remediation", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => ({ items: [] }) });
+    vi.stubGlobal("fetch", fetchMock);
+
+    await api.dashboard.controlDrillDown(12);
+    await api.dashboard.suggestion(34);
+
+    expect(String(fetchMock.mock.calls[0][0])).toContain("/dashboard/controls/12/drill-down");
+    expect(String(fetchMock.mock.calls[1][0])).toContain("/dashboard/remediation-backlog/34/suggestion");
+    expect(fetchMock.mock.calls[1][1].method).toBe("POST");
+  });
 });

@@ -12,6 +12,12 @@ It does not import any application code, so it cannot affect test behaviour.
 """
 import pathlib
 import sys
+import os
+
+# Tests must never consume provider quota or depend on network latency. Tests
+# that exercise AI behavior patch the module-level keys/clients explicitly.
+os.environ["GEMINI_API_KEY"] = ""
+os.environ["GROQ_API_KEY"] = ""
 
 _REPO_ROOT = pathlib.Path(__file__).resolve().parent  # .../complisoc
 _PROJECT_PARENT = str(_REPO_ROOT.parent)

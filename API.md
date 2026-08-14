@@ -158,6 +158,8 @@ ZIP
 | GET    | /dashboard/severity-distribution | Severity metrics        |
 | GET    | /dashboard/gap-summary           | Gap analysis            |
 | GET    | /dashboard/remediation-backlog   | Outstanding remediation |
+| GET    | /dashboard/controls/{id}/drill-down | Failed findings for one control |
+| POST   | /dashboard/remediation-backlog/{id}/suggestion | On-demand remediation guidance |
 | GET    | /dashboard/trends                | Historical trends       |
 
 ---

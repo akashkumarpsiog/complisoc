@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
-import { AlertCircle, Loader2, RefreshCw } from "lucide-react";
+import { useState } from "react";
+import { AlertCircle, ChevronDown, ChevronUp, Loader2, RefreshCw } from "lucide-react";
 import { accentBar, progressTone, severityBarClass, type Accent, type BarTone, type ProgressTone } from "../theme";
 
 export function Section({
@@ -8,13 +9,18 @@ export function Section({
   actions,
   children,
   className,
+  collapsible = false,
+  defaultOpen = true,
 }: {
   title: string;
   description?: string;
   actions?: ReactNode;
   children: ReactNode;
   className?: string;
+  collapsible?: boolean;
+  defaultOpen?: boolean;
 }) {
+  const [open, setOpen] = useState(defaultOpen);
   return (
     <section className={`panel shadow-sm ${className || ""}`}>
       <div className="flex flex-col gap-3 border-b border-line px-4 py-3 md:flex-row md:items-center md:justify-between">
@@ -22,9 +28,11 @@ export function Section({
           <h2 className="text-base font-semibold text-ink">{title}</h2>
           {description ? <p className="mt-1 text-sm text-slate-500">{description}</p> : null}
         </div>
-        {actions ? <div className="flex flex-wrap items-center gap-2">{actions}</div> : null}
+        <div className="flex flex-wrap items-center gap-2">{actions}
+          {collapsible ? <button className="icon-button" onClick={() => setOpen((value) => !value)} aria-expanded={open} aria-label={`${open ? "Collapse" : "Expand"} ${title}`}>{open ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}</button> : null}
+        </div>
       </div>
-      <div className="p-4">{children}</div>
+      {(!collapsible || open) ? <div className="p-4">{children}</div> : null}
     </section>
   );
 }

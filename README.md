@@ -168,6 +168,8 @@ Note: The frontend expects the backend at `http://127.0.0.1:8000/api/v1`. To use
 | `GET` | `/api/v1/dashboard/severity-distribution` | Severity metrics |
 | `GET` | `/api/v1/dashboard/gap-summary` | Gap analysis |
 | `GET` | `/api/v1/dashboard/remediation-backlog` | Remediation queue |
+| `GET` | `/api/v1/dashboard/controls/{id}/drill-down` | Control finding drill-down |
+| `POST` | `/api/v1/dashboard/remediation-backlog/{id}/suggestion` | On-demand remediation guidance |
 | `GET` | `/api/v1/dashboard/trends` | Historical trends |
 | `GET` | `/api/v1/review-queue` | List review items |
 | `POST` | `/api/v1/review-queue/{id}/approve` | Approve mapping |

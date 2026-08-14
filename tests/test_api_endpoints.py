@@ -295,10 +295,29 @@ class TestDashboardAPI:
 
     def test_remediation_backlog(self, client, db_session):
         _seed_scan(client, db_session)
+        mapping = db_session.query(ControlMapping).first()
+        mapping.mapping_status = "manual_review"
+        db_session.commit()
         resp = client.get("/api/v1/dashboard/remediation-backlog")
         assert resp.status_code == 200
         body = resp.json()
         assert "items" in body
+        assert body["items"][0]["control_catalog_id"] == mapping.control_catalog_id
+        assert "suggested_remediation_steps" not in body["items"][0]
+
+    def test_control_drill_down_and_on_demand_suggestion(self, client, db_session):
+        _seed_scan(client, db_session)
+        mapping = db_session.query(ControlMapping).first()
+        mapping.mapping_status = "manual_review"
+        db_session.commit()
+        detail = client.get(f"/api/v1/dashboard/controls/{mapping.control_catalog_id}/drill-down")
+        assert detail.status_code == 200
+        assert detail.json()["items"][0]["mapping_id"] == mapping.id
+        with patch("complisoc.backend.api.main.GROQ_API_KEY", None):
+            suggestion = client.post(f"/api/v1/dashboard/remediation-backlog/{mapping.id}/suggestion")
+        assert suggestion.status_code == 200
+        assert suggestion.json()["source"] == "deterministic_fallback"
+        assert len(suggestion.json()["steps"]) >= 2
 
     def test_trends(self, client, db_session):
         _seed_scan(client, db_session)

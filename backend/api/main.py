@@ -412,6 +412,49 @@ def dashboard_remediation_backlog(db: Session = Depends(get_db)):
     return _dashboard_remediation_backlog(db)
 
 
+@app.get("/api/v1/dashboard/controls/{control_catalog_id}/drill-down")
+def dashboard_control_drill_down(control_catalog_id: int, db: Session = Depends(get_db)):
+    """Return traceable, processed findings for a control selected in the dashboard."""
+    control = db.get(ControlCatalog, control_catalog_id)
+    if control is None:
+        not_found("Control")
+    mappings = (
+        db.query(ControlMapping)
+        .filter(
+            ControlMapping.control_catalog_id == control_catalog_id,
+            ControlMapping.mapping_status.in_(["manual_review", "rejected"]),
+        )
+        .order_by(ControlMapping.id.desc())
+        .all()
+    )
+    return {
+        "control": {
+            "id": control.id,
+            "framework_name": control.framework_name,
+            "control_id": control.control_id,
+            "title": control.title,
+            "description": control.description,
+        },
+        "items": [_mapping_backlog_item(mapping) for mapping in mappings],
+    }
+
+
+@app.post("/api/v1/dashboard/remediation-backlog/{mapping_id}/suggestion")
+def dashboard_remediation_suggestion(mapping_id: int, db: Session = Depends(get_db)):
+    """Generate a suggestion only after the operator asks for one.
+
+    Keeping this out of the list endpoint prevents a large backlog or a slow AI
+    provider from blocking the dashboard and keeps automated tests offline.
+    """
+    mapping = db.get(ControlMapping, mapping_id)
+    if mapping is None:
+        not_found("Mapping")
+    if mapping.mapping_status not in {"manual_review", "rejected"}:
+        raise HTTPException(status_code=409, detail={"code": "NOT_IN_BACKLOG", "message": "Mapping is not in remediation backlog"})
+    steps, source = _suggested_remediation_steps_with_source(mapping)
+    return {"mapping_id": mapping.id, "steps": steps, "source": source}
+
+
 def _dashboard_trends(db: Session):
     trends = []
     for scan_run in db.query(ScanRun).order_by(ScanRun.created_at).all():
@@ -532,6 +575,10 @@ def _coerce_remediation_steps(payload: object) -> list[str]:
 
 
 def _suggested_remediation_steps(mapping: ControlMapping) -> list[str]:
+    return _suggested_remediation_steps_with_source(mapping)[0]
+
+
+def _suggested_remediation_steps_with_source(mapping: ControlMapping) -> tuple[list[str], str]:
     finding = mapping.normalized_finding
     control = mapping.control_catalog
     steps = [
@@ -541,7 +588,7 @@ def _suggested_remediation_steps(mapping: ControlMapping) -> list[str]:
     ]
 
     if not GROQ_API_KEY:
-        return steps
+        return steps, "deterministic_fallback"
 
     try:
         client = Groq(api_key=GROQ_API_KEY)
@@ -566,30 +613,24 @@ def _suggested_remediation_steps(mapping: ControlMapping) -> list[str]:
             response_format={"type": "json_object"},
             temperature=0.2,
             max_tokens=500,
+            timeout=2.5,
         )
         data = extract_json(response.choices[0].message.content)
         parsed = data.get("steps") or data.get("remediation_steps") or data
         normalized = _coerce_remediation_steps(parsed)
         if len(normalized) >= 2:
-            return normalized[:3]
+            return normalized[:3], "groq"
     except Exception:
         pass
-    return steps
+    return steps, "deterministic_fallback"
 
 
 def _mapping_backlog_item(mapping: ControlMapping):
     finding = mapping.normalized_finding
     control = mapping.control_catalog
-    remediation_steps = _suggested_remediation_steps(mapping)
-    remediation = " ".join(str(step).strip() for step in remediation_steps if str(step).strip())
-    if control.control_id not in remediation:
-        remediation = (
-            f"Review {finding.resource_identifier} for {finding.title}. "
-            f"Apply the required control update for {control.framework_name} {control.control_id}: {control.title}. "
-            f"{remediation}"
-        )
     return {
         "mapping_id": mapping.id,
+        "control_catalog_id": control.id,
         "status": mapping.mapping_status,
         "severity": finding.severity,
         "resource_identifier": finding.resource_identifier,
@@ -597,6 +638,4 @@ def _mapping_backlog_item(mapping: ControlMapping):
         "control_title": control.title,
         "gemini_confidence": mapping.gemini_confidence,
         "groq_agreement_value": mapping.groq_agreement_value,
-        "suggested_remediation": remediation,
-        "suggested_remediation_steps": remediation_steps,
     }
