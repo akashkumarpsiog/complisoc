@@ -111,7 +111,11 @@ def _finding_header(finding: NormalizedFinding) -> str:
 
 
 def _clean_decision(data: dict) -> tuple[bool, float, str]:
-    maps = bool(data.get("maps", False))
+    maps_raw = data.get("maps", False)
+    if isinstance(maps_raw, str):
+        maps = maps_raw.strip().lower() in ("true", "1", "yes")
+    else:
+        maps = bool(maps_raw)
     confidence = float(data.get("confidence", 0.0))
     confidence = min(0.99, max(0.01, confidence))
     if not maps:
@@ -157,7 +161,10 @@ class GeminiMapper:
             data = extract_json(response.text)
             out: dict[int, list[CandidateDecision]] = {}
             for entry in data.get("results", []):
-                finding_id = int(entry.get("finding_id"))
+                finding_id = entry.get("finding_id")
+                if finding_id is None:
+                    continue
+                finding_id = int(finding_id)
                 if finding_id not in expected:
                     continue
                 valid_ids = set(expected[finding_id])

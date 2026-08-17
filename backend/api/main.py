@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 
 from fastapi import Depends, FastAPI, HTTPException
@@ -15,6 +15,7 @@ from complisoc.backend.database.session import get_db
 
 from complisoc.backend.api.schemas import (
     AuditBundleRead,
+    BulkReviewDecision,
     ComplianceReportRead,
     ControlMappingRead,
     ControlRead,
@@ -258,8 +259,32 @@ def get_mapping_verification(mapping_id: int, db: Session = Depends(get_db)):
 
 
 @app.get("/api/v1/review-queue", response_model=list[ReviewQueueItemRead])
-def list_review_queue(db: Session = Depends(get_db)):
-    return db.query(ReviewQueueItem).order_by(ReviewQueueItem.id.desc()).all()
+def list_review_queue(
+    status: str | None = None,
+    severity: str | None = None,
+    control_id: str | None = None,
+    scan_run_id: int | None = None,
+    db: Session = Depends(get_db),
+):
+    query = (
+        db.query(ReviewQueueItem)
+        .join(ControlMapping, ReviewQueueItem.control_mapping_id == ControlMapping.id)
+        .join(NormalizedFinding, ControlMapping.normalized_finding_id == NormalizedFinding.id)
+    )
+    if status:
+        query = query.filter(ReviewQueueItem.status == status)
+    if severity:
+        query = query.filter(NormalizedFinding.severity == severity)
+    if control_id:
+        query = query.join(ControlCatalog, ControlMapping.control_catalog_id == ControlCatalog.id).filter(ControlCatalog.control_id == control_id)
+    if scan_run_id:
+        query = (
+            query.join(RawFinding, NormalizedFinding.raw_finding_id == RawFinding.id)
+            .join(ScannerExecution, RawFinding.scanner_execution_id == ScannerExecution.id)
+            .join(ScanRun, ScannerExecution.scan_run_id == ScanRun.id)
+            .filter(ScanRun.id == scan_run_id)
+        )
+    return query.order_by(ReviewQueueItem.id.desc()).all()
 
 
 @app.get("/api/v1/review-queue/{item_id}", response_model=ReviewQueueItemRead)
@@ -278,6 +303,54 @@ def approve_review_item(item_id: int, payload: ReviewDecision, db: Session = Dep
 @app.post("/api/v1/review-queue/{item_id}/reject", response_model=ReviewQueueItemRead)
 def reject_review_item(item_id: int, payload: ReviewDecision, db: Session = Depends(get_db)):
     return _decide_review_item(db, item_id, "rejected", "rejected", payload)
+
+
+@app.post("/api/v1/review-queue/bulk-decide", response_model=list[ReviewQueueItemRead])
+def bulk_decide_review_items(payload: BulkReviewDecision, db: Session = Depends(get_db)):
+    results = []
+    for item_id in payload.item_ids[:100]:
+        item = db.get(ReviewQueueItem, item_id)
+        if item is None or item.status != "pending":
+            continue
+        mapping_status = "published" if payload.action == "approve" else "rejected"
+        result = _decide_review_item(
+            db,
+            item_id,
+            payload.action,
+            mapping_status,
+            ReviewDecision(reviewer_id=payload.reviewer_id, comments=payload.comments),
+        )
+        results.append(result)
+    db.commit()
+    return results
+
+
+@app.post("/api/v1/scan-runs/bulk-archive")
+def bulk_archive_scan_runs(payload: dict[str, list[int]], db: Session = Depends(get_db)):
+    scan_run_ids = payload.get("scan_run_ids", [])
+    for scan_run_id in scan_run_ids:
+        scan_run = db.get(ScanRun, scan_run_id)
+        if scan_run and scan_run.archived_at is None:
+            scan_run.archived_at = datetime.utcnow()
+    db.commit()
+    return {"archived_count": len(scan_run_ids)}
+
+
+@app.post("/api/v1/review-queue/cleanup")
+def cleanup_old_review_items(payload: dict[str, int] | None = None, db: Session = Depends(get_db)):
+    older_than_days = (payload or {}).get("older_than_days", 30)
+    cutoff = datetime.utcnow() - timedelta(days=older_than_days)
+    items = db.query(ReviewQueueItem).filter(
+        ReviewQueueItem.status == "pending",
+        ReviewQueueItem.created_at < cutoff,
+    ).all()
+    for item in items:
+        item.status = "dismissed"
+        item.reviewed_at = datetime.utcnow()
+        item.reviewer_id = "system-cleanup"
+        item.comments = "Auto-dismissed after 30 days without review"
+    db.commit()
+    return {"dismissed_count": len(items)}
 
 
 @app.get("/api/v1/controls", response_model=list[ControlRead])
@@ -431,8 +504,18 @@ def dashboard_gap_summary(db: Session = Depends(get_db)):
 
 
 def _dashboard_remediation_backlog(db: Session):
-    mappings = db.query(ControlMapping).filter(ControlMapping.mapping_status.in_(["manual_review", "rejected"])).all()
-    return {"items": [_mapping_backlog_item(mapping) for mapping in mappings]}
+    severity_order = {"critical": 0, "high": 1, "medium": 2, "low": 3, "info": 4}
+    query = db.query(ControlMapping).filter(ControlMapping.mapping_status.in_(["manual_review", "rejected"]))
+    total = query.count()
+    mappings = (
+        query.order_by(ControlMapping.id.desc())
+        .limit(20)
+        .all()
+    )
+    return {
+        "items": [_mapping_backlog_item(mapping) for mapping in mappings],
+        "total": total,
+    }
 
 
 @app.get("/api/v1/dashboard/remediation-backlog")
@@ -485,7 +568,14 @@ def dashboard_remediation_suggestion(mapping_id: int, db: Session = Depends(get_
 
 def _dashboard_trends(db: Session):
     trends = []
-    for scan_run in db.query(ScanRun).filter(ScanRun.archived_at.is_(None)).order_by(ScanRun.created_at).all():
+    scan_runs = (
+        db.query(ScanRun)
+        .filter(ScanRun.archived_at.is_(None))
+        .order_by(ScanRun.created_at.desc())
+        .limit(10)
+        .all()
+    )
+    for scan_run in reversed(scan_runs):
         mappings = _mappings_for_scan_run(db, scan_run.id)
         trends.append(
             {

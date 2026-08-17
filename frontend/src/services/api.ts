@@ -1,5 +1,6 @@
 import type {
   AuditBundle,
+  BulkReviewDecision,
   ComplianceReport,
   Control,
   ControlMapping,
@@ -120,7 +121,7 @@ export const api = {
     list: (framework?: string) => request<Control[]>("/controls", {}, { framework }),
   },
   reviewQueue: {
-    list: () => request<ReviewQueueItem[]>("/review-queue"),
+    list: (query?: Record<string, QueryValue>) => request<ReviewQueueItem[]>("/review-queue", {}, query),
     approve: (id: number, comments: string) =>
       request<ReviewQueueItem>(`/review-queue/${id}/approve`, {
         method: "POST",
@@ -130,6 +131,11 @@ export const api = {
       request<ReviewQueueItem>(`/review-queue/${id}/reject`, {
         method: "POST",
         body: JSON.stringify({ reviewer_id: "frontend-operator", comments }),
+      }),
+    bulkDecide: (payload: BulkReviewDecision) =>
+      request<ReviewQueueItem[]>("/review-queue/bulk-decide", {
+        method: "POST",
+        body: JSON.stringify(payload),
       }),
   },
   reports: {

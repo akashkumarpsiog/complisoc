@@ -43,6 +43,13 @@ class ReviewDecision(BaseModel):
     comments: str | None = None
 
 
+class BulkReviewDecision(BaseModel):
+    item_ids: list[int] = Field(min_length=1, max_length=100)
+    reviewer_id: str | None = None
+    comments: str | None = None
+    action: str = Field(default="approve", pattern="^(approve|reject)$")
+
+
 class ReportCreate(BaseModel):
     scan_run_id: int
 

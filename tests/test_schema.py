@@ -45,6 +45,7 @@ def test_scan_runs_schema():
         "completed_at",
         "created_at",
         "updated_at",
+        "archived_at",
     }
 
 

@@ -127,10 +127,17 @@ class GroqVerifier:
             data = extract_json(response.choices[0].message.content)
             out: dict[int, VerificationDecision] = {}
             for entry in data.get("results", []):
-                ref = int(entry.get("ref"))
+                ref = entry.get("ref")
+                if ref is None:
+                    continue
+                ref = int(ref)
                 if ref not in expected_refs:
                     continue
-                result = str(entry.get("result", "")).strip().lower()
+                result_raw = entry.get("result", "")
+                if isinstance(result_raw, bool):
+                    result = "agree" if result_raw else "disagree"
+                else:
+                    result = str(result_raw).strip().lower()
                 if result not in {"agree", "disagree"}:
                     continue
                 explanation = str(entry.get("explanation") or "No explanation provided by model.").strip()
@@ -160,22 +167,37 @@ class GroqVerifier:
         rationale: str,
     ) -> VerificationDecision:
         item = PendingVerification(ref=1, finding=finding, control=control, confidence=confidence, rationale=rationale)
-        response = self._client.chat.completions.create(
-            model=GROQ_MODEL,
-            messages=[
-                {"role": "system", "content": _SYSTEM_ONE},
-                {"role": "user", "content": _entry_block(item)},
-            ],
-            response_format={"type": "json_object"},
-            temperature=0.0,
-            timeout=self._timeout,
-        )
-        data = extract_json(response.choices[0].message.content)
-        result = str(data.get("result", "")).strip().lower()
-        if result not in {"agree", "disagree"}:
-            raise ValueError(f"Groq verification returned an invalid result: {result!r}")
-        return VerificationDecision(
-            result=result,
-            agreement_value=1.0 if result == "agree" else 0.0,
-            explanation=str(data.get("explanation") or "No explanation provided by model.").strip(),
+
+        def _attempt() -> VerificationDecision:
+            response = self._client.chat.completions.create(
+                model=GROQ_MODEL,
+                messages=[
+                    {"role": "system", "content": _SYSTEM_ONE},
+                    {"role": "user", "content": _entry_block(item)},
+                ],
+                response_format={"type": "json_object"},
+                temperature=0.0,
+                timeout=self._timeout,
+            )
+            data = extract_json(response.choices[0].message.content)
+            result_raw = data.get("result", "")
+            if isinstance(result_raw, bool):
+                result = "agree" if result_raw else "disagree"
+            else:
+                result = str(result_raw).strip().lower()
+            if result not in {"agree", "disagree"}:
+                raise ValueError(f"Groq verification returned an invalid result: {result!r}")
+            return VerificationDecision(
+                result=result,
+                agreement_value=1.0 if result == "agree" else 0.0,
+                explanation=str(data.get("explanation") or "No explanation provided by model.").strip(),
+            )
+
+        return call_with_retry(
+            _attempt,
+            attempts=3,
+            backoff=2.0,
+            delay_for=extract_retry_delay,
+            give_up_on=is_quota_exhausted,
+            max_delay=30.0,
         )

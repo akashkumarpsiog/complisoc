@@ -35,7 +35,7 @@ from complisoc.backend.database.session import get_db
 from complisoc.backend.models import ControlCatalog
 from complisoc.backend.scanners import runners
 
-REPO_ROOT = pathlib.Path(__file__).resolve().parents[3]
+REPO_ROOT = pathlib.Path(__file__).resolve().parents[2]
 SCAN_TARGETS = REPO_ROOT / "scan_targets"
 
 

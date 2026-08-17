@@ -26,17 +26,17 @@ export function App() {
   };
 
   return (
-    <Layout view={view} onViewChange={handleViewChange}>
-      {view === "overview" && <OverviewPage />}
-      {view === "scan-runs" && <ScanRunsPage onSelectScan={handleSelectScan} />}
-      {view === "scan-detail" && selectedScanId !== null && (
-        <ScanDetailPage scanRunId={selectedScanId} onBack={() => handleViewChange("scan-runs")} />
-      )}
-      {view === "scan-detail" && selectedScanId === null && <ScanRunsPage onSelectScan={handleSelectScan} />}
-      {view === "controls" && <ControlsPage />}
-      {view === "review" && <ReviewPage />}
-      {view === "reports" && <ReportsPage />}
-      {view === "audit-bundles" && <AuditBundlesPage />}
-    </Layout>
+      <Layout view={view} onViewChange={handleViewChange}>
+        {view === "overview" && <OverviewPage onViewChange={handleViewChange} />}
+        {view === "scan-runs" && <ScanRunsPage onSelectScan={handleSelectScan} />}
+        {view === "scan-detail" && selectedScanId !== null && (
+          <ScanDetailPage scanRunId={selectedScanId} onBack={() => handleViewChange("scan-runs")} />
+        )}
+        {view === "scan-detail" && selectedScanId === null && <ScanRunsPage onSelectScan={handleSelectScan} />}
+        {view === "controls" && <ControlsPage />}
+        {view === "review" && <ReviewPage />}
+        {view === "reports" && <ReportsPage />}
+        {view === "audit-bundles" && <AuditBundlesPage />}
+      </Layout>
   );
 }

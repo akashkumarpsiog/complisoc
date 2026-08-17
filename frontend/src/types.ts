@@ -152,6 +152,7 @@ export interface RemediationBacklog {
     gemini_confidence: number | null;
     groq_agreement_value: number | null;
   }>;
+  total: number;
 }
 
 export interface RemediationSuggestion {
@@ -194,4 +195,11 @@ export interface ScanRequest {
   target: string;
   scan_profile?: string;
   framework?: string;
+}
+
+export interface BulkReviewDecision {
+  item_ids: number[];
+  reviewer_id?: string | null;
+  comments?: string | null;
+  action: "approve" | "reject";
 }

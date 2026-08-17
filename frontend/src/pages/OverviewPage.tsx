@@ -6,13 +6,16 @@ import { BarList, DataTable, DonutChart, MetricCard, ProgressBar, Section, Statu
 import { ControlDrillDownDrawer, RemediationSuggestionPanel } from "../components/DashboardDetails";
 import { formatPercent } from "../utils/format";
 
-export function OverviewPage() {
+export function OverviewPage({ onViewChange }: { onViewChange?: (viewId: string) => void }) {
   const [selectedControlId, setSelectedControlId] = useState<number | null>(null);
+  const [showAllTrends, setShowAllTrends] = useState(false);
   const coverage = useResource(api.dashboard.coverage);
   const severity = useResource(api.dashboard.severity);
   const gap = useResource(api.dashboard.gap);
   const backlog = useResource(api.dashboard.backlog);
   const trends = useResource(api.dashboard.trends);
+
+  const visibleTrends = showAllTrends ? trends.data?.trends : trends.data?.trends.slice(-5);
 
   return (
     <>
@@ -86,7 +89,7 @@ export function OverviewPage() {
           <ResourceBoundary resource={trends}>
             {(data) => (
               <div className="space-y-3">
-                {data.trends.slice().reverse().map((item: { scan_run_id: number; published: number; manual_review: number; created_at: string }) => (
+                {(visibleTrends || []).slice().reverse().map((item: { scan_run_id: number; published: number; manual_review: number; created_at: string }) => (
                   <div key={item.scan_run_id} className="space-y-1.5">
                     <div className="flex items-center justify-between text-sm">
                       <span className="font-medium text-slate-700">Scan #{item.scan_run_id}</span>
@@ -104,6 +107,11 @@ export function OverviewPage() {
                     </div>
                   </div>
                 ))}
+                {trends.data && trends.data.trends.length > 5 && (
+                  <button className="text-sm font-medium text-brand-700 hover:text-brand-800" onClick={() => setShowAllTrends(!showAllTrends)}>
+                    {showAllTrends ? "Show less" : `Show all ${trends.data.trends.length} scans`}
+                  </button>
+                )}
               </div>
             )}
           </ResourceBoundary>
@@ -148,19 +156,30 @@ export function OverviewPage() {
           {(data) => (
             <div className="space-y-4">
               {data.items.length > 0 ? (
-                <DataTable
-                  columns={["Mapping", "Status", "Severity", "Resource", "Control", "Gemini", "Groq", "Guidance"]}
-                  rows={data.items.map((item) => [
-                    item.mapping_id,
-                    <StatusBadge value={item.status} />,
-                    item.severity,
-                    item.resource_identifier,
-                    <button className="text-left font-medium text-brand-700 underline-offset-2 hover:underline focus:outline-none focus:ring-2 focus:ring-brand-500" onClick={() => setSelectedControlId(item.control_catalog_id)}>{item.control_id} {item.control_title}</button>,
-                    formatPercent(item.gemini_confidence),
-                    formatPercent(item.groq_agreement_value),
-                    <RemediationSuggestionPanel item={item} />,
-                  ])}
-                />
+                <>
+                  <DataTable
+                    columns={["Mapping", "Status", "Severity", "Resource", "Control", "Gemini", "Groq", "Guidance"]}
+                    rows={data.items.map((item) => [
+                      item.mapping_id,
+                      <StatusBadge value={item.status} />,
+                      item.severity,
+                      item.resource_identifier,
+                      <button className="text-left font-medium text-brand-700 underline-offset-2 hover:underline focus:outline-none focus:ring-2 focus:ring-brand-500" onClick={() => setSelectedControlId(item.control_catalog_id)}>{item.control_id} {item.control_title}</button>,
+                      formatPercent(item.gemini_confidence),
+                      formatPercent(item.groq_agreement_value),
+                      <RemediationSuggestionPanel item={item} />,
+                    ])}
+                  />
+                  {data.total > data.items.length && (
+                    <p className="text-sm text-slate-500">
+                      Showing {data.items.length} of {data.total} items. {onViewChange ? (
+                        <button className="font-medium text-brand-700 underline-offset-2 hover:underline" onClick={() => onViewChange("review")}>View all {data.total} items in Review Queue &rarr;</button>
+                      ) : (
+                        <span className="font-medium text-brand-700">View all {data.total} items in Review Queue &rarr;</span>
+                      )}
+                    </p>
+                  )}
+                </>
               ) : (
                 <p className="text-sm text-slate-500">No remediation items in the backlog.</p>
               )}
