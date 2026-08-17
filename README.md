@@ -72,7 +72,27 @@ Copy `.env.example` to `.env` and set `GEMINI_API_KEY` (Gemini 2.5 Flash, primar
 cp .env.example .env
 ```
 
-3. Configure the database (optional):
+4. Configure Microsoft Defender for Cloud (optional):
+
+Complisoc can ingest Microsoft Defender for Cloud findings (alerts, recommendations, secure scores) from an Azure subscription. To enable:
+
+1. Enable **Microsoft Defender for Cloud** (Foundational CSPM) on your Azure subscription. This is free. Wait 15–30 minutes for assessments to populate.
+2. Create a read-only service principal:
+   ```powershell
+   az ad sp create-for-rbac --name "complisoc-defender-scanner" --role Reader --scopes /subscriptions/<your-subscription-id>
+   ```
+3. Add the output values to `.env`:
+   ```env
+   AZURE_TENANT_ID=<tenant>
+   AZURE_CLIENT_ID=<appId>
+   AZURE_CLIENT_SECRET=<password>
+   AZURE_SUBSCRIPTION_ID=<subscription-id>
+   ```
+4. Trigger an Azure scan from the frontend (Live scan → Azure Subscription) or call `POST /api/v1/scans` with `scan_profile: "azure"`.
+
+Defender findings are normalized into the same `NormalizedFinding` schema as other scanners and flow through the standard AI compliance pipeline. See `scan_targets/azure/README.md` for the test IaC target.
+
+5. Configure the database (optional):
 
 By default the app uses SQLite at `complisoc.db` in the repository root. To override:
 
@@ -80,19 +100,19 @@ By default the app uses SQLite at `complisoc.db` in the repository root. To over
 $env:DATABASE_URL = "sqlite:///C:/path/to/complisoc.db"
 ```
 
-4. Apply migrations:
+6. Apply migrations:
 
 ```powershell
 alembic upgrade head
 ```
 
-5. Run tests:
+7. Run tests:
 
 ```powershell
 python -m pytest -v
 ```
 
-6. Start the API server:
+8. Start the API server:
 
 ```powershell
 uvicorn complisoc.backend.api.main:app --reload --port 8000
