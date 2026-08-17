@@ -205,6 +205,9 @@ def test_defender_parser_extracts_alerts():
     alerts_resp = MagicMock()
     alerts_resp.status_code = 200
     alerts_resp.json.return_value = {"value": [alert]}
+    empty_resp = MagicMock()
+    empty_resp.status_code = 200
+    empty_resp.json.return_value = {"value": []}
     with patch.dict(
         os.environ,
         {
@@ -213,16 +216,141 @@ def test_defender_parser_extracts_alerts():
             "AZURE_CLIENT_SECRET": "secret",
             "AZURE_SUBSCRIPTION_ID": "sub",
         },
-    ), patch.object(runners._requests, "post", return_value=token_resp) as mock_post, patch.object(
+    ), patch.object(runners._requests, "post", return_value=token_resp), patch.object(
         runners._requests, "Session"
     ) as MockSession:
         session_instance = MockSession.return_value
-        session_instance.get.return_value = alerts_resp
+        def _get_side_effect(url, **kwargs):
+            if "alerts?" in url:
+                return alerts_resp
+            return empty_resp
+        session_instance.get.side_effect = _get_side_effect
         session_instance.headers = {}
         findings, error = runners.DefenderScanner().run("target")
     assert error is None
     assert len(findings) == 1
     assert findings[0]["raw_json"]["title"] == "Suspicious login"
+    assert findings[0]["raw_json"]["defender_source"] == "alerts"
+
+
+def test_defender_parser_extracts_assessments():
+    assessment = {
+        "properties": {
+            "displayName": "Enable disk encryption",
+            "assessmentType": "DiskEncryption",
+            "severity": "HIGH",
+            "description": "Managed disks should be encrypted.",
+            "resourceDetails": {"resourceId": "/subscriptions/sub/resource/r2", "resourceType": "Microsoft.Compute/disks"},
+            "remediationSteps": "Enable encryption on managed disks.",
+        }
+    }
+    token_resp = MagicMock()
+    token_resp.status_code = 200
+    token_resp.json.return_value = {"access_token": "abc"}
+    assessments_resp = MagicMock()
+    assessments_resp.status_code = 200
+    assessments_resp.json.return_value = {"value": [assessment]}
+    empty_resp = MagicMock()
+    empty_resp.status_code = 200
+    empty_resp.json.return_value = {"value": []}
+    with patch.dict(
+        os.environ,
+        {
+            "AZURE_TENANT_ID": "tenant",
+            "AZURE_CLIENT_ID": "client",
+            "AZURE_CLIENT_SECRET": "secret",
+            "AZURE_SUBSCRIPTION_ID": "sub",
+        },
+    ), patch.object(runners._requests, "post", return_value=token_resp), patch.object(
+        runners._requests, "Session"
+    ) as MockSession:
+        session_instance = MockSession.return_value
+        def _get_side_effect(url, **kwargs):
+            if "assessments?" in url:
+                return assessments_resp
+            return empty_resp
+        session_instance.get.side_effect = _get_side_effect
+        session_instance.headers = {}
+        findings, error = runners.DefenderScanner().run("target")
+    assert error is None
+    assert len(findings) == 1
+    assert findings[0]["raw_json"]["finding_type"] == "Enable disk encryption"
+    assert findings[0]["raw_json"]["defender_source"] == "assessments"
+    assert findings[0]["raw_json"]["remediationSteps"] == "Enable encryption on managed disks."
+
+
+def test_defender_parser_extracts_secure_scores():
+    score = {
+        "properties": {
+            "displayName": "Secure score",
+            "severity": "MEDIUM",
+            "description": "Overall secure score.",
+            "score": {"controlId": "diskEncryption", "current": 2, "max": 10},
+            "percentage": 20,
+        }
+    }
+    token_resp = MagicMock()
+    token_resp.status_code = 200
+    token_resp.json.return_value = {"access_token": "abc"}
+    scores_resp = MagicMock()
+    scores_resp.status_code = 200
+    scores_resp.json.return_value = {"value": [score]}
+    empty_resp = MagicMock()
+    empty_resp.status_code = 200
+    empty_resp.json.return_value = {"value": []}
+    with patch.dict(
+        os.environ,
+        {
+            "AZURE_TENANT_ID": "tenant",
+            "AZURE_CLIENT_ID": "client",
+            "AZURE_CLIENT_SECRET": "secret",
+            "AZURE_SUBSCRIPTION_ID": "sub",
+        },
+    ), patch.object(runners._requests, "post", return_value=token_resp), patch.object(
+        runners._requests, "Session"
+    ) as MockSession:
+        session_instance = MockSession.return_value
+        def _get_side_effect(url, **kwargs):
+            if "secureScores?" in url:
+                return scores_resp
+            return empty_resp
+        session_instance.get.side_effect = _get_side_effect
+        session_instance.headers = {}
+        findings, error = runners.DefenderScanner().run("target")
+    assert error is None
+    assert len(findings) == 1
+    assert findings[0]["raw_json"]["finding_type"] == "DefenderSecureScore"
+    assert findings[0]["raw_json"]["defender_source"] == "secureScores"
+
+
+def test_defender_retry_on_transient_failure():
+    token_resp = MagicMock()
+    token_resp.status_code = 200
+    token_resp.json.return_value = {"access_token": "abc"}
+    fail_resp = MagicMock()
+    fail_resp.status_code = 429
+    fail_resp.raise_for_status.side_effect = runners._requests.HTTPError("429 Too Many Requests")
+    success_resp = MagicMock()
+    success_resp.status_code = 200
+    success_resp.json.return_value = {"value": []}
+    with patch.dict(
+        os.environ,
+        {
+            "AZURE_TENANT_ID": "tenant",
+            "AZURE_CLIENT_ID": "client",
+            "AZURE_CLIENT_SECRET": "secret",
+            "AZURE_SUBSCRIPTION_ID": "sub",
+        },
+    ), patch.object(runners._requests, "post", return_value=token_resp), patch.object(
+        runners._requests, "Session"
+    ) as MockSession:
+        session_instance = MockSession.return_value
+        session_instance.get.side_effect = [fail_resp, success_resp, success_resp, success_resp, success_resp]
+        session_instance.headers = {}
+        findings, error = runners.DefenderScanner().run("target")
+    assert error is None
+    assert findings == []
+    assert session_instance.get.call_count >= 2
 
 
 def test_sonarqube_missing_env_returns_failure():

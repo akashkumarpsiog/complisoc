@@ -174,7 +174,7 @@ export function ErrorState({ message, onRetry }: { message: string; onRetry: () 
   );
 }
 
-export function DataTable({ columns, rows }: { columns: string[]; rows: ReactNode[][] }) {
+export function DataTable({ columns, rows, expandableRows }: { columns: string[]; rows: ReactNode[][]; expandableRows?: ReactNode[] }) {
   if (rows.length === 0) {
     return <EmptyState label="No records found." />;
   }
@@ -198,6 +198,13 @@ export function DataTable({ columns, rows }: { columns: string[]; rows: ReactNod
                   {cell}
                 </td>
               ))}
+            </tr>
+          ))}
+          {expandableRows?.map((row, index) => (
+            <tr key={`expand-${index}`} className="bg-slate-50/60">
+              <td colSpan={columns.length} className="px-3 py-3">
+                {row}
+              </td>
             </tr>
           ))}
         </tbody>

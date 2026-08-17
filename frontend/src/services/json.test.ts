@@ -3,7 +3,7 @@ import { parseFailureJson, parseFindingJson, sampleFindings } from "./json";
 
 describe("scan-run JSON parsing", () => {
   it("accepts valid scanner findings", () => {
-    expect(parseFindingJson(sampleFindings)).toHaveLength(1);
+    expect(parseFindingJson(sampleFindings)).toHaveLength(4);
   });
 
   it("rejects malformed findings", () => {

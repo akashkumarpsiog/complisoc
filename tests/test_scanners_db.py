@@ -23,6 +23,7 @@ from complisoc.backend.database.base import Base
 from complisoc.backend.database.session import get_db
 from complisoc.backend.models import (
     ControlCatalog,
+    NormalizedFinding,
     RawFinding,
     ScanRun,
     ScannerExecution,
@@ -164,6 +165,9 @@ class TestDefenderIntegration:
         alerts_resp = MagicMock()
         alerts_resp.status_code = 200
         alerts_resp.json.return_value = {"value": [alert]}
+        empty_resp = MagicMock()
+        empty_resp.status_code = 200
+        empty_resp.json.return_value = {"value": []}
         with patch.dict(
             os.environ,
             {
@@ -176,12 +180,59 @@ class TestDefenderIntegration:
             runners._requests, "Session"
         ) as MockSession:
             session_instance = MockSession.return_value
-            session_instance.get.return_value = alerts_resp
+            def _get_side_effect(url, **kwargs):
+                if "alerts?" in url:
+                    return alerts_resp
+                return empty_resp
+            session_instance.get.side_effect = _get_side_effect
             session_instance.headers = {}
             findings, error = runners.DefenderScanner().run("target")
         assert error is None
         assert len(findings) == 1
         assert findings[0]["raw_json"]["title"] == "Suspicious login"
+
+    def test_defender_recommendations_ingested_into_db(self, db_session):
+        assessment = {
+            "properties": {
+                "displayName": "Enable disk encryption",
+                "assessmentType": "DiskEncryption",
+                "severity": "HIGH",
+                "description": "Managed disks should be encrypted.",
+                "resourceDetails": {"resourceId": "/subscriptions/sub/resource/r2", "resourceType": "Microsoft.Compute/disks"},
+                "remediationSteps": "Enable encryption on managed disks.",
+            }
+        }
+        token_resp = MagicMock()
+        token_resp.status_code = 200
+        token_resp.json.return_value = {"access_token": "abc"}
+        assessments_resp = MagicMock()
+        assessments_resp.status_code = 200
+        assessments_resp.json.return_value = {"value": [assessment]}
+        empty_resp = MagicMock()
+        empty_resp.status_code = 200
+        empty_resp.json.return_value = {"value": []}
+        with patch.dict(
+            os.environ,
+            {
+                "AZURE_TENANT_ID": "tenant",
+                "AZURE_CLIENT_ID": "client",
+                "AZURE_CLIENT_SECRET": "secret",
+                "AZURE_SUBSCRIPTION_ID": "sub",
+            },
+        ), patch.object(runners._requests, "post", return_value=token_resp), patch.object(
+            runners._requests, "Session"
+        ) as MockSession:
+            session_instance = MockSession.return_value
+            def _get_side_effect(url, **kwargs):
+                if "assessments?" in url:
+                    return assessments_resp
+                return empty_resp
+            session_instance.get.side_effect = _get_side_effect
+            session_instance.headers = {}
+            findings, error = runners.DefenderScanner().run("target")
+        assert error is None
+        assert len(findings) == 1
+        assert findings[0]["raw_json"]["defender_source"] == "assessments"
 
 
 class TestScanRunDBLineage:

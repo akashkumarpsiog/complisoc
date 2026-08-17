@@ -593,6 +593,39 @@ def dashboard_trends(db: Session = Depends(get_db)):
     return _dashboard_trends(db)
 
 
+def _dashboard_cloud_findings(db: Session) -> dict[str, int]:
+    alerts = (
+        db.query(NormalizedFinding)
+        .filter(
+            NormalizedFinding.scanner_name == "defender",
+            func.json_extract(NormalizedFinding.metadata_json, "$.defender_source") == "alerts",
+        )
+        .count()
+    )
+    recommendations = (
+        db.query(NormalizedFinding)
+        .filter(
+            NormalizedFinding.scanner_name == "defender",
+            func.json_extract(NormalizedFinding.metadata_json, "$.defender_source") == "assessments",
+        )
+        .count()
+    )
+    secure_scores = (
+        db.query(NormalizedFinding)
+        .filter(
+            NormalizedFinding.scanner_name == "defender",
+            func.json_extract(NormalizedFinding.metadata_json, "$.defender_source") == "secureScores",
+        )
+        .count()
+    )
+    return {"alerts": alerts, "recommendations": recommendations, "secure_scores": secure_scores}
+
+
+@app.get("/api/v1/dashboard/cloud-findings")
+def dashboard_cloud_findings(db: Session = Depends(get_db)):
+    return _dashboard_cloud_findings(db)
+
+
 def _ensure_scan_run(db: Session, scan_run_id: int):
     if db.get(ScanRun, scan_run_id) is None:
         not_found("Scan run")

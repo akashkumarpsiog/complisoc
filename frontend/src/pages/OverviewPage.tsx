@@ -14,6 +14,7 @@ export function OverviewPage({ onViewChange }: { onViewChange?: (viewId: string)
   const gap = useResource(api.dashboard.gap);
   const backlog = useResource(api.dashboard.backlog);
   const trends = useResource(api.dashboard.trends);
+  const cloudFindings = useResource(api.dashboard.cloudFindings);
 
   const visibleTrends = showAllTrends ? trends.data?.trends : trends.data?.trends.slice(-5);
 
@@ -41,6 +42,16 @@ export function OverviewPage({ onViewChange }: { onViewChange?: (viewId: string)
         </ResourceBoundary>
         <ResourceBoundary resource={backlog}>
           {(data) => <MetricCard label="Backlog" value={data.items.length} detail="Remediation queue items" accent="brand" />}
+        </ResourceBoundary>
+        <ResourceBoundary resource={cloudFindings}>
+          {(data) => (
+            <MetricCard
+              label="Cloud findings"
+              value={data.alerts + data.recommendations + data.secure_scores}
+              detail={`${data.alerts} alerts · ${data.recommendations} recommendations · ${data.secure_scores} scores`}
+              accent="slate"
+            />
+          )}
         </ResourceBoundary>
       </div>
 

@@ -117,6 +117,12 @@ export interface AuditBundle {
   checksum: string;
 }
 
+export interface DashboardCloudFindings {
+  alerts: number;
+  recommendations: number;
+  secure_scores: number;
+}
+
 export interface DashboardCoverage {
   covered_controls: number;
   total_controls: number;

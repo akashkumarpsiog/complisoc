@@ -20,6 +20,8 @@ from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import Any
 
+from complisoc.backend.core.retry import call_with_retry
+
 try:
     import requests as _requests
 
@@ -306,7 +308,7 @@ class DefenderScanner(BaseScanner):
     name = "defender"
     kind = "cloud"
     label = "Azure Defender"
-    description = "Reads Microsoft Defender for Cloud alerts from the configured Azure subscription."
+    description = "Reads Microsoft Defender for Cloud alerts, recommendations, and secure scores from the configured Azure subscription."
     required_inputs = [
         "Azure subscription/resource scope in Target",
         "AZURE_TENANT_ID",
@@ -324,17 +326,10 @@ class DefenderScanner(BaseScanner):
             missing.append("requests library")
         return missing
 
-    def run(self, target: str, timeout: int = 300) -> tuple[list[dict[str, Any]], str | None]:
-        missing = [env for env in ["AZURE_TENANT_ID", "AZURE_CLIENT_ID", "AZURE_CLIENT_SECRET", "AZURE_SUBSCRIPTION_ID"] if not os.environ.get(env)]
-        if missing:
-            return [], f"defender requires {', '.join(missing)}"
-        if not _HAS_REQUESTS:
-            return [], "defender requires the requests library; install it to enable."
-
+    def _authenticate(self, timeout: int = 300) -> tuple[_requests.Session | None, str | None]:
         tenant = os.environ["AZURE_TENANT_ID"]
         client_id = os.environ["AZURE_CLIENT_ID"]
         client_secret = os.environ["AZURE_CLIENT_SECRET"]
-        subscription = os.environ["AZURE_SUBSCRIPTION_ID"]
         token_url = f"https://login.microsoftonline.com/{tenant}/oauth2/v2.0/token"
         token_data = {
             "grant_type": "client_credentials",
@@ -342,32 +337,32 @@ class DefenderScanner(BaseScanner):
             "client_secret": client_secret,
             "scope": "https://management.azure.com/.default",
         }
-
         try:
             token_resp = _requests.post(token_url, data=token_data, timeout=timeout)
         except _requests.RequestException as exc:
-            return [], f"defender token request failed: {exc}"
+            return None, f"defender token request failed: {exc}"
         if token_resp.status_code != 200:
-            return [], f"defender token endpoint returned {token_resp.status_code}: {token_resp.text[:500]}"
-
+            return None, f"defender token endpoint returned {token_resp.status_code}: {token_resp.text[:500]}"
         access_token = token_resp.json().get("access_token")
         if not access_token:
-            return [], "defender token response missing access_token"
-
+            return None, "defender token response missing access_token"
         headers = {"Authorization": f"Bearer {access_token}", "Accept": "application/json"}
-        findings: list[dict[str, Any]] = []
         session = _requests.Session()
         session.headers.update(headers)
+        return session, None
+
+    def _fetch_alerts(self, subscription: str, session: _requests.Session, target: str, timeout: int) -> tuple[list[dict[str, Any]], str | None]:
         url = f"https://management.azure.com/subscriptions/{subscription}/providers/Microsoft.Security/alerts?api-version=2020-01-01-preview"
-
         try:
-            resp = session.get(url, timeout=timeout)
-        except _requests.RequestException as exc:
-            return findings, f"defender alerts request failed: {exc}"
-        if resp.status_code != 200:
-            return findings, f"defender returned {resp.status_code}: {resp.text[:500]}"
-
+            def _get():
+                resp = session.get(url, timeout=timeout)
+                resp.raise_for_status()
+                return resp
+            resp = call_with_retry(_get, attempts=3, backoff=1.0, max_delay=30.0)
+        except Exception as exc:
+            return [], f"defender alerts request failed: {exc}"
         alerts = resp.json().get("value") or []
+        findings: list[dict[str, Any]] = []
         for alert in alerts:
             props = alert.get("properties") or {}
             raw = {
@@ -377,8 +372,108 @@ class DefenderScanner(BaseScanner):
                 "severity": (props.get("severity") or "medium").lower(),
                 "title": props.get("alertDisplayName") or "Microsoft Defender alert",
                 "description": props.get("description") or props.get("remediationSteps"),
+                "defender_source": "alerts",
+                "alertType": props.get("alertType"),
+                "remediationSteps": props.get("remediationSteps"),
             }
             findings.append(self._emit(raw))
+        return findings, None
+
+    def _fetch_assessments(self, subscription: str, session: _requests.Session, target: str, timeout: int) -> tuple[list[dict[str, Any]], str | None]:
+        findings: list[dict[str, Any]] = []
+        page = 0
+        while True:
+            url = f"https://management.azure.com/subscriptions/{subscription}/providers/Microsoft.Security/assessments?api-version=2020-01-01-preview"
+            params = {"$top": 100, "$skip": page * 100}
+            try:
+                def _get():
+                    resp = session.get(url, params=params, timeout=timeout)
+                    resp.raise_for_status()
+                    return resp
+                resp = call_with_retry(_get, attempts=3, backoff=1.0, max_delay=30.0)
+            except Exception as exc:
+                return findings, f"defender assessments request failed: {exc}"
+            items = resp.json().get("value") or []
+            if not items:
+                break
+            for item in items:
+                props = item.get("properties") or {}
+                details = props.get("resourceDetails") or {}
+                raw = {
+                    "finding_type": props.get("displayName") or props.get("assessmentType") or "defender-assessment",
+                    "resource_type": details.get("resourceType") or "azure-resource",
+                    "resource_identifier": details.get("resourceId") or target,
+                    "severity": (props.get("severity") or "medium").lower(),
+                    "title": props.get("displayName") or "Microsoft Defender recommendation",
+                    "description": props.get("description") or props.get("shortDescription"),
+                    "defender_source": "assessments",
+                    "assessmentType": props.get("assessmentType"),
+                    "resourceType": details.get("resourceType"),
+                    "remediationSteps": props.get("remediationSteps"),
+                }
+                findings.append(self._emit(raw))
+            if len(items) < 100:
+                break
+            page += 1
+            if page * 100 >= 1000:
+                break
+        return findings, None
+
+    def _fetch_secure_scores(self, subscription: str, session: _requests.Session, target: str, timeout: int) -> tuple[list[dict[str, Any]], str | None]:
+        findings: list[dict[str, Any]] = []
+        page = 0
+        while True:
+            url = f"https://management.azure.com/subscriptions/{subscription}/providers/Microsoft.Security/secureScores?api-version=2020-01-01-preview"
+            params = {"$top": 100, "$skip": page * 100}
+            try:
+                def _get():
+                    resp = session.get(url, params=params, timeout=timeout)
+                    resp.raise_for_status()
+                    return resp
+                resp = call_with_retry(_get, attempts=3, backoff=1.0, max_delay=30.0)
+            except Exception as exc:
+                return findings, f"defender secure scores request failed: {exc}"
+            items = resp.json().get("value") or []
+            if not items:
+                break
+            for item in items:
+                props = item.get("properties") or {}
+                raw = {
+                    "finding_type": "DefenderSecureScore",
+                    "resource_type": "secure-score",
+                    "resource_identifier": props.get("score", {}).get("controlId") or target,
+                    "severity": (props.get("severity") or "medium").lower(),
+                    "title": props.get("displayName") or "Microsoft Defender secure score",
+                    "description": props.get("description"),
+                    "defender_source": "secureScores",
+                    "score": props.get("score"),
+                    "percentage": props.get("percentage"),
+                }
+                findings.append(self._emit(raw))
+            if len(items) < 100:
+                break
+            page += 1
+            if page * 100 >= 1000:
+                break
+        return findings, None
+
+    def run(self, target: str, timeout: int = 300) -> tuple[list[dict[str, Any]], str | None]:
+        missing = [env for env in ["AZURE_TENANT_ID", "AZURE_CLIENT_ID", "AZURE_CLIENT_SECRET", "AZURE_SUBSCRIPTION_ID"] if not os.environ.get(env)]
+        if missing:
+            return [], f"defender requires {', '.join(missing)}"
+        if not _HAS_REQUESTS:
+            return [], "defender requires the requests library; install it to enable."
+
+        session, error = self._authenticate(timeout)
+        if error:
+            return [], error
+
+        findings: list[dict[str, Any]] = []
+        for fetcher in (self._fetch_alerts, self._fetch_assessments, self._fetch_secure_scores):
+            scanned, error = fetcher(os.environ["AZURE_SUBSCRIPTION_ID"], session, target, timeout)
+            if error:
+                return findings, error
+            findings.extend(scanned)
         return findings, None
 
 

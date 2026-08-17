@@ -50,7 +50,8 @@ AuditBundle
 
 | Method | Endpoint                | Purpose         |
 | ------ | ----------------------- | --------------- |
-| POST   | /scan-runs              | Create scan run |
+| POST   | /scans                  | Trigger live scan |
+| POST   | /scan-runs              | Ingest findings |
 | GET    | /scan-runs              | List scan runs  |
 | GET    | /scan-runs/{id}         | Get scan run    |
 | GET    | /scan-runs/{id}/summary | Scan summary    |

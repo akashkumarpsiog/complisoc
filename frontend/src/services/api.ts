@@ -6,6 +6,7 @@ import type {
   ControlMapping,
   ControlDrillDown,
   DashboardCoverage,
+  DashboardCloudFindings,
   DashboardGap,
   DashboardSeverity,
   DashboardTrend,
@@ -90,6 +91,7 @@ export const api = {
     controlDrillDown: (controlCatalogId: number) => request<ControlDrillDown>(`/dashboard/controls/${controlCatalogId}/drill-down`),
     suggestion: (mappingId: number) => request<RemediationSuggestion>(`/dashboard/remediation-backlog/${mappingId}/suggestion`, { method: "POST" }),
     trends: () => request<DashboardTrend>("/dashboard/trends"),
+    cloudFindings: () => request<DashboardCloudFindings>("/dashboard/cloud-findings"),
   },
   scanRuns: {
     list: (archivedOnly = false) => request<ScanRun[]>("/scan-runs", {}, { archived_only: archivedOnly ? "true" : undefined }),

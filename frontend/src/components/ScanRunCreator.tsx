@@ -101,7 +101,7 @@ function LiveScanForm({
   useEffect(() => {
     if (targetType === "local") setTarget(".");
     if (targetType === "aws") setTarget("aws-iac-container");
-    if (targetType === "azure") setTarget("azure-subscription");
+    if (targetType === "azure") setTarget("scan_targets/azure/");
     if (targetType === "git") setTarget("");
   }, [targetType]);
 
@@ -203,7 +203,7 @@ function LiveScanForm({
               {targetType === "aws"
                 ? "AWS scans use Checkov for IaC, Trivy for vulnerabilities, and SonarQube for static code analysis."
                 : targetType === "azure"
-                  ? "Azure scans use Defender for cloud alerts, Checkov for IaC, Trivy for vulnerabilities, and SonarQube for static code analysis."
+                  ? "Azure scans fetch Defender alerts, recommendations, and secure scores, plus Checkov for IaC, Trivy for vulnerabilities, and SonarQube for static code analysis."
                   : targetType === "git"
                     ? "Repository scans use Trivy and Checkov, plus SonarQube if a project is configured."
                     : "Local scans use Checkov and Trivy, plus SonarQube if a project is configured."}

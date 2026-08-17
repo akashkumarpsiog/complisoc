@@ -325,6 +325,64 @@ class TestDashboardAPI:
         assert resp.status_code == 200
         assert "trends" in resp.json()
 
+    def test_cloud_findings(self, client, db_session):
+        from complisoc.backend.models import NormalizedFinding, RawFinding, ScannerExecution, ScanRun
+        scan_run = ScanRun(target_environment="cloud-test", status="completed")
+        db_session.add(scan_run)
+        db_session.commit()
+        db_session.refresh(scan_run)
+        execution = ScannerExecution(scan_run_id=scan_run.id, scanner_name="defender", status="completed")
+        db_session.add(execution)
+        db_session.commit()
+        db_session.refresh(execution)
+        raw1 = RawFinding(scanner_execution_id=execution.id, scanner_name="defender", scanner_finding_id="d1", raw_json={"defender_source": "alerts"})
+        raw2 = RawFinding(scanner_execution_id=execution.id, scanner_name="defender", scanner_finding_id="d2", raw_json={"defender_source": "assessments"})
+        raw3 = RawFinding(scanner_execution_id=execution.id, scanner_name="defender", scanner_finding_id="d3", raw_json={"defender_source": "secureScores"})
+        db_session.add_all([raw1, raw2, raw3])
+        db_session.commit()
+        db_session.refresh(raw1)
+        db_session.refresh(raw2)
+        db_session.refresh(raw3)
+        db_session.add_all([
+            NormalizedFinding(
+                raw_finding_id=raw1.id,
+                scanner_name="defender",
+                finding_type="DefenderAlert",
+                resource_type="azure-resource",
+                resource_identifier="r1",
+                severity="high",
+                title="Alert",
+                metadata_json={"defender_source": "alerts"},
+            ),
+            NormalizedFinding(
+                raw_finding_id=raw2.id,
+                scanner_name="defender",
+                finding_type="DefenderRecommendation",
+                resource_type="azure-resource",
+                resource_identifier="r2",
+                severity="high",
+                title="Rec",
+                metadata_json={"defender_source": "assessments"},
+            ),
+            NormalizedFinding(
+                raw_finding_id=raw3.id,
+                scanner_name="defender",
+                finding_type="DefenderSecureScore",
+                resource_type="secure-score",
+                resource_identifier="diskEncryption",
+                severity="medium",
+                title="Score",
+                metadata_json={"defender_source": "secureScores"},
+            ),
+        ])
+        db_session.commit()
+        resp = client.get("/api/v1/dashboard/cloud-findings")
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["alerts"] == 1
+        assert body["recommendations"] == 1
+        assert body["secure_scores"] == 1
+
 
 class TestScanRunsAPI:
     def test_list_scan_runs(self, client, db_session):

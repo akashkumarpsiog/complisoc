@@ -125,6 +125,7 @@ function FindingsTab({
 }) {
   const [severity, setSeverity] = useState("");
   const [scanner, setScanner] = useState("");
+  const [expanded, setExpanded] = useState<Set<number>>(new Set());
   const filtered = useMemo(
     () =>
       findings.filter((item) => {
@@ -132,6 +133,18 @@ function FindingsTab({
       }),
     [findings, severity, scanner],
   );
+
+  const toggle = (id: number) => {
+    setExpanded((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
+  };
 
   return (
     <Section
@@ -154,9 +167,11 @@ function FindingsTab({
       <ResourceBoundary resource={{ ...resource, data: filtered }}>
         {(data) => (
           <DataTable
-            columns={["ID", "Severity", "Scanner", "Resource", "Title", "Description"]}
+            columns={["ID", "Severity", "Scanner", "Resource", "Title", "Description", "Details"]}
             rows={data.map((finding) => {
               const description = finding.description || "No description";
+              const isDefender = finding.scanner_name === "defender";
+              const meta = (finding.metadata_json || {}) as Record<string, unknown>;
               return [
                 finding.id,
                 <StatusBadge value={finding.severity} />,
@@ -164,7 +179,26 @@ function FindingsTab({
                 finding.resource_identifier,
                 finding.title,
                 <span className="max-w-[320px] truncate" title={description}>{description}</span>,
+                isDefender ? (
+                  <button className="text-sm font-medium text-brand-700 hover:text-brand-800" onClick={() => toggle(finding.id)}>
+                    {isOpen ? "Hide" : "Show"} details
+                  </button>
+                ) : null,
               ];
+            })}
+            expandableRows={data.map((finding) => {
+              if (finding.scanner_name !== "defender" || !expanded.has(finding.id)) return null;
+              const meta = (finding.metadata_json || {}) as Record<string, unknown>;
+              const alertType = typeof meta.alertType === "string" ? meta.alertType : typeof meta.assessmentType === "string" ? meta.assessmentType : null;
+              const resourceType = typeof meta.resourceType === "string" ? meta.resourceType : typeof meta.resource_type === "string" ? meta.resource_type : null;
+              const remediationSteps = typeof meta.remediationSteps === "string" ? meta.remediationSteps : null;
+              return (
+                <div key={finding.id} className="space-y-2 text-sm text-slate-700">
+                  {alertType ? <div><span className="font-medium">Type:</span> {alertType}</div> : null}
+                  {resourceType ? <div><span className="font-medium">Resource type:</span> {resourceType}</div> : null}
+                  {remediationSteps ? <div><span className="font-medium">Remediation:</span> {remediationSteps}</div> : null}
+                </div>
+              );
             })}
           />
         )}
