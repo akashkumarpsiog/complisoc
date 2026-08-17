@@ -15,6 +15,7 @@ export function ScanRunsPage({ onSelectScan }: { onSelectScan: (id: number) => v
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const selected = scanRuns.data?.find((item) => item.id === selectedId) || null;
   const [summary, setSummary] = useState<ScanRunSummary | null>(null);
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
 
   useEffect(() => {
     if (!selected) {
@@ -27,8 +28,12 @@ export function ScanRunsPage({ onSelectScan }: { onSelectScan: (id: number) => v
   return (
     <div className="grid gap-5 2xl:grid-cols-[1fr_420px]">
       <Section title="Scan Runs" description={showArchived ? "Archived scan history only. Restore a scan to return it to active views." : "Active scans only. Archived scans remain available for audit."} actions={<><button className="secondary-button" onClick={() => setShowArchived((value) => !value)}>{showArchived ? "Show active" : "Show archived"}</button><ScanRunCreator onCreated={scanRuns.reload} /></>}>
+        <div className="mb-4 flex items-center gap-2">
+          <button className="secondary-button" disabled={selectedIds.size === 0} onClick={() => { void api.scanRuns.bulkArchive(Array.from(selectedIds)).then(() => { setSelectedIds(new Set()); void scanRuns.reload(); }); }}>Archive Selected ({selectedIds.size})</button>
+          <button className="secondary-button" onClick={() => setSelectedIds(new Set())} disabled={selectedIds.size === 0}>Clear Selection</button>
+        </div>
         <ResourceBoundary resource={scanRuns}>
-          {(data) => <ScanRunTable data={data} onSelect={setSelectedId} onOpen={onSelectScan} onChanged={scanRuns.reload} />}
+          {(data) => <ScanRunTable data={data} onSelect={setSelectedId} onOpen={onSelectScan} onChanged={scanRuns.reload} selectedIds={selectedIds} onToggleSelect={(id) => setSelectedIds((prev) => { const next = new Set(prev); if (next.has(id)) next.delete(id); else next.add(id); return next; })} />}
         </ResourceBoundary>
       </Section>
       <ScanRunDetail scanRun={selected} summary={summary} onOpen={onSelectScan} />
@@ -36,11 +41,17 @@ export function ScanRunsPage({ onSelectScan }: { onSelectScan: (id: number) => v
   );
 }
 
-function ScanRunTable({ data, onSelect, onOpen, onChanged }: { data: ScanRun[]; onSelect: (id: number) => void; onOpen: (id: number) => void; onChanged: () => Promise<void> }) {
+function ScanRunTable({ data, onSelect, onOpen, onChanged, selectedIds, onToggleSelect }: { data: ScanRun[]; onSelect: (id: number) => void; onOpen: (id: number) => void; onChanged: () => Promise<void>; selectedIds: Set<number>; onToggleSelect: (id: number) => void }) {
   return (
     <DataTable
-      columns={["ID", "Environment", "Status", "Created", "Open", "Retention"]}
+      columns={["", "ID", "Environment", "Status", "Created", "Open", "Retention"]}
       rows={data.map((scanRun) => [
+        <input
+          type="checkbox"
+          checked={selectedIds.has(scanRun.id)}
+          onChange={() => onToggleSelect(scanRun.id)}
+          className="h-4 w-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500"
+        />,
         scanRun.id,
         scanRun.target_environment,
         <StatusBadge value={scanRun.status} />,

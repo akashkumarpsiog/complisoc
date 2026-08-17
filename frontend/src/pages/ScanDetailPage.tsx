@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Loader2 } from "lucide-react";
 import { api } from "../services/api";
 import { useResource } from "../hooks/useResource";
-import type { AuditBundle, ComplianceReport, ControlMapping, NormalizedFinding, ReviewQueueItem, ScanRunSummary, VerificationRecord } from "../types";
+import type { AuditBundle, BulkReviewDecision, ComplianceReport, ControlMapping, NormalizedFinding, ReviewQueueItem, ScanRunSummary, VerificationRecord } from "../types";
 import { Detail } from "../components/Detail";
 import { ResourceBoundary } from "../components/ResourceBoundary";
 import { DataTable, EmptyState, LoadingState, MetricCard, Section, StatusBadge } from "../components/Primitives";
@@ -301,6 +301,7 @@ function MappingsTab({ mappings, resource, scanRunId }: { mappings: ControlMappi
 
 function ReviewTab({ items, resource, onRefresh }: { items: ReviewQueueItem[]; resource: ReturnType<typeof useResource<ReviewQueueItem[]>>; onRefresh: () => void }) {
   const [comment, setComment] = useState("Reviewed from frontend.");
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
 
   async function decide(id: number, action: "approve" | "reject") {
     if (action === "approve") {
@@ -311,17 +312,77 @@ function ReviewTab({ items, resource, onRefresh }: { items: ReviewQueueItem[]; r
     await onRefresh();
   }
 
+  async function bulkDecide(action: "approve" | "reject", explicitIds?: number[]) {
+    const itemIds = explicitIds ?? Array.from(selectedIds);
+    const payload: BulkReviewDecision = {
+      item_ids: itemIds,
+      reviewer_id: "frontend-operator",
+      comments: comment || undefined,
+      action,
+    };
+    await api.reviewQueue.bulkDecide(payload);
+    setSelectedIds(new Set());
+    await onRefresh();
+  }
+
+  const allPendingSelected = items.every((item) => item.status === "pending" && selectedIds.has(item.id));
+  const someSelected = selectedIds.size > 0;
+  const hasPending = items.some((item) => item.status === "pending");
+
+  function toggleSelect(id: number) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  function toggleSelectAll() {
+    const pendingIds = items.filter((item) => item.status === "pending").map((item) => item.id);
+    const allPendingSelected = pendingIds.length > 0 && pendingIds.every((id) => selectedIds.has(id));
+    if (allPendingSelected) {
+      setSelectedIds(new Set());
+      return;
+    }
+    setSelectedIds(new Set(pendingIds));
+  }
+
   return (
     <Section
       title="Review Queue"
       description="Low-confidence or uncertain mappings for this scan require explicit human review."
       actions={<input className="control w-72" value={comment} onChange={(e) => setComment(e.target.value)} />}
     >
+      <div className="mb-4 flex flex-wrap items-center gap-2">
+        <button className="icon-button" disabled={!someSelected} onClick={() => bulkDecide("approve")}>
+          Approve Selected ({selectedIds.size})
+        </button>
+        <button className="icon-button" disabled={!someSelected} onClick={() => bulkDecide("reject")}>
+          Reject Selected ({selectedIds.size})
+        </button>
+        <button className="icon-button" disabled={!hasPending} onClick={() => {
+          const pendingIds = items.filter((i) => i.status === "pending").map((i) => i.id);
+          bulkDecide("approve", pendingIds);
+        }}>
+          Approve All Pending
+        </button>
+        <button className="icon-button" onClick={() => setSelectedIds(new Set())} disabled={!someSelected}>
+          Clear Selection
+        </button>
+      </div>
       <ResourceBoundary resource={{ ...resource, data: items }}>
         {(data) => (
           <DataTable
-            columns={["ID", "Mapping", "Status", "Reason", "Reviewed", "Decision"]}
+            columns={["", "ID", "Mapping", "Status", "Reason", "Reviewed", "Decision"]}
             rows={data.map((item) => [
+              <input
+                type="checkbox"
+                checked={selectedIds.has(item.id)}
+                onChange={() => toggleSelect(item.id)}
+                disabled={item.status !== "pending"}
+                className="h-4 w-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500"
+              />,
               item.id,
               item.control_mapping_id,
               <StatusBadge value={item.status} />,

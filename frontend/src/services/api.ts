@@ -101,6 +101,11 @@ export const api = {
     summary: (id: number) => request<ScanRunSummary>(`/scan-runs/${id}/summary`),
     archive: (id: number) => request<ScanRun>(`/scan-runs/${id}/archive`, { method: "POST" }),
     restore: (id: number) => request<ScanRun>(`/scan-runs/${id}/restore`, { method: "POST" }),
+    bulkArchive: (scanRunIds: number[]) =>
+      request<{ archived_count: number }>("/scan-runs/bulk-archive", {
+        method: "POST",
+        body: JSON.stringify({ scan_run_ids: scanRunIds }),
+      }),
   },
   scanners: {
     list: () => request<ScannerInfo[]>("/scanners"),

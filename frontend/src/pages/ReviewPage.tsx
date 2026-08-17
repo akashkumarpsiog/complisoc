@@ -24,8 +24,8 @@ export function ReviewPage() {
     }),
   );
 
-  const allPendingSelected = reviewQueue.data?.every((item) => item.status === "pending" && selectedIds.has(item.id)) ?? false;
   const someSelected = selectedIds.size > 0;
+  const hasPending = (reviewQueue.data?.some((item) => item.status === "pending") ?? false);
 
   function toggleSelect(id: number) {
     setSelectedIds((prev) => {
@@ -37,11 +37,13 @@ export function ReviewPage() {
   }
 
   function toggleSelectAll() {
+    const pendingIds = reviewQueue.data?.filter((item) => item.status === "pending").map((item) => item.id) ?? [];
+    const allPendingSelected = pendingIds.length > 0 && pendingIds.every((id) => selectedIds.has(id));
     if (allPendingSelected) {
       setSelectedIds(new Set());
       return;
     }
-    setSelectedIds(new Set(reviewQueue.data?.filter((item) => item.status === "pending").map((item) => item.id) ?? []));
+    setSelectedIds(new Set(pendingIds));
   }
 
   async function bulkDecide(action: "approve" | "reject", explicitIds?: number[]) {
@@ -95,7 +97,7 @@ export function ReviewPage() {
             <X className="h-4 w-4" aria-hidden />
             Reject Selected ({selectedIds.size})
           </button>
-          <button className="icon-button" disabled={!allPendingSelected && !someSelected} onClick={() => {
+          <button className="icon-button" disabled={!hasPending} onClick={() => {
             const pendingIds = filteredData.filter(i => i.status === "pending").map(i => i.id);
             bulkDecide("approve", pendingIds);
           }}>
