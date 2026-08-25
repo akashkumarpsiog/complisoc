@@ -114,6 +114,7 @@ export interface AuditBundle {
   scan_run_id: number;
   generated_at?: string | null;
   bundle_path?: string | null;
+  manifest_path?: string | null;
   checksum: string;
 }
 
@@ -208,4 +209,132 @@ export interface BulkReviewDecision {
   reviewer_id?: string | null;
   comments?: string | null;
   action: "approve" | "reject";
+}
+
+export interface DashboardAIMetrics {
+  total_mappings: number;
+  published_mappings: number;
+  manual_review_mappings: number;
+  avg_gemini_confidence: number | null;
+  avg_groq_agreement: number | null;
+  avg_final_confidence: number | null;
+  agreement_rate: number | null;
+  manual_review_rate: number | null;
+}
+
+export interface ScanDiff {
+  previous_scan_id: number | null;
+  current_scan_id: number;
+  previous_finding_count: number;
+  current_finding_count: number;
+  new_count: number;
+  resolved_count: number;
+  unchanged_count: number;
+  net_change: number;
+  new_findings: Array<{
+    fingerprint: string;
+    scanner_name: string;
+    finding_type: string;
+    resource_type: string;
+    resource_identifier: string;
+    severity: string;
+    title: string;
+    first_seen: string | null;
+    last_seen: string | null;
+    status: string;
+    control_ids: string[];
+  }>;
+  resolved_findings: Array<{
+    fingerprint: string;
+    scanner_name: string;
+    finding_type: string;
+    resource_type: string;
+    resource_identifier: string;
+    severity: string;
+    title: string;
+    first_seen: string | null;
+    last_seen: string | null;
+    status: string;
+    control_ids: string[];
+  }>;
+  unchanged_findings: Array<{
+    fingerprint: string;
+    scanner_name: string;
+    finding_type: string;
+    resource_type: string;
+    resource_identifier: string;
+    severity: string;
+    title: string;
+    first_seen: string | null;
+    last_seen: string | null;
+    status: string;
+    control_ids: string[];
+  }>;
+  severity_new: Record<string, number>;
+  severity_resolved: Record<string, number>;
+  new_control_ids: string[];
+  resolved_control_ids: string[];
+}
+
+export interface FindingLineage {
+  scan_run: {
+    id: number | null;
+    target_environment: string | null;
+    status: string | null;
+    started_at: string | null;
+    completed_at: string | null;
+    created_at: string | null;
+  } | null;
+  raw_finding: {
+    id: number | null;
+    scanner_finding_id: string | null;
+    scanner_name: string | null;
+    raw_json: Record<string, unknown> | null;
+    created_at: string | null;
+  } | null;
+  normalized_finding: {
+    id: number;
+    scanner_name: string;
+    finding_type: string;
+    resource_type: string;
+    resource_identifier: string;
+    severity: string;
+    title: string;
+    description: string | null;
+    timestamp: string | null;
+    metadata_json: Record<string, unknown> | null;
+  };
+  mappings: Array<{
+    mapping_id: number;
+    control_catalog_id: number | null;
+    control_id: string | null;
+    framework_name: string | null;
+    control_title: string | null;
+    mapping_status: string;
+    gemini_confidence: number | null;
+    final_confidence: number | null;
+    verification_status: string | null;
+    groq_agreement_value: number | null;
+    rationale: string | null;
+    created_at: string | null;
+    verification_records: Array<{
+      id: number;
+      result: string;
+      explanation: string | null;
+      agreement_value: number | null;
+      verification_model: string;
+      timestamp: string | null;
+    }>;
+  }>;
+}
+
+export interface DashboardAIMetrics {
+  total_mappings: number;
+  published_mappings: number;
+  manual_review_mappings: number;
+  avg_gemini_confidence: number | null;
+  avg_groq_agreement: number | null;
+  avg_final_confidence: number | null;
+  agreement_rate: number | null;
+  manual_review_rate: number | null;
 }

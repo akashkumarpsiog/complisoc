@@ -8,6 +8,8 @@ import { ControlsPage } from "./pages/ControlsPage";
 import { ReviewPage } from "./pages/ReviewPage";
 import { ReportsPage } from "./pages/ReportsPage";
 import { AuditBundlesPage } from "./pages/AuditBundlesPage";
+import { ComplianceDriftPage } from "./pages/ComplianceDriftPage";
+import { EvidenceLineagePage } from "./pages/EvidenceLineagePage";
 
 export function App() {
   const [view, setView] = useState<ViewId>("overview");
@@ -33,6 +35,8 @@ export function App() {
           <ScanDetailPage scanRunId={selectedScanId} onBack={() => handleViewChange("scan-runs")} />
         )}
         {view === "scan-detail" && selectedScanId === null && <ScanRunsPage onSelectScan={handleSelectScan} />}
+        {view === "compliance-drift" && <ComplianceDriftPage />}
+        {view === "evidence-lineage" && <EvidenceLineagePage />}
         {view === "controls" && <ControlsPage />}
         {view === "review" && <ReviewPage />}
         {view === "reports" && <ReportsPage />}

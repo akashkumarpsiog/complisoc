@@ -39,6 +39,11 @@ the compliance pipeline end-to-end:
 See [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) for deployment and the
 gap-by-gap status used in the Moodle submission.
 
+## Engineering Quality
+
+See [BUG_REGISTRY.md](../BUG_REGISTRY.md) for root-cause analysis of major
+pipeline bugs and their regression test coverage.
+
 ## Quick Start
 
 ### Backend (FastAPI + SQLAlchemy + SQLite)

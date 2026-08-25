@@ -16,6 +16,7 @@ import os
 import shutil
 import subprocess
 import sys
+import tempfile
 from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import Any
@@ -179,7 +180,7 @@ class CheckovScanner(BaseScanner):
             return []
         return ["checkov executable (pip install checkov) or ensure it is on PATH"]
 
-    def _command(self, target: str) -> list[str]:
+    def _command(self, target: str, output_dir: str | None = None) -> list[str]:
         # Checkov scans a directory with `-d` but a single file with `-f`.
         flag = "-f" if os.path.isfile(target) else "-d"
         venv_python = _python_executable()
@@ -200,25 +201,32 @@ class CheckovScanner(BaseScanner):
             parts = ["checkov", flag, target, "--output", "json", "--compact"]
         if external_checks.is_dir():
             parts.extend(["--external-checks-dir", str(external_checks)])
+        if output_dir:
+            # Keep Checkov's JSON outside the directory being scanned.  A
+            # report inside ``target`` becomes input on the next scan.
+            parts.extend(["--output-file-path", output_dir, "--quiet"])
         return parts
 
     def run(self, target: str, timeout: int = 300) -> tuple[list[dict[str, Any]], str | None]:
         try:
-            proc = subprocess.run(
-                self._command(target),
-                capture_output=True,
-                text=True,
-                timeout=timeout,
-                check=False,
-            )
+            with tempfile.TemporaryDirectory(prefix="complisoc-checkov-") as output_dir:
+                proc = subprocess.run(
+                    self._command(target, output_dir),
+                    capture_output=True,
+                    text=True,
+                    timeout=timeout,
+                    check=False,
+                )
+                reports = list(Path(output_dir).rglob("*.json"))
+                report_text = reports[0].read_text(encoding="utf-8") if reports else proc.stdout
         except (subprocess.SubprocessError, OSError) as exc:
             return [], f"checkov execution failed: {exc}"
 
-        if proc.returncode not in (0, 1) and not proc.stdout.strip():
+        if proc.returncode not in (0, 1) and not report_text.strip():
             return [], f"checkov exited with {proc.returncode}: {proc.stderr[:500]}"
 
         try:
-            report = json.loads(proc.stdout or "{}")
+            report = json.loads(report_text or "{}")
         except json.JSONDecodeError as exc:
             return [], f"checkov produced invalid JSON: {exc}"
 

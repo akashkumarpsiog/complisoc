@@ -46,7 +46,8 @@ def normalize_raw_finding(db: Session, raw_finding: RawFinding) -> NormalizedFin
         finding_type=str(finding_type)[:128],
         resource_type=str(resource_type)[:128],
         resource_identifier=str(resource_identifier)[:512],
-        severity=normalize_severity(payload.get("severity")),
+        # ``dict.get(..., default)`` misses an explicitly-null severity.
+        severity=normalize_severity(payload.get("severity") or "medium"),
         title=str(title)[:512],
         description=str(description)[:1024] if description else None,
         metadata_json=payload,
@@ -55,4 +56,3 @@ def normalize_raw_finding(db: Session, raw_finding: RawFinding) -> NormalizedFin
     db.commit()
     db.refresh(normalized)
     return normalized
-

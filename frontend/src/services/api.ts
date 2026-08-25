@@ -5,16 +5,19 @@ import type {
   Control,
   ControlMapping,
   ControlDrillDown,
-  DashboardCoverage,
+  DashboardAIMetrics,
   DashboardCloudFindings,
+  DashboardCoverage,
   DashboardGap,
   DashboardSeverity,
   DashboardTrend,
+  FindingLineage,
   NormalizedFinding,
   RawFindingInput,
   RemediationBacklog,
   RemediationSuggestion,
   ReviewQueueItem,
+  ScanDiff,
   ScanRequest,
   ScanRun,
   ScanRunSummary,
@@ -92,6 +95,9 @@ export const api = {
     suggestion: (mappingId: number) => request<RemediationSuggestion>(`/dashboard/remediation-backlog/${mappingId}/suggestion`, { method: "POST" }),
     trends: () => request<DashboardTrend>("/dashboard/trends"),
     cloudFindings: () => request<DashboardCloudFindings>("/dashboard/cloud-findings"),
+    aiMetrics: () => request<DashboardAIMetrics>("/dashboard/ai-metrics"),
+    drift: (scanRunId: number, compareTo?: number) =>
+      request<ScanDiff>(`/scan-runs/${scanRunId}/drift`, {}, compareTo ? { compare_to: String(compareTo) } : undefined),
   },
   scanRuns: {
     list: (archivedOnly = false) => request<ScanRun[]>("/scan-runs", {}, { archived_only: archivedOnly ? "true" : undefined }),
@@ -119,6 +125,7 @@ export const api = {
   findings: {
     list: (query?: Record<string, QueryValue>) => request<NormalizedFinding[]>("/findings", {}, query),
     mappings: (id: number) => request<ControlMapping[]>(`/findings/${id}/mappings`),
+    lineage: (id: number) => request<FindingLineage>(`/findings/${id}/lineage`),
   },
   mappings: {
     list: (query?: Record<string, QueryValue>) => request<ControlMapping[]>("/mappings", {}, query),
@@ -167,5 +174,6 @@ export const api = {
         body: JSON.stringify({ scan_run_id: scanRunId }),
       }),
     downloadUrl: (id: number) => buildUrl(`/audit-bundles/${id}/download`),
+    verify: (id: number) => request<{ status: string; bundle_verified: boolean; manifest_verified: boolean; files: Record<string, string>; errors: string[] }>(`/audit-bundles/${id}/verify`),
   },
 };

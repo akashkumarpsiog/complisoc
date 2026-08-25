@@ -34,6 +34,8 @@ from complisoc.backend.api.schemas import (
 )
 from complisoc.backend.compliance.workflow import process_scan_run
 from complisoc.backend.compliance.langchain_pipeline import run_pipeline
+from complisoc.backend.compliance.diff import compare_scans
+from complisoc.backend.compliance.lineage import get_finding_lineage as get_finding_lineage_data
 from complisoc.backend.scanners.runners import list_scanners, run_scanners
 from complisoc.backend.models import (
     AuditBundle,
@@ -832,3 +834,36 @@ def _mapping_backlog_item(mapping: ControlMapping):
         "gemini_confidence": mapping.gemini_confidence,
         "groq_agreement_value": mapping.groq_agreement_value,
     }
+
+
+def _serialize_scan_diff(diff: dict[str, Any]) -> dict[str, Any]:
+    return diff
+
+
+@app.get("/api/v1/scan-runs/{scan_run_id}/drift")
+def get_scan_drift(scan_run_id: int, compare_to: int | None = None, db: Session = Depends(get_db)):
+    scan_run = db.get(ScanRun, scan_run_id)
+    if scan_run is None:
+        not_found("Scan run")
+    previous_id = compare_to
+    if previous_id is None:
+        previous = (
+            db.query(ScanRun)
+            .filter(ScanRun.status == "completed", ScanRun.id != scan_run_id)
+            .order_by(ScanRun.id.desc())
+            .first()
+        )
+        previous_id = previous.id if previous else None
+    try:
+        diff = compare_scans(db, previous_id, scan_run_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    return _serialize_scan_diff(diff)
+
+
+@app.get("/api/v1/findings/{finding_id}/lineage")
+def get_finding_lineage_endpoint(finding_id: int, db: Session = Depends(get_db)):
+    try:
+        return get_finding_lineage_data(db, finding_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))

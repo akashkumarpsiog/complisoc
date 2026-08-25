@@ -1,3 +1,4 @@
+import type { ViewId } from "../navigation";
 import { useState } from "react";
 import { api } from "../services/api";
 import { useResource } from "../hooks/useResource";
@@ -6,7 +7,7 @@ import { BarList, DataTable, DonutChart, MetricCard, ProgressBar, Section, Statu
 import { ControlDrillDownDrawer, RemediationSuggestionPanel } from "../components/DashboardDetails";
 import { formatPercent } from "../utils/format";
 
-export function OverviewPage({ onViewChange }: { onViewChange?: (viewId: string) => void }) {
+export function OverviewPage({ onViewChange }: { onViewChange?: (viewId: ViewId) => void }) {
   const [selectedControlId, setSelectedControlId] = useState<number | null>(null);
   const [showAllTrends, setShowAllTrends] = useState(false);
   const coverage = useResource(api.dashboard.coverage);
@@ -14,7 +15,8 @@ export function OverviewPage({ onViewChange }: { onViewChange?: (viewId: string)
   const gap = useResource(api.dashboard.gap);
   const backlog = useResource(api.dashboard.backlog);
   const trends = useResource(api.dashboard.trends);
-  const cloudFindings = useResource(api.dashboard.cloudFindings);
+   const cloudFindings = useResource(api.dashboard.cloudFindings);
+  const aiMetrics = useResource(api.dashboard.aiMetrics);
 
   const visibleTrends = showAllTrends ? trends.data?.trends : trends.data?.trends.slice(-5);
 
@@ -55,6 +57,19 @@ export function OverviewPage({ onViewChange }: { onViewChange?: (viewId: string)
                 value={data.alerts + data.recommendations + data.secure_scores}
                 detail={`${data.alerts} alerts · ${data.recommendations} recommendations · ${data.secure_scores} scores`}
                 accent="slate"
+              />
+            </div>
+          )}
+        </ResourceBoundary>
+        <ResourceBoundary resource={aiMetrics}>
+          {(data) => (
+            <div className="animate-slide-up" style={staggerStyle(4)}>
+              <MetricCard
+                label="AI agreement rate"
+                value={formatPercent(data.agreement_rate)}
+                detail={`${data.published_mappings} published · ${data.manual_review_mappings} review`}
+                accent={data.agreement_rate !== null && data.agreement_rate >= 0.9 ? "emerald" : "amber"}
+                progress={data.agreement_rate ?? undefined}
               />
             </div>
           )}
@@ -203,6 +218,21 @@ export function OverviewPage({ onViewChange }: { onViewChange?: (viewId: string)
               ) : (
                 <p className="text-sm text-muted">No remediation items in the backlog.</p>
               )}
+            </div>
+          )}
+        </ResourceBoundary>
+      </Section>
+
+      <Section title="AI Evaluation" description="Mapping quality and model agreement metrics" collapsible defaultOpen={false}>
+        <ResourceBoundary resource={aiMetrics}>
+          {(data) => (
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+              <MetricCard label="Total mappings" value={data.total_mappings} detail={`${data.published_mappings} published · ${data.manual_review_mappings} review`} accent="brand" />
+              <MetricCard label="Agreement rate" value={formatPercent(data.agreement_rate)} detail="Groq vs Gemini" accent={data.agreement_rate !== null && data.agreement_rate >= 0.9 ? "emerald" : "amber"} progress={data.agreement_rate ?? undefined} />
+              <MetricCard label="Avg Gemini confidence" value={formatPercent(data.avg_gemini_confidence)} detail="Mapper output" accent="slate" />
+              <MetricCard label="Avg final confidence" value={formatPercent(data.avg_final_confidence)} detail="Post-verification" accent="emerald" />
+              <MetricCard label="Avg Groq agreement" value={formatPercent(data.avg_groq_agreement)} detail="Verifier output" accent="brand" />
+              <MetricCard label="Manual review rate" value={formatPercent(data.manual_review_rate)} detail="Below threshold or failures" accent="amber" />
             </div>
           )}
         </ResourceBoundary>
