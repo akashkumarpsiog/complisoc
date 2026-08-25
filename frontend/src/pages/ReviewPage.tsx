@@ -26,6 +26,8 @@ export function ReviewPage() {
 
   const someSelected = selectedIds.size > 0;
   const hasPending = (reviewQueue.data?.some((item) => item.status === "pending") ?? false);
+  const pendingIds = reviewQueue.data?.filter((item) => item.status === "pending").map((item) => item.id) ?? [];
+  const allPendingSelected = pendingIds.length > 0 && pendingIds.every((id) => selectedIds.has(id));
 
   function toggleSelect(id: number) {
     setSelectedIds((prev) => {
@@ -37,8 +39,6 @@ export function ReviewPage() {
   }
 
   function toggleSelectAll() {
-    const pendingIds = reviewQueue.data?.filter((item) => item.status === "pending").map((item) => item.id) ?? [];
-    const allPendingSelected = pendingIds.length > 0 && pendingIds.every((id) => selectedIds.has(id));
     if (allPendingSelected) {
       setSelectedIds(new Set());
       return;
@@ -79,14 +79,14 @@ export function ReviewPage() {
       description="Low-confidence or uncertain mappings require explicit human review."
       actions={
         <div className="flex flex-wrap items-center gap-2">
-          <input className="control w-48" placeholder="Status" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} />
-          <input className="control w-36" placeholder="Severity" value={severityFilter} onChange={(e) => setSeverityFilter(e.target.value)} />
-          <input className="control w-32" placeholder="Control ID" value={controlIdFilter} onChange={(e) => setControlIdFilter(e.target.value)} />
-          <input className="control w-28" placeholder="Scan run" value={scanRunIdFilter} onChange={(e) => setScanRunIdFilter(e.target.value)} type="number" />
+          <input className="control w-36" placeholder="Status" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} />
+          <input className="control w-28" placeholder="Severity" value={severityFilter} onChange={(e) => setSeverityFilter(e.target.value)} />
+          <input className="control w-28" placeholder="Control ID" value={controlIdFilter} onChange={(e) => setControlIdFilter(e.target.value)} />
+          <input className="control w-24" placeholder="Scan run" value={scanRunIdFilter} onChange={(e) => setScanRunIdFilter(e.target.value)} type="number" />
         </div>
       }
     >
-      <div className="mb-4 flex flex-wrap items-center gap-2">
+      <div className={`mb-4 flex flex-wrap items-center gap-2 transition-all duration-300 ${someSelected ? "translate-y-0 opacity-100" : "-translate-y-2 opacity-0 pointer-events-none"}`}>
         <input className="control w-72" value={comment} onChange={(event) => setComment(event.target.value)} placeholder="Review comment..." />
         <div className="flex gap-2">
           <button className="icon-button" disabled={!someSelected} onClick={() => bulkDecide("approve")}>
@@ -109,7 +109,7 @@ export function ReviewPage() {
         </div>
       </div>
       <ResourceBoundary resource={reviewQueue}>
-        {(data) => <ReviewTable data={data} selectedIds={selectedIds} onToggleSelect={toggleSelect} onToggleSelectAll={toggleSelectAll} allPendingSelected={allPendingSelected} onDecision={decide} />}
+        {(data) => <ReviewTable data={data} selectedIds={selectedIds} onToggleSelect={toggleSelect} onToggleSelectAll={toggleSelectAll} allPendingSelected={allPendingSelected as boolean} onDecision={decide} />}
       </ResourceBoundary>
     </Section>
   );
@@ -135,24 +135,25 @@ function ReviewTable({
       columns={["", "ID", "Mapping", "Status", "Reason", "Reviewed", "Decision"]}
       rows={data.map((item) => [
         <input
+          key={`cb-${item.id}`}
           type="checkbox"
           checked={selectedIds.has(item.id)}
           onChange={() => onToggleSelect(item.id)}
           disabled={item.status !== "pending"}
-          className="h-4 w-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500"
+          className="h-4 w-4 rounded border-line-strong text-brand-600 focus:ring-brand-500"
         />,
         item.id,
         item.control_mapping_id,
-        <StatusBadge value={item.status} />,
+        <StatusBadge key={`status-${item.id}`} value={item.status} />,
         item.review_reason_code,
         formatDate(item.reviewed_at),
-        <div className="flex gap-2">
-          <button className="icon-button" disabled={item.status !== "pending"} onClick={() => onDecision(item.id, "approve")}>
-            <Check className="h-4 w-4" aria-hidden />
+        <div key={`actions-${item.id}`} className="flex gap-2">
+          <button className="icon-button !h-8 !px-3 !text-xs" disabled={item.status !== "pending"} onClick={() => onDecision(item.id, "approve")}>
+            <Check className="h-3.5 w-3.5" aria-hidden />
             Approve
           </button>
-          <button className="icon-button" disabled={item.status !== "pending"} onClick={() => onDecision(item.id, "reject")}>
-            <X className="h-4 w-4" aria-hidden />
+          <button className="icon-button !h-8 !px-3 !text-xs" disabled={item.status !== "pending"} onClick={() => onDecision(item.id, "reject")}>
+            <X className="h-3.5 w-3.5" aria-hidden />
             Reject
           </button>
         </div>,

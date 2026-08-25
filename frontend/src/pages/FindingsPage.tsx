@@ -20,7 +20,7 @@ export function FindingsPage() {
 
   return (
     <div className="grid gap-5 2xl:grid-cols-[1fr_420px]">
-      <Section title="Findings" actions={<FindingFilters severity={severity} scanner={scanner} setSeverity={setSeverity} setScanner={setScanner} />}>
+      <Section title="Findings" description="Security findings discovered during scans" actions={<FindingFilters severity={severity} scanner={scanner} setSeverity={setSeverity} setScanner={setScanner} />}>
         <ResourceBoundary resource={{ ...findings, data: filtered }}>
           {(data) => <FindingTable data={data} onSelect={setSelectedId} />}
         </ResourceBoundary>
@@ -55,11 +55,11 @@ function FindingTable({ data, onSelect }: { data: NormalizedFinding[]; onSelect:
       columns={["ID", "Severity", "Scanner", "Resource", "Title", "Open"]}
       rows={data.map((finding) => [
         finding.id,
-        <StatusBadge value={finding.severity} />,
+        <StatusBadge key={`severity-${finding.id}`} value={finding.severity} />,
         finding.scanner_name,
         finding.resource_identifier,
         finding.title,
-        <button className="icon-button" onClick={() => onSelect(finding.id)}>
+        <button key={`detail-${finding.id}`} className="secondary-button !h-8 !px-3 !text-xs" onClick={() => onSelect(finding.id)}>
           Detail
         </button>,
       ])}
@@ -81,25 +81,25 @@ function FindingDetail({ finding }: { finding: NormalizedFinding | null }) {
   return (
     <Section title="Finding Detail">
       {finding ? (
-        <div className="space-y-3">
+        <div className="space-y-3 animate-slide-in-right">
           <Detail label="Normalized" value={finding.id} />
           <Detail label="Raw finding" value={finding.raw_finding_id} />
           <Detail label="Severity" value={<StatusBadge value={finding.severity} />} />
           <Detail label="Type" value={finding.finding_type} />
           <Detail label="Resource" value={finding.resource_identifier} />
           <Detail label="Description" value={finding.description || "n/a"} />
-          <h3 className="pt-2 text-sm font-semibold">Mappings</h3>
+          <h3 className="pt-3 text-sm font-bold text-ink border-t border-line mt-1">Mappings</h3>
           {mappings ? (
             <DataTable
               columns={["Mapping", "Control", "AI Verdict", "Gemini Score", "Groq Score", "Final Confidence", "Groq Verdict"]}
               rows={mappings.map((mapping) => [
                 mapping.id,
                 mapping.control_catalog_id,
-                <StatusBadge value={mapping.mapping_status} />,
+                <StatusBadge key={`vs-${mapping.id}`} value={mapping.mapping_status} />,
                 formatPercent(mapping.gemini_confidence),
                 formatPercent(mapping.groq_agreement_value),
                 formatPercent(mapping.final_confidence),
-                <StatusBadge value={mapping.verification_status || "pending"} />,
+                <StatusBadge key={`gv-${mapping.id}`} value={mapping.verification_status || "pending"} />,
               ])}
             />
           ) : (

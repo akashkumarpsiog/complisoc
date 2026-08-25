@@ -2,7 +2,7 @@ import { useState } from "react";
 import { api } from "../services/api";
 import { useResource } from "../hooks/useResource";
 import { ResourceBoundary } from "../components/ResourceBoundary";
-import { BarList, DataTable, DonutChart, MetricCard, ProgressBar, Section, StatusBadge } from "../components/Primitives";
+import { BarList, DataTable, DonutChart, MetricCard, ProgressBar, Section, StatusBadge, staggerStyle } from "../components/Primitives";
 import { ControlDrillDownDrawer, RemediationSuggestionPanel } from "../components/DashboardDetails";
 import { formatPercent } from "../utils/format";
 
@@ -20,37 +20,43 @@ export function OverviewPage({ onViewChange }: { onViewChange?: (viewId: string)
 
   return (
     <>
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
         <ResourceBoundary resource={coverage}>
           {(data) => (
-            <MetricCard
-              label="Control coverage"
-              value={`${data.covered_controls}/${data.total_controls}`}
-              detail={`${Math.round((data.covered_controls / data.total_controls) * 100)}% of controls covered`}
-              accent="emerald"
-              progress={data.total_controls ? data.covered_controls / data.total_controls : 0}
-            />
+            <div className="animate-slide-up" style={staggerStyle(0)}>
+              <MetricCard
+                label="Control coverage"
+                value={`${data.covered_controls}/${data.total_controls}`}
+                detail={`${Math.round((data.covered_controls / data.total_controls) * 100)}% of controls covered`}
+                accent="emerald"
+                progress={data.total_controls ? data.covered_controls / data.total_controls : 0}
+              />
+            </div>
           )}
         </ResourceBoundary>
         <ResourceBoundary resource={gap}>
           {(data) => (
-            <MetricCard label="Manual review" value={data.manual_review_mappings} detail="Mappings awaiting decision" accent="amber" />
+            <div className="animate-slide-up" style={staggerStyle(1)}>
+              <MetricCard label="Manual review" value={data.manual_review_mappings} detail="Mappings awaiting decision" accent="amber" />
+            </div>
           )}
         </ResourceBoundary>
         <ResourceBoundary resource={gap}>
-          {(data) => <MetricCard label="Rejected" value={data.rejected_mappings} detail="Mappings not accepted" accent="rose" />}
+          {(data) => <div className="animate-slide-up" style={staggerStyle(2)}><MetricCard label="Rejected" value={data.rejected_mappings} detail="Mappings not accepted" accent="rose" /></div>}
         </ResourceBoundary>
         <ResourceBoundary resource={backlog}>
-          {(data) => <MetricCard label="Backlog" value={data.items.length} detail="Remediation queue items" accent="brand" />}
+          {(data) => <div className="animate-slide-up" style={staggerStyle(3)}><MetricCard label="Backlog" value={data.items.length} detail="Remediation queue items" accent="brand" /></div>}
         </ResourceBoundary>
         <ResourceBoundary resource={cloudFindings}>
           {(data) => (
-            <MetricCard
-              label="Cloud findings"
-              value={data.alerts + data.recommendations + data.secure_scores}
-              detail={`${data.alerts} alerts · ${data.recommendations} recommendations · ${data.secure_scores} scores`}
-              accent="slate"
-            />
+            <div className="animate-slide-up" style={staggerStyle(4)}>
+              <MetricCard
+                label="Cloud findings"
+                value={data.alerts + data.recommendations + data.secure_scores}
+                detail={`${data.alerts} alerts · ${data.recommendations} recommendations · ${data.secure_scores} scores`}
+                accent="slate"
+              />
+            </div>
           )}
         </ResourceBoundary>
       </div>
@@ -63,17 +69,17 @@ export function OverviewPage({ onViewChange }: { onViewChange?: (viewId: string)
               description="Published mappings vs. total control catalog"
               className="xl:col-span-1"
             >
-              <div className="flex flex-col items-center gap-4">
+              <div className="flex flex-col items-center gap-5">
                 <DonutChart
                   value={data.covered_controls}
                   total={data.total_controls}
                   label="Coverage"
                   accent="emerald"
-                  size={140}
+                  size={160}
                 />
                 <div className="text-center">
-                  <p className="text-sm text-slate-600">
-                    {data.total_controls - data.covered_controls} controls have <span className="font-medium text-slate-800">no published mapping</span>
+                  <p className="text-sm text-muted leading-relaxed">
+                    {data.total_controls - data.covered_controls} controls have <span className="font-semibold text-ink">no published mapping</span>
                   </p>
                 </div>
               </div>
@@ -99,27 +105,27 @@ export function OverviewPage({ onViewChange }: { onViewChange?: (viewId: string)
         <Section title="Historical Trends" description="Published vs. manual-review per scan" className="xl:col-span-1" collapsible>
           <ResourceBoundary resource={trends}>
             {(data) => (
-              <div className="space-y-3">
+              <div className="space-y-4">
                 {(visibleTrends || []).slice().reverse().map((item: { scan_run_id: number; published: number; manual_review: number; created_at: string }) => (
-                  <div key={item.scan_run_id} className="space-y-1.5">
+                  <div key={item.scan_run_id} className="space-y-2 animate-slide-up" style={staggerStyle(item.scan_run_id % 5)}>
                     <div className="flex items-center justify-between text-sm">
-                      <span className="font-medium text-slate-700">Scan #{item.scan_run_id}</span>
-                      <span className="text-xs text-slate-500">{new Date(item.created_at).toLocaleDateString()}</span>
+                      <span className="font-semibold text-ink">Scan #{item.scan_run_id}</span>
+                      <span className="text-xs text-subtle font-medium">{new Date(item.created_at).toLocaleDateString()}</span>
                     </div>
-                    <div className="grid grid-cols-2 gap-2 text-center">
-                      <div>
-                        <span className="text-lg font-semibold text-emerald-600 tabular-nums">{item.published}</span>
-                        <span className="block text-xs text-slate-500">Published</span>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="rounded-lg border border-success/20 bg-success-light p-3 text-center">
+                        <span className="text-lg font-bold text-success-dark tabular-nums">{item.published}</span>
+                        <span className="block text-xs font-medium text-success/70 mt-0.5">Published</span>
                       </div>
-                      <div>
-                        <span className="text-lg font-semibold text-amber-600 tabular-nums">{item.manual_review}</span>
-                        <span className="block text-xs text-slate-500">Review</span>
+                      <div className="rounded-lg border border-warning/20 bg-warning-light p-3 text-center">
+                        <span className="text-lg font-bold text-warning-dark tabular-nums">{item.manual_review}</span>
+                        <span className="block text-xs font-medium text-warning/70 mt-0.5">Review</span>
                       </div>
                     </div>
                   </div>
                 ))}
                 {trends.data && trends.data.trends.length > 5 && (
-                  <button className="text-sm font-medium text-brand-700 hover:text-brand-800" onClick={() => setShowAllTrends(!showAllTrends)}>
+                  <button className="text-sm font-semibold text-brand-600 hover:text-brand-700 transition-colors duration-150" onClick={() => setShowAllTrends(!showAllTrends)}>
                     {showAllTrends ? "Show less" : `Show all ${trends.data.trends.length} scans`}
                   </button>
                 )}
@@ -131,25 +137,28 @@ export function OverviewPage({ onViewChange }: { onViewChange?: (viewId: string)
         <Section title="Compliance Gap Summary" description="Where mapping decisions are unresolved" className="xl:col-span-1">
           <ResourceBoundary resource={gap}>
             {(data) => (
-              <div className="space-y-4">
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <div>
-                    <DataTable columns={["Manual Review", "Rejected"]} rows={[[data.manual_review_mappings, data.rejected_mappings]]} />
+              <div className="space-y-5">
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <div>
+                      <DataTable
+                        columns={["Manual Review", "Rejected"]}
+                        rows={[[data.manual_review_mappings, data.rejected_mappings]]}
+                      />
+                    </div>
+                    <div className="space-y-4">
+                      <GapMeter label="Manual review" value={data.manual_review_mappings} max={Math.max(data.manual_review_mappings + data.rejected_mappings, 1)} tone="amber" />
+                      <GapMeter label="Rejected" value={data.rejected_mappings} max={Math.max(data.manual_review_mappings + data.rejected_mappings, 1)} tone="rose" />
+                    </div>
                   </div>
-                  <div className="space-y-3">
-                    <GapMeter label="Manual review" value={data.manual_review_mappings} max={Math.max(data.manual_review_mappings + data.rejected_mappings, 1)} tone="amber" />
-                    <GapMeter label="Rejected" value={data.rejected_mappings} max={Math.max(data.manual_review_mappings + data.rejected_mappings, 1)} tone="rose" />
-                  </div>
-                </div>
 
                 {data.failed_controls && data.failed_controls.length > 0 ? (
                   <div>
-                    <h3 className="mb-2 text-sm font-semibold uppercase tracking-wide text-slate-500">Failed controls by status</h3>
+                    <h3 className="text-xs font-bold uppercase tracking-wider text-subtle mb-3">Failed controls by status</h3>
                     <DataTable
                       columns={["Status", "Control ID", "Control Title", "Count"]}
                       rows={data.failed_controls.map((item) => [
-                        <StatusBadge value={item.status} />,
-                        <button className="font-medium text-brand-700 underline-offset-2 hover:underline focus:outline-none focus:ring-2 focus:ring-brand-500" onClick={() => setSelectedControlId(item.control_catalog_id ?? null)}>{item.control_id}</button>,
+                        <StatusBadge key={`status-${item.control_catalog_id}`} value={item.status} />,
+                        <button key={`id-${item.control_catalog_id}`} className="font-semibold text-brand-600 hover:text-brand-700 underline-offset-2 hover:underline transition-colors duration-150 focus:outline-none focus:ring-2 focus:ring-brand-500 rounded" onClick={() => setSelectedControlId(item.control_catalog_id ?? null)}>{item.control_id}</button>,
                         item.control_title,
                         item.count,
                       ])}
@@ -172,27 +181,27 @@ export function OverviewPage({ onViewChange }: { onViewChange?: (viewId: string)
                     columns={["Mapping", "Status", "Severity", "Resource", "Control", "Gemini", "Groq", "Guidance"]}
                     rows={data.items.map((item) => [
                       item.mapping_id,
-                      <StatusBadge value={item.status} />,
+                      <StatusBadge key={`status-${item.mapping_id}`} value={item.status} />,
                       item.severity,
                       item.resource_identifier,
-                      <button className="text-left font-medium text-brand-700 underline-offset-2 hover:underline focus:outline-none focus:ring-2 focus:ring-brand-500" onClick={() => setSelectedControlId(item.control_catalog_id)}>{item.control_id} {item.control_title}</button>,
+                      <button key={`control-${item.mapping_id}`} className="text-left font-semibold text-brand-600 hover:text-brand-700 underline-offset-2 hover:underline transition-colors duration-150 focus:outline-none focus:ring-2 focus:ring-brand-500 rounded" onClick={() => setSelectedControlId(item.control_catalog_id)}>{item.control_id} {item.control_title}</button>,
                       formatPercent(item.gemini_confidence),
                       formatPercent(item.groq_agreement_value),
-                      <RemediationSuggestionPanel item={item} />,
+                      <RemediationSuggestionPanel key={`guide-${item.mapping_id}`} item={item} />,
                     ])}
                   />
                   {data.total > data.items.length && (
-                    <p className="text-sm text-slate-500">
+                    <p className="text-sm text-muted">
                       Showing {data.items.length} of {data.total} items. {onViewChange ? (
-                        <button className="font-medium text-brand-700 underline-offset-2 hover:underline" onClick={() => onViewChange("review")}>View all {data.total} items in Review Queue &rarr;</button>
+                        <button className="font-semibold text-brand-600 hover:text-brand-700 underline-offset-2 hover:underline transition-colors duration-150" onClick={() => onViewChange("review")}>View all {data.total} items in Review Queue &rarr;</button>
                       ) : (
-                        <span className="font-medium text-brand-700">View all {data.total} items in Review Queue &rarr;</span>
+                        <span className="font-semibold text-brand-600">View all {data.total} items in Review Queue &rarr;</span>
                       )}
                     </p>
                   )}
                 </>
               ) : (
-                <p className="text-sm text-slate-500">No remediation items in the backlog.</p>
+                <p className="text-sm text-muted">No remediation items in the backlog.</p>
               )}
             </div>
           )}
@@ -207,9 +216,9 @@ function GapMeter({ label, value, max, tone }: { label: string; value: number; m
   const pct = max > 0 ? value / max : 0;
   return (
     <div>
-      <div className="mb-1 flex items-center justify-between text-sm">
-        <span className="font-medium text-slate-700">{label}</span>
-        <span className="font-semibold tabular-nums text-slate-600">{value}</span>
+      <div className="mb-2 flex items-center justify-between text-sm">
+        <span className="font-semibold text-ink">{label}</span>
+        <span className="text-sm font-bold tabular-nums text-ink">{value}</span>
       </div>
       <ProgressBar value={pct} tone={tone} />
     </div>

@@ -18,7 +18,7 @@ export function MappingsPage() {
 
   return (
     <div className="grid gap-5 2xl:grid-cols-[1fr_420px]">
-      <Section title="Mappings" actions={<MappingStatusFilter value={status} onChange={setStatus} />}>
+      <Section title="Mappings" description="Control mappings generated from findings" actions={<MappingStatusFilter value={status} onChange={setStatus} />}>
         <ResourceBoundary resource={{ ...mappings, data: filtered }}>
           {(data) => <MappingTable data={data} onSelect={setSelectedId} />}
         </ResourceBoundary>
@@ -47,11 +47,11 @@ function MappingTable({ data, onSelect }: { data: ControlMapping[]; onSelect: (i
         mapping.id,
         mapping.normalized_finding_id,
         mapping.control_catalog_id,
-        <StatusBadge value={mapping.mapping_status} />,
+        <StatusBadge key={`vs-${mapping.id}`} value={mapping.mapping_status} />,
         formatPercent(mapping.gemini_confidence),
         formatPercent(mapping.groq_agreement_value),
         formatPercent(mapping.final_confidence),
-        <StatusBadge value={mapping.verification_status || "pending"} />,
+        <StatusBadge key={`gv-${mapping.id}`} value={mapping.verification_status || "pending"} />,
       ])}
     />
   );
@@ -71,7 +71,7 @@ function MappingDetail({ mapping }: { mapping: ControlMapping | null }) {
   return (
     <Section title="Mapping Detail">
       {mapping ? (
-        <div className="space-y-3">
+        <div key={mapping.id} className="space-y-3 animate-slide-in-right">
           <Detail label="Mapping" value={mapping.id} />
           <Detail label="Finding" value={mapping.normalized_finding_id} />
           <Detail label="Control" value={mapping.control_catalog_id} />
@@ -81,7 +81,7 @@ function MappingDetail({ mapping }: { mapping: ControlMapping | null }) {
           <Detail label="Final Confidence" value={formatPercent(mapping.final_confidence)} />
           <Detail label="Model" value={mapping.mapping_model} />
           <Detail label="Rationale" value={mapping.rationale || "n/a"} />
-          <h3 className="pt-2 text-sm font-semibold">Verification</h3>
+          <h3 className="pt-3 text-sm font-bold text-ink border-t border-line mt-1">Verification</h3>
           {verification ? <VerificationTable data={verification} /> : <LoadingState label="Loading verification" />}
         </div>
       ) : (
@@ -95,7 +95,7 @@ function VerificationTable({ data }: { data: VerificationRecord[] }) {
   return (
     <DataTable
       columns={["ID", "Result", "Agreement", "Model", "Explanation"]}
-      rows={data.map((record) => [record.id, <StatusBadge value={record.result} />, formatPercent(record.agreement_value), record.verification_model, record.explanation || "n/a"])}
+      rows={data.map((record) => [record.id, <StatusBadge key={`vr-${record.id}`} value={record.result} />, formatPercent(record.agreement_value), record.verification_model, record.explanation || "n/a"])}
     />
   );
 }

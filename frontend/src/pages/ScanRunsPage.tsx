@@ -27,10 +27,25 @@ export function ScanRunsPage({ onSelectScan }: { onSelectScan: (id: number) => v
 
   return (
     <div className="grid gap-5 2xl:grid-cols-[1fr_420px]">
-      <Section title="Scan Runs" description={showArchived ? "Archived scan history only. Restore a scan to return it to active views." : "Active scans only. Archived scans remain available for audit."} actions={<><button className="secondary-button" onClick={() => setShowArchived((value) => !value)}>{showArchived ? "Show active" : "Show archived"}</button><ScanRunCreator onCreated={scanRuns.reload} /></>}>
-        <div className="mb-4 flex items-center gap-2">
-          <button className="secondary-button" disabled={selectedIds.size === 0} onClick={() => { void api.scanRuns.bulkArchive(Array.from(selectedIds)).then(() => { setSelectedIds(new Set()); void scanRuns.reload(); }); }}>Archive Selected ({selectedIds.size})</button>
-          <button className="secondary-button" onClick={() => setSelectedIds(new Set())} disabled={selectedIds.size === 0}>Clear Selection</button>
+      <Section
+        title="Scan Runs"
+        description={showArchived ? "Archived scan history only. Restore a scan to return it to active views." : "Active scans only. Archived scans remain available for audit."}
+        actions={
+          <div className="flex items-center gap-2">
+            <button className="secondary-button" onClick={() => setShowArchived((value) => !value)}>
+              {showArchived ? "Show active" : "Show archived"}
+            </button>
+            <ScanRunCreator onCreated={scanRuns.reload} />
+          </div>
+        }
+      >
+        <div className="mb-4 flex flex-wrap items-center gap-2">
+          <button className="secondary-button" disabled={selectedIds.size === 0} onClick={() => { void api.scanRuns.bulkArchive(Array.from(selectedIds)).then(() => { setSelectedIds(new Set()); void scanRuns.reload(); }); }}>
+            Archive Selected ({selectedIds.size})
+          </button>
+          <button className="secondary-button" onClick={() => setSelectedIds(new Set())} disabled={selectedIds.size === 0}>
+            Clear Selection
+          </button>
         </div>
         <ResourceBoundary resource={scanRuns}>
           {(data) => <ScanRunTable data={data} onSelect={setSelectedId} onOpen={onSelectScan} onChanged={scanRuns.reload} selectedIds={selectedIds} onToggleSelect={(id) => setSelectedIds((prev) => { const next = new Set(prev); if (next.has(id)) next.delete(id); else next.add(id); return next; })} />}
@@ -45,23 +60,24 @@ function ScanRunTable({ data, onSelect, onOpen, onChanged, selectedIds, onToggle
   return (
     <DataTable
       columns={["", "ID", "Environment", "Status", "Created", "Open", "Retention"]}
-      rows={data.map((scanRun) => [
+      rows={data.map((scanRun, index) => [
         <input
+          key={scanRun.id}
           type="checkbox"
           checked={selectedIds.has(scanRun.id)}
           onChange={() => onToggleSelect(scanRun.id)}
-          className="h-4 w-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500"
+          className="h-4 w-4 rounded border-line-strong text-brand-600 focus:ring-brand-500"
         />,
         scanRun.id,
         scanRun.target_environment,
-        <StatusBadge value={scanRun.status} />,
+        <StatusBadge key={`status-${scanRun.id}`} value={scanRun.status} />,
         formatDate(scanRun.created_at),
-        <button className="primary-button" onClick={() => onOpen(scanRun.id)}>
-          <ArrowRight className="h-4 w-4" aria-hidden />
+        <button key={`open-${scanRun.id}`} className="primary-button !h-8 !px-3 !text-xs" onClick={() => onOpen(scanRun.id)}>
+          <ArrowRight className="h-3.5 w-3.5" aria-hidden />
           View
         </button>,
-        <button className="secondary-button" onClick={() => void (scanRun.archived_at ? api.scanRuns.restore(scanRun.id) : api.scanRuns.archive(scanRun.id)).then(onChanged)}>
-          {scanRun.archived_at ? <RotateCcw className="h-4 w-4" aria-hidden /> : <Archive className="h-4 w-4" aria-hidden />}
+        <button key={`archive-${scanRun.id}`} className="secondary-button !h-8 !px-3 !text-xs" onClick={() => void (scanRun.archived_at ? api.scanRuns.restore(scanRun.id) : api.scanRuns.archive(scanRun.id)).then(onChanged)}>
+          {scanRun.archived_at ? <RotateCcw className="h-3.5 w-3.5" aria-hidden /> : <Archive className="h-3.5 w-3.5" aria-hidden />}
           {scanRun.archived_at ? "Restore" : "Archive"}
         </button>,
       ])}
@@ -73,23 +89,23 @@ function ScanRunDetail({ scanRun, summary, onOpen }: { scanRun: ScanRun | null; 
   return (
     <Section title="Scan Detail">
       {scanRun ? (
-        <div className="space-y-3">
+        <div className="space-y-4 animate-slide-in-right">
           <Detail label="Scan run" value={scanRun.id} />
           <Detail label="Environment" value={scanRun.target_environment} />
           <Detail label="Status" value={<StatusBadge value={scanRun.status} />} />
           <Detail label="Started" value={formatDate(scanRun.started_at)} />
           {summary ? (
-            <div className="grid grid-cols-2 gap-3 pt-2">
-              <MetricCard label="Raw" value={summary.raw_findings} />
-              <MetricCard label="Normalized" value={summary.normalized_findings} />
-              <MetricCard label="Mappings" value={summary.mappings} />
-              <MetricCard label="Published" value={summary.published_mappings} accent="emerald" />
-              <MetricCard label="Manual review" value={summary.manual_review_mappings} accent="amber" />
+            <div className="grid grid-cols-2 gap-3 pt-3">
+              <MetricCard label="Raw" value={summary.raw_findings} className="!p-4" />
+              <MetricCard label="Normalized" value={summary.normalized_findings} className="!p-4" />
+              <MetricCard label="Mappings" value={summary.mappings} className="!p-4" />
+              <MetricCard label="Published" value={summary.published_mappings} accent="emerald" className="!p-4" />
+              <MetricCard label="Manual review" value={summary.manual_review_mappings} accent="amber" className="!p-4" />
             </div>
           ) : (
             <LoadingState label="Loading summary" />
           )}
-          <div className="pt-2">
+          <div className="pt-3">
             <button className="primary-button w-full justify-center" onClick={() => onOpen(scanRun.id)}>
               Open scan workspace
               <ArrowRight className="h-4 w-4" aria-hidden />

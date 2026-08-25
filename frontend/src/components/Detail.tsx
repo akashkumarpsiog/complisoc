@@ -1,10 +1,10 @@
 import type { ReactNode } from "react";
 
-export function Detail({ label, value }: { label: string; value: ReactNode }) {
+export function Detail({ label, value, className }: { label: string; value: ReactNode; className?: string }) {
   return (
-    <div className="grid grid-cols-[130px_1fr] gap-3 border-b border-line pb-2 text-sm last:border-0">
-      <dt className="text-slate-500">{label}</dt>
-      <dd className="min-w-0 break-words font-medium text-ink">{value}</dd>
+    <div className={`grid grid-cols-[140px_1fr] gap-3 border-b border-line py-3 text-sm last:border-0 ${className || ""}`}>
+      <dt className="text-sm font-semibold text-subtle uppercase tracking-wider">{label}</dt>
+      <dd className="min-w-0 break-words text-ink font-medium leading-relaxed">{value}</dd>
     </div>
   );
 }

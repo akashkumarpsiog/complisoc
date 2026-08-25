@@ -16,7 +16,7 @@ export function ControlsPage() {
 
   return (
     <div className="grid gap-5 2xl:grid-cols-[1fr_420px]">
-      <Section title="Controls" actions={<FrameworkFilter frameworks={frameworks} value={framework} onChange={setFramework} />}>
+      <Section title="Controls" description="Reference control catalog" actions={<FrameworkFilter frameworks={frameworks} value={framework} onChange={setFramework} />}>
         <ResourceBoundary resource={{ ...controls, data: filtered }}>
           {(data) => <ControlTable data={data} onSelect={setSelectedId} />}
         </ResourceBoundary>
@@ -47,7 +47,7 @@ function ControlTable({ data, onSelect }: { data: Control[]; onSelect: (id: numb
         control.control_id,
         control.control_family,
         control.title,
-        <button className="icon-button" onClick={() => onSelect(control.id)}>
+        <button key={`detail-${control.id}`} className="secondary-button !h-8 !px-3 !text-xs" onClick={() => onSelect(control.id)}>
           Detail
         </button>,
       ])}
@@ -59,7 +59,7 @@ function ControlDetail({ control }: { control: Control | null }) {
   return (
     <Section title="Control Detail">
       {control ? (
-        <div className="space-y-3">
+        <div key={control.id} className="space-y-4 animate-slide-in-right">
           <Detail label="Framework" value={control.framework_name} />
           <Detail label="Version" value={control.framework_version} />
           <Detail label="Control" value={control.control_id} />

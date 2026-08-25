@@ -20,6 +20,7 @@ export function AuditBundlesPage() {
   return (
     <Section
       title="Audit Bundles"
+      description="Exportable audit evidence with full lineage"
       actions={<BundleActions scanRuns={scanRuns.data || []} scanRunId={scanRunId} setScanRunId={setScanRunId} onCreate={create} />}
     >
       <ResourceBoundary resource={bundles}>
@@ -66,7 +67,7 @@ function BundleTable({ data }: { data: AuditBundle[] }) {
         bundle.scan_run_id,
         formatDate(bundle.generated_at),
         bundle.checksum,
-        <a className="icon-button" href={api.auditBundles.downloadUrl(bundle.id)}>
+        <a key={`dl-${bundle.id}`} className="icon-button" href={api.auditBundles.downloadUrl(bundle.id)}>
           Download
         </a>,
       ])}

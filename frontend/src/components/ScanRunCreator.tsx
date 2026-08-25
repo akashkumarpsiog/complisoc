@@ -3,6 +3,7 @@ import { ChevronDown, ChevronRight, Cloud, Folder, GitBranch, Loader2, Play, Ter
 import { api } from "../services/api";
 import type { ScannerInfo } from "../types";
 import { sampleFailures, sampleFindings } from "../services/json";
+import { staggerStyle } from "./Primitives";
 
 type Mode = "live" | "sample";
 type TargetType = "local" | "git" | "aws" | "azure";
@@ -33,35 +34,32 @@ export function ScanRunCreator({ onCreated }: { onCreated: () => void }) {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" onClick={close} />
-      <div className="relative max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-xl border border-line bg-white shadow-xl">
-        <div className="sticky top-0 z-10 flex items-center justify-between border-b border-line bg-white px-4 py-3">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 animate-fade-in">
+      <div className="absolute inset-0 bg-ink/30 backdrop-blur-sm transition-opacity duration-200" onClick={close} />
+      <div className="relative max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-2xl border border-line bg-white shadow-2xl animate-scale-in">
+        <div className="sticky top-0 z-10 flex items-center justify-between border-b border-line bg-white/95 backdrop-blur-sm px-6 py-4">
           <div className="flex gap-2">
-            <button
-              disabled={busy}
-              className={`rounded-md px-3 py-1.5 text-sm font-medium transition ${
-                mode === "live" ? "bg-brand-600 text-white" : "bg-panel text-slate-600 hover:bg-slate-100"
-              }`}
-              onClick={() => setMode("live")}
-            >
-              Live scan
-            </button>
-            <button
-              disabled={busy}
-              className={`rounded-md px-3 py-1.5 text-sm font-medium transition ${
-                mode === "sample" ? "bg-brand-600 text-white" : "bg-panel text-slate-600 hover:bg-slate-100"
-              }`}
-              onClick={() => setMode("sample")}
-            >
-              Sample scan
-            </button>
+            {(["live", "sample"] as Mode[]).map((m) => (
+              <button
+                key={m}
+                type="button"
+                disabled={busy}
+                className={`rounded-lg px-4 py-2 text-sm font-semibold transition-all duration-150 ${
+                  mode === m
+                    ? "bg-brand-500 text-white shadow-sm shadow-brand-500/20"
+                    : "bg-panel text-muted hover:bg-panel-hover hover:text-ink"
+                }`}
+                onClick={() => setMode(m)}
+              >
+                {m === "live" ? "Live scan" : "Sample scan"}
+              </button>
+            ))}
           </div>
-          <button className="icon-button border-0 p-1" disabled={busy} onClick={close} aria-label="Close">
-            <X className="h-4 w-4" aria-hidden />
+          <button className="icon-button !border-0 !p-1.5 text-subtle hover:text-ink hover:bg-panel-hover" disabled={busy} onClick={close} aria-label="Close">
+            <X className="h-4 w-4" />
           </button>
         </div>
-        <div className="p-4">
+        <div className="p-6">
           {mode === "live" ? (
             <LiveScanForm onBusyChange={setBusy} onCreated={onCreated} onClose={close} />
           ) : (
@@ -154,9 +152,9 @@ function LiveScanForm({
           : ". or C:/repo";
 
   return (
-    <div className="grid gap-4">
+    <div className="grid gap-5">
       <div>
-        <div className="mb-2 text-sm font-medium">Target</div>
+        <label className="text-sm font-semibold text-ink block mb-2">Target</label>
         <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
           {TARGET_OPTIONS.map((option) => (
             <button
@@ -164,10 +162,10 @@ function LiveScanForm({
               type="button"
               disabled={submitting}
               onClick={() => setTargetType(option.value)}
-              className={`inline-flex items-center justify-center gap-2 rounded-md border px-3 py-2 text-sm font-medium transition ${
+              className={`inline-flex items-center justify-center gap-2 rounded-xl border px-3 py-2.5 text-sm font-medium transition-all duration-150 ${
                 targetType === option.value
-                  ? "border-brand-200 bg-brand-50 text-brand-700"
-                  : "border-line bg-white text-slate-600 hover:bg-slate-50"
+                  ? "border-brand-200 bg-brand-50 text-brand-700 shadow-sm shadow-brand-500/5"
+                  : "border-line bg-white text-muted hover:border-line-strong hover:bg-panel-hover hover:text-ink"
               }`}
             >
               {option.icon}
@@ -177,29 +175,29 @@ function LiveScanForm({
         </div>
       </div>
 
-      <label className="text-sm font-medium">
+      <label className="text-sm font-semibold text-ink block">
         {targetLabel}
-        <input className="control mt-1" disabled={submitting} value={target} onChange={(event) => setTarget(event.target.value)} placeholder={targetPlaceholder} />
+        <input className="control mt-1.5" disabled={submitting} value={target} onChange={(event) => setTarget(event.target.value)} placeholder={targetPlaceholder} />
       </label>
 
-      <div className="rounded-md border border-line bg-panel p-3">
+      <div className="rounded-xl border border-line bg-panel/40 overflow-hidden">
         <button
           type="button"
           onClick={() => setShowProviders((prev) => !prev)}
-          className="flex w-full items-center justify-between text-sm font-medium text-slate-700"
+          className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left text-sm font-semibold text-ink hover:bg-white transition-colors duration-150"
         >
           <span>Security providers used in this scan</span>
-          {showProviders ? <ChevronDown className="h-4 w-4 text-slate-400" aria-hidden /> : <ChevronRight className="h-4 w-4 text-slate-400" aria-hidden />}
+          {showProviders ? <ChevronDown className="h-4 w-4 text-subtle" /> : <ChevronRight className="h-4 w-4 text-subtle" />}
         </button>
         {showProviders ? (
-          <div className="mt-3 grid gap-2">
-            <ProviderRow label="Infrastructure Analysis" provider="Checkov" available={isInfraAvailable} missing={infrastructure?.missing_config} />
-            <ProviderRow label="Vulnerability Analysis" provider="Trivy" available={isVulnAvailable} missing={vulnerability?.missing_config} />
-            <ProviderRow label="Static Analysis" provider="SonarQube" available={isStaticConfigured} missing={staticAnalysis?.missing_config} />
+          <div className="border-t border-line bg-white p-4 grid gap-2.5">
+            <ProviderRow label="Infrastructure Analysis" provider="Checkov" available={isInfraAvailable} missing={infrastructure?.missing_config} index={0} />
+            <ProviderRow label="Vulnerability Analysis" provider="Trivy" available={isVulnAvailable} missing={vulnerability?.missing_config} index={1} />
+            <ProviderRow label="Static Analysis" provider="SonarQube" available={isStaticConfigured} missing={staticAnalysis?.missing_config} index={2} />
             {(targetType === "azure") && (
-              <ProviderRow label="Cloud Findings" provider="Azure Defender" available={cloudFindings?.available ?? false} missing={cloudFindings?.missing_config} />
+              <ProviderRow label="Cloud Findings" provider="Azure Defender" available={cloudFindings?.available ?? false} missing={cloudFindings?.missing_config} index={3} />
             )}
-            <p className="text-xs text-slate-500">
+            <p className="text-xs text-muted pt-1">
               {targetType === "aws"
                 ? "AWS scans use Checkov for IaC, Trivy for vulnerabilities, and SonarQube for static code analysis."
                 : targetType === "azure"
@@ -210,27 +208,31 @@ function LiveScanForm({
             </p>
           </div>
         ) : (
-          <p className="mt-1 text-xs text-slate-500">
+          <div className="px-4 py-2.5 text-xs text-muted border-t border-line">
             {availableCount} of {scanners.length} providers available. SonarQube and Azure Defender require environment configuration.
-          </p>
+          </div>
         )}
       </div>
 
-      <label className="text-sm font-medium">
-        Framework (optional)
-        <input className="control mt-1" disabled={submitting} value={framework} onChange={(event) => setFramework(event.target.value)} placeholder="ISO/IEC 27001:2022 Annex A" />
+      <label className="text-sm font-semibold text-ink block">
+        Framework <span className="font-normal text-subtle">(optional)</span>
+        <input className="control mt-1.5" disabled={submitting} value={framework} onChange={(event) => setFramework(event.target.value)} placeholder="ISO/IEC 27001:2022 Annex A" />
       </label>
 
-      {message ? <div className="rounded-md bg-panel px-3 py-2 text-sm text-slate-700">{message}</div> : null}
-      {submitting ? (
-        <div className="flex items-center gap-2 rounded-md border border-brand-100 bg-brand-50 px-3 py-2 text-sm text-brand-700">
+      {message && (
+        <div className={`rounded-xl border px-4 py-3 text-sm font-medium animate-slide-up ${message.includes("Created") ? "border-success/20 bg-success-light text-success-dark" : "border-danger/20 bg-danger-light text-danger-dark"}`}>
+          {message}
+        </div>
+      )}
+      {submitting && (
+        <div className="flex items-center gap-3 rounded-xl border border-brand-200 bg-brand-50 px-4 py-3 text-sm font-medium text-brand-700">
           <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
           Running security scan and generating compliance decisions...
         </div>
-      ) : null}
+      )}
 
-      <div className="flex items-center justify-end gap-2">
-        <button className="icon-button" disabled={submitting} onClick={onClose}>
+      <div className="flex items-center justify-end gap-2 pt-2">
+        <button className="secondary-button" disabled={submitting} onClick={onClose}>
           Cancel
         </button>
         <button className="primary-button" disabled={submitting} onClick={submit}>
@@ -251,25 +253,27 @@ function ProviderRow({
   provider,
   available,
   missing,
+  index = 0,
 }: {
   label: string;
   provider: string;
   available: boolean;
   missing?: string[] | null;
+  index?: number;
 }) {
   return (
-    <div className="flex items-center justify-between rounded-md border border-line bg-white px-3 py-2 text-sm">
+    <div className="flex items-center justify-between rounded-xl border border-line bg-white px-4 py-3 text-sm animate-fade-in hover:border-line-strong hover:shadow-sm transition-all duration-150" style={staggerStyle(index, 80)}>
       <div className="flex flex-col">
-        <span className="font-medium text-slate-700">{label}</span>
-        <span className="text-xs text-slate-500">{provider}</span>
+        <span className="font-semibold text-ink">{label}</span>
+        <span className="text-xs text-subtle">{provider}</span>
       </div>
       {available ? (
-        <span className="inline-flex items-center gap-1.5 text-xs font-medium text-emerald-700">
-          <span className="h-2 w-2 rounded-full bg-emerald-500" aria-hidden />
+        <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-success">
+          <span className="h-2 w-2 rounded-full bg-success shadow-sm shadow-success/30" aria-hidden />
           Connected
         </span>
       ) : (
-        <span className="text-xs text-slate-400">
+        <span className="text-xs text-subtle">
           {missing && missing.length > 0 ? `Not configured: ${missing.join(", ")}` : "Not available"}
         </span>
       )}
@@ -291,10 +295,10 @@ function JsonEditor({
   onChange: (value: string) => void;
 }) {
   return (
-    <label className="text-sm font-medium">
+    <label className="text-sm font-semibold text-ink block">
       {label}
       <textarea
-        className="control mt-1 w-full resize-y font-mono text-xs"
+        className="control mt-1.5 w-full resize-y font-mono text-xs leading-relaxed"
         disabled={disabled}
         rows={rows}
         value={value}
@@ -345,11 +349,11 @@ function SampleScanForm({
   }
 
   return (
-    <div className="grid gap-3">
-      <label className="text-sm font-medium">
+    <div className="grid gap-4">
+      <label className="text-sm font-semibold text-ink block">
         Target environment
         <input
-          className="control mt-1"
+          className="control mt-1.5"
           disabled={submitting}
           value={targetEnvironment}
           onChange={(event) => setTargetEnvironment(event.target.value)}
@@ -358,15 +362,19 @@ function SampleScanForm({
       </label>
       <JsonEditor disabled={submitting} label="Findings JSON" rows={8} value={findingsJson} onChange={setFindingsJson} />
       <JsonEditor disabled={submitting} label="Scanner failures JSON (optional)" rows={4} value={failuresJson} onChange={setFailuresJson} />
-      {message ? <div className="rounded-md bg-panel px-3 py-2 text-sm text-slate-700">{message}</div> : null}
-      {submitting ? (
-        <div className="flex items-center gap-2 rounded-md border border-brand-100 bg-brand-50 px-3 py-2 text-sm text-brand-700">
+      {message && (
+        <div className={`rounded-xl border px-4 py-3 text-sm font-medium animate-slide-up ${message.includes("Created") ? "border-success/20 bg-success-light text-success-dark" : "border-danger/20 bg-danger-light text-danger-dark"}`}>
+          {message}
+        </div>
+      )}
+      {submitting && (
+        <div className="flex items-center gap-3 rounded-xl border border-brand-200 bg-brand-50 px-4 py-3 text-sm font-medium text-brand-700">
           <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
           Creating scan, mapping findings, and generating compliance decisions...
         </div>
-      ) : null}
-      <div className="flex items-center justify-end gap-2">
-        <button className="icon-button" disabled={submitting} onClick={onClose}>
+      )}
+      <div className="flex items-center justify-end gap-2 pt-2">
+        <button className="secondary-button" disabled={submitting} onClick={onClose}>
           Cancel
         </button>
         <button className="primary-button" disabled={submitting} onClick={submit}>

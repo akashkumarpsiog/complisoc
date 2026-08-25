@@ -30,6 +30,7 @@ export function ReportsPage() {
   return (
     <Section
       title="Reports"
+      description="Generate engineering and leadership reports"
       actions={
         <ReportActions
           cooldowns={cooldowns}
@@ -97,7 +98,7 @@ function ReportTable({ data }: { data: ComplianceReport[] }) {
         report.report_type,
         formatDate(report.generated_at),
         report.content_hash || "n/a",
-        <a className="icon-button" href={api.reports.downloadUrl(report.id)}>
+        <a key={`dl-${report.id}`} className="icon-button" href={api.reports.downloadUrl(report.id)}>
           Download
         </a>,
       ])}

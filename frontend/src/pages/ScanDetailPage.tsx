@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Loader2 } from "lucide-react";
+import { ChevronLeft, Loader2 } from "lucide-react";
 import { api } from "../services/api";
 import { useResource } from "../hooks/useResource";
 import type { AuditBundle, BulkReviewDecision, ComplianceReport, ControlMapping, NormalizedFinding, ReviewQueueItem, ScanRunSummary, VerificationRecord } from "../types";
@@ -42,29 +42,49 @@ export function ScanDetailPage({ scanRunId, onBack }: { scanRunId: number; onBac
     await summaryResource.reload();
   };
 
+  const renderTab = () => {
+    switch (activeTab) {
+      case "summary":
+        return <SummaryTab summary={summaryResource.data} />;
+      case "findings":
+        return <FindingsTab findings={scanFindings} resource={findingsResource} onRefresh={findingsResource.reload} />;
+      case "mappings":
+        return <MappingsTab mappings={scanMappings} resource={mappingsResource} scanRunId={scanRunId} />;
+      case "review":
+        return <ReviewTab items={reviewForScan} resource={reviewResource} onRefresh={refreshReview} />;
+      case "reports":
+        return <ReportsTab scanRunId={scanRunId} reports={reportsResource.data || []} resource={reportsResource} onRefresh={reportsResource.reload} />;
+      case "bundle":
+        return <BundleTab scanRunId={scanRunId} bundles={bundlesResource.data || []} resource={bundlesResource} onRefresh={bundlesResource.reload} />;
+      default:
+        return null;
+    }
+  };
+
   return (
     <div className="space-y-5">
       <div className="flex items-center gap-3">
-        <button className="icon-button" onClick={onBack}>
-          ← Back
+        <button className="secondary-button !h-9 !px-3" onClick={onBack}>
+          <ChevronLeft className="h-4 w-4" aria-hidden />
+          Back
         </button>
         <div>
-          <h1 className="text-xl font-semibold text-ink">Scan #{scanRunId}</h1>
-          <p className="text-sm text-slate-500">
+          <h1 className="text-xl font-bold text-ink tracking-tight">Scan #{scanRunId}</h1>
+          <p className="mt-0.5 text-sm text-muted">
             {summaryResource.data ? `${summaryResource.data.raw_findings} findings · ${summaryResource.data.mappings} mappings` : "Loading..."}
           </p>
         </div>
       </div>
 
       <div className="border-b border-line">
-        <nav className="flex gap-1 overflow-x-auto" aria-label="Scan tabs">
+        <nav className="flex gap-0.5 overflow-x-auto" aria-label="Scan tabs">
           {TABS.map((tab) => (
             <button
               key={tab.id}
-              className={`shrink-0 border-b-2 px-4 py-2 text-sm font-medium transition focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-1 ${
+              className={`shrink-0 border-b-2 px-4 py-2.5 text-sm font-semibold transition-all duration-150 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-1 ${
                 activeTab === tab.id
-                  ? "border-brand-600 text-brand-700"
-                  : "border-transparent text-slate-600 hover:text-slate-900"
+                  ? "border-brand-500 text-brand-700"
+                  : "border-transparent text-muted hover:text-ink"
               }`}
               onClick={() => setActiveTab(tab.id)}
             >
@@ -74,20 +94,9 @@ export function ScanDetailPage({ scanRunId, onBack }: { scanRunId: number; onBac
         </nav>
       </div>
 
-      {activeTab === "summary" && <SummaryTab summary={summaryResource.data} />}
-      {activeTab === "findings" && (
-        <FindingsTab findings={scanFindings} resource={findingsResource} onRefresh={findingsResource.reload} />
-      )}
-      {activeTab === "mappings" && (
-        <MappingsTab mappings={scanMappings} resource={mappingsResource} scanRunId={scanRunId} />
-      )}
-      {activeTab === "review" && <ReviewTab items={reviewForScan} resource={reviewResource} onRefresh={refreshReview} />}
-      {activeTab === "reports" && (
-        <ReportsTab scanRunId={scanRunId} reports={reportsResource.data || []} resource={reportsResource} onRefresh={reportsResource.reload} />
-      )}
-      {activeTab === "bundle" && (
-        <BundleTab scanRunId={scanRunId} bundles={bundlesResource.data || []} resource={bundlesResource} onRefresh={bundlesResource.reload} />
-      )}
+      <div key={activeTab} className="animate-fade-in">
+        {renderTab()}
+      </div>
     </div>
   );
 }
@@ -151,7 +160,7 @@ function FindingsTab({
       title="Findings"
       description="Security findings discovered during this scan."
       actions={
-        <>
+        <div className="flex flex-wrap items-center gap-2">
           <select className="control" value={severity} onChange={(e) => setSeverity(e.target.value)}>
             <option value="">All severities</option>
             {severityOrder.map((s) => (
@@ -161,7 +170,7 @@ function FindingsTab({
             ))}
           </select>
           <input className="control" placeholder="Filter scanner..." value={scanner} onChange={(e) => setScanner(e.target.value)} />
-        </>
+        </div>
       }
     >
       <ResourceBoundary resource={{ ...resource, data: filtered }}>
@@ -178,10 +187,10 @@ function FindingsTab({
                 finding.scanner_name,
                 finding.resource_identifier,
                 finding.title,
-                <span className="max-w-[320px] truncate" title={description}>{description}</span>,
+                <span className="max-w-[320px] truncate text-muted" title={description}>{description}</span>,
                 isDefender ? (
-                  <button className="text-sm font-medium text-brand-700 hover:text-brand-800" onClick={() => toggle(finding.id)}>
-                    {isOpen ? "Hide" : "Show"} details
+                  <button className="text-sm font-semibold text-brand-600 hover:text-brand-700 transition-colors duration-150" onClick={() => toggle(finding.id)}>
+                    {expanded.has(finding.id) ? "Hide" : "Show"} details
                   </button>
                 ) : null,
               ];
@@ -193,13 +202,13 @@ function FindingsTab({
               const resourceType = typeof meta.resourceType === "string" ? meta.resourceType : typeof meta.resource_type === "string" ? meta.resource_type : null;
               const remediationSteps = typeof meta.remediationSteps === "string" ? meta.remediationSteps : null;
               return (
-                <div key={finding.id} className="space-y-2 text-sm text-slate-700">
-                  {alertType ? <div><span className="font-medium">Type:</span> {alertType}</div> : null}
-                  {resourceType ? <div><span className="font-medium">Resource type:</span> {resourceType}</div> : null}
-                  {remediationSteps ? <div><span className="font-medium">Remediation:</span> {remediationSteps}</div> : null}
+                <div key={finding.id} className="space-y-2 text-sm text-ink/90">
+                  {alertType ? <div><span className="font-semibold text-ink">Type:</span> {alertType}</div> : null}
+                  {resourceType ? <div><span className="font-semibold text-ink">Resource type:</span> {resourceType}</div> : null}
+                  {remediationSteps ? <div><span className="font-semibold text-ink">Remediation:</span> {remediationSteps}</div> : null}
                 </div>
               );
-            })}
+            }).filter(Boolean)}
           />
         )}
       </ResourceBoundary>
@@ -248,27 +257,27 @@ function MappingsTab({ mappings, resource, scanRunId }: { mappings: ControlMappi
                 return [
                   mapping.id,
                   finding ? (
-                    <span className="flex items-center gap-2">
+                    <span key={`f-${mapping.id}`} className="flex items-center gap-2">
                       <StatusBadge value={finding.severity} />
-                      <span className="truncate" title={finding.title}>{finding.title}</span>
+                      <span className="truncate font-medium text-ink" title={finding.title}>{finding.title}</span>
                     </span>
                   ) : (
-                    <span className="text-slate-500">#{mapping.normalized_finding_id}</span>
+                    <span key={`f-${mapping.id}`} className="text-subtle">#{mapping.normalized_finding_id}</span>
                   ),
                   control ? (
-                    <span className="truncate" title={`${control.framework} - ${control.title}`}>
-                      <span className="font-mono text-xs">{control.control_id}</span>
-                      <span className="mx-1 text-slate-400">·</span>
-                      <span>{control.title}</span>
+                    <span key={`c-${mapping.id}`} className="truncate" title={`${control.framework} - ${control.title}`}>
+                      <span className="font-mono text-xs text-subtle">{control.control_id}</span>
+                      <span className="mx-1.5 text-line-strong">·</span>
+                      <span className="font-medium text-ink">{control.title}</span>
                     </span>
                   ) : (
-                    <span className="text-slate-500">#{mapping.control_catalog_id}</span>
+                    <span key={`c-${mapping.id}`} className="text-subtle">#{mapping.control_catalog_id}</span>
                   ),
-                  <StatusBadge value={mapping.mapping_status} />,
+                  <StatusBadge key={`s-${mapping.id}`} value={mapping.mapping_status} />,
                   formatPercent(mapping.gemini_confidence),
                   formatPercent(mapping.groq_agreement_value),
                   formatPercent(mapping.final_confidence),
-                  <StatusBadge value={mapping.verification_status || "pending"} />,
+                  <StatusBadge key={`v-${mapping.id}`} value={mapping.verification_status || "pending"} />,
                 ];
               })}
             />
@@ -277,16 +286,16 @@ function MappingsTab({ mappings, resource, scanRunId }: { mappings: ControlMappi
       </Section>
       <Section title="Mapping Detail">
         {selected ? (
-          <div className="space-y-3">
+          <div key={selected.id} className="space-y-4 animate-slide-in-right">
             <Detail label="Mapping" value={selected.id} />
             {(() => {
               const finding = findingsByTitle.get(selected.normalized_finding_id);
               return finding ? (
-                <div className="space-y-1">
-                  <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">Finding</div>
+                <div className="space-y-1.5">
+                  <div className="text-xs font-bold uppercase tracking-wider text-subtle">Finding</div>
                   <div className="flex items-center gap-2">
                     <StatusBadge value={finding.severity} />
-                    <span className="text-sm font-medium">{finding.title}</span>
+                    <span className="text-sm font-semibold text-ink">{finding.title}</span>
                   </div>
                 </div>
               ) : (
@@ -296,13 +305,13 @@ function MappingsTab({ mappings, resource, scanRunId }: { mappings: ControlMappi
             {(() => {
               const control = controlsByTitle.get(selected.control_catalog_id);
               return control ? (
-                <div className="space-y-1">
-                  <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">Control</div>
+                <div className="space-y-1.5">
+                  <div className="text-xs font-bold uppercase tracking-wider text-subtle">Control</div>
                   <div className="text-sm">
-                    <span className="font-mono text-xs">{control.control_id}</span>
-                    <span className="mx-1 text-slate-400">·</span>
-                    <span className="font-medium">{control.title}</span>
-                    <div className="text-xs text-slate-500">{control.framework}</div>
+                    <span className="font-mono text-xs text-subtle">{control.control_id}</span>
+                    <span className="mx-1.5 text-line-strong">·</span>
+                    <span className="font-semibold text-ink">{control.title}</span>
+                    <div className="text-xs text-muted mt-0.5">{control.framework}</div>
                   </div>
                 </div>
               ) : (
@@ -315,11 +324,11 @@ function MappingsTab({ mappings, resource, scanRunId }: { mappings: ControlMappi
             <Detail label="AI Verdict" value={<StatusBadge value={selected.mapping_status} />} />
             <Detail label="Model" value={selected.mapping_model} />
             <Detail label="Rationale" value={selected.rationale || "n/a"} />
-            <h3 className="pt-2 text-sm font-semibold">Verification</h3>
+            <h3 className="pt-3 text-sm font-bold text-ink border-t border-line mt-2">Verification</h3>
             {verification ? (
               <DataTable
                 columns={["ID", "Result", "Agreement", "Model", "Explanation"]}
-                rows={verification.map((record) => [record.id, <StatusBadge value={record.result} />, formatPercent(record.agreement_value), record.verification_model, record.explanation || "n/a"])}
+                rows={verification.map((record) => [record.id, <StatusBadge key={`vr-${record.id}`} value={record.result} />, formatPercent(record.agreement_value), record.verification_model, record.explanation || "n/a"])}
               />
             ) : (
               <LoadingState label="Loading verification" />
@@ -411,28 +420,29 @@ function ReviewTab({ items, resource, onRefresh }: { items: ReviewQueueItem[]; r
             columns={["", "ID", "Mapping", "Status", "Reason", "Reviewed", "Decision"]}
             rows={data.map((item) => [
               <input
+                key={`cb-${item.id}`}
                 type="checkbox"
                 checked={selectedIds.has(item.id)}
                 onChange={() => toggleSelect(item.id)}
                 disabled={item.status !== "pending"}
-                className="h-4 w-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500"
+                className="h-4 w-4 rounded border-line-strong text-brand-600 focus:ring-brand-500"
               />,
               item.id,
               item.control_mapping_id,
-              <StatusBadge value={item.status} />,
+              <StatusBadge key={`status-${item.id}`} value={item.status} />,
               item.review_reason_code,
               formatDate(item.reviewed_at),
               item.status === "pending" ? (
-                <div className="flex gap-2">
-                  <button className="icon-button" onClick={() => decide(item.id, "approve")}>
+                <div key={`actions-${item.id}`} className="flex gap-2">
+                  <button className="icon-button !h-8 !px-3 !text-xs" onClick={() => decide(item.id, "approve")}>
                     Approve
                   </button>
-                  <button className="icon-button" onClick={() => decide(item.id, "reject")}>
+                  <button className="icon-button !h-8 !px-3 !text-xs" onClick={() => decide(item.id, "reject")}>
                     Reject
                   </button>
                 </div>
               ) : (
-                <span className="text-xs text-slate-500">Closed</span>
+                <span key={`closed-${item.id}`} className="text-xs text-subtle font-medium">Closed</span>
               ),
             ])}
           />
@@ -519,7 +529,7 @@ function ReportsTab({ scanRunId, reports, resource, onRefresh }: { scanRunId: nu
         </div>
       }
     >
-      {error ? <div className="mb-3 rounded-md bg-rose-50 border border-rose-200 p-3 text-sm text-rose-800">{error}</div> : null}
+      {error && <div className="mb-4 rounded-xl border border-danger/20 bg-danger-light px-4 py-3 text-sm font-medium text-danger-dark">{error}</div>}
       <ResourceBoundary resource={{ ...resource, data: complianceReports }}>
         {(data) => (
           <DataTable
@@ -529,7 +539,7 @@ function ReportsTab({ scanRunId, reports, resource, onRefresh }: { scanRunId: nu
               report.report_type,
               formatDate(report.generated_at),
               report.content_hash || "n/a",
-              <a className="icon-button" href={api.reports.downloadUrl(report.id)}>
+              <a key={`dl-${report.id}`} className="icon-button" href={api.reports.downloadUrl(report.id)}>
                 Download
               </a>,
             ])}
@@ -539,7 +549,7 @@ function ReportsTab({ scanRunId, reports, resource, onRefresh }: { scanRunId: nu
 
       {scenarioReports.length > 0 ? (
         <div className="mt-6 space-y-3">
-          <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-500">Scenario Reports</h3>
+          <h3 className="text-xs font-bold uppercase tracking-wider text-subtle">Scenario Reports</h3>
           <DataTable
             columns={["ID", "Scenario", "Generated", "Hash", "Download"]}
             rows={scenarioReports.map((report) => [
@@ -547,16 +557,16 @@ function ReportsTab({ scanRunId, reports, resource, onRefresh }: { scanRunId: nu
               report.report_type.replace("scenario:", ""),
               formatDate(report.generated_at),
               report.content_hash || "n/a",
-              <a className="icon-button" href={api.reports.downloadUrl(report.id)}>
+              <a key={`dl-${report.id}`} className="icon-button" href={api.reports.downloadUrl(report.id)}>
                 Download
               </a>,
             ])}
           />
         </div>
       ) : creating !== null ? (
-        <p className="mt-4 text-sm text-slate-500">Generating scenario report...</p>
+        <p className="mt-4 text-sm text-muted">Generating scenario report...</p>
       ) : (
-        <p className="mt-4 text-sm text-slate-500">No scenario reports generated yet. Click one of the scenario buttons above.</p>
+        <p className="mt-4 text-sm text-muted">No scenario reports generated yet. Click one of the scenario buttons above.</p>
       )}
     </Section>
   );
@@ -588,7 +598,7 @@ function BundleTab({ scanRunId, bundles, resource, onRefresh }: { scanRunId: num
               bundle.id,
               formatDate(bundle.generated_at),
               bundle.checksum,
-              <a className="icon-button" href={api.auditBundles.downloadUrl(bundle.id)}>
+              <a key={`dl-${bundle.id}`} className="icon-button" href={api.auditBundles.downloadUrl(bundle.id)}>
                 Download
               </a>,
             ])}
