@@ -264,6 +264,7 @@ class AuditBundle(Base):
     scan_run_id = Column(Integer, ForeignKey("scan_runs.id"), nullable=False)
     generated_at = Column(DateTime, default=datetime.utcnow)
     bundle_path = Column(String(1024))
+    manifest_path = Column(String(1024))
     checksum = Column(String(128), nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)

@@ -477,3 +477,113 @@ class TestScannersAPI:
         assert len(data) >= 4
         names = {s["name"] for s in data}
         assert {"trivy", "checkov", "sonarqube", "defender"} <= names
+
+
+class TestAIMetricsAPI:
+    def test_ai_metrics_returns_defaults_when_empty(self, client):
+        resp = client.get("/api/v1/dashboard/ai-metrics")
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["total_mappings"] == 0
+        assert body["manual_review_rate"] == 0.0
+
+    def test_ai_metrics_reflects_published_and_review_counts(self, client, db_session):
+        scan_run_id = _seed_scan(client, db_session)
+        resp = client.get("/api/v1/dashboard/ai-metrics")
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["total_mappings"] >= 1
+        assert body["published_mappings"] >= 1
+        assert body["avg_final_confidence"] is not None
+
+    def test_ai_metrics_agreement_rate_reflects_verification_records(self, client, db_session):
+        def make_finding(fid):
+            return {
+                "scanner_name": "checkov",
+                "scanner_finding_id": fid,
+                "raw_json": {
+                    "finding_type": "public_access iam permission",
+                    "resource_type": "aws_iam_policy",
+                    "resource_identifier": f"aws_iam_policy.public_{fid}",
+                    "severity": "high",
+                    "title": f"public access iam permission found {fid}",
+                    "description": f"Public access on iam permission {fid}",
+                },
+            }
+
+        with patch("complisoc.backend.compliance.langchain_pipeline.GeminiMapper") as MockMapper, patch(
+            "complisoc.backend.compliance.langchain_pipeline.GroqVerifier"
+        ) as MockVerifier:
+            MockMapper.return_value.map_batch.side_effect = lambda items: {
+                items[0][0].id: [CandidateDecision(control_id=items[0][1][0].control_catalog.control_id, maps=True, confidence=0.95, rationale="oracle")],
+                items[1][0].id: [CandidateDecision(control_id=items[1][1][0].control_catalog.control_id, maps=True, confidence=0.95, rationale="oracle")],
+            }
+            MockVerifier.return_value.verify_batch.return_value = {
+                1: VerificationDecision(result="agree", agreement_value=1.0, explanation="oracle"),
+                2: VerificationDecision(result="disagree", agreement_value=0.0, explanation="nope"),
+            }
+            client.post(
+                "/api/v1/scan-runs",
+                json={"target_environment": "metrics-test", "findings": [make_finding("MET-1"), make_finding("MET-2")]},
+            )
+        resp = client.get("/api/v1/dashboard/ai-metrics")
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["total_mappings"] == 2
+        assert body["agreement_rate"] == 0.5
+
+
+class TestAuditBundleVerifyAPI:
+    def test_verify_audit_bundle_returns_valid_status(self, client, db_session):
+        from complisoc.backend.reporting.reports import generate_audit_bundle
+
+        scan_run_id = _seed_scan(client, db_session)
+        bundle = generate_audit_bundle(db_session, scan_run_id=scan_run_id)
+        resp = client.get(f"/api/v1/audit-bundles/{bundle.id}/verify")
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["status"] == "VALID"
+        assert body["bundle_verified"] is True
+        assert body["manifest_verified"] is True
+
+    def test_verify_audit_bundle_not_found(self, client):
+        resp = client.get("/api/v1/audit-bundles/99999/verify")
+        assert resp.status_code == 404
+
+    def test_verify_audit_bundle_detects_tampered_bundle(self, client, db_session):
+        from complisoc.backend.reporting.reports import generate_audit_bundle
+
+        scan_run_id = _seed_scan(client, db_session)
+        bundle = generate_audit_bundle(db_session, scan_run_id=scan_run_id)
+        original = Path(bundle.bundle_path).read_text(encoding="utf-8")
+        tampered = original.replace("scan_run", "scan_ruN")
+        Path(bundle.bundle_path).write_text(tampered, encoding="utf-8")
+        try:
+            resp = client.get(f"/api/v1/audit-bundles/{bundle.id}/verify")
+            assert resp.status_code == 200
+            body = resp.json()
+            assert body["status"] == "TAMPERED"
+            assert body["bundle_verified"] is False
+            assert any("checksum mismatch" in e for e in body["errors"])
+        finally:
+            Path(bundle.bundle_path).write_text(original, encoding="utf-8")
+
+    def test_verify_audit_bundle_detects_missing_files(self, client, db_session):
+        from complisoc.backend.models import AuditBundle
+        from uuid import uuid4
+
+        bundle = AuditBundle(
+            scan_run_id=1,
+            bundle_path=f"/nonexistent/bundle-{uuid4().hex}.json",
+            manifest_path=f"/nonexistent/manifest-{uuid4().hex}.json",
+            checksum="deadbeef",
+        )
+        db_session.add(bundle)
+        db_session.commit()
+
+        resp = client.get(f"/api/v1/audit-bundles/{bundle.id}/verify")
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["status"] == "TAMPERED"
+        assert body["bundle_verified"] is False
+        assert body["manifest_verified"] is False

@@ -1,0 +1,190 @@
+name: PR Compliance Gate
+
+on:
+  pull_request:
+    branches: [main, develop]
+  workflow_dispatch:
+
+jobs:
+  compliance-gate:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install requests
+
+      - name: Install Trivy
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y wget apt-transport-https gnupg lsb-release
+          wget -qO - https://aquasecurity.github.io/trivy-repo/deb/public.key | sudo apt-key add -
+          echo "deb https://aquasecurity.github.io/trivy-repo/deb $(lsb_release -sc) main" | sudo tee -a /etc/apt/sources.list.d/trivy.list
+          sudo apt-get update
+          sudo apt-get install -y trivy
+
+      - name: Install Checkov
+        run: pip install checkov
+
+      - name: Run Trivy scan
+        id: trivy
+        continue-on-error: true
+        run: |
+          trivy fs --scanners vuln,secret,misconfig --severity LOW,MEDIUM,HIGH,CRITICAL --format json --output /tmp/trivy.json .
+
+      - name: Run Checkov scan with custom policies
+        id: checkov
+        continue-on-error: true
+        run: |
+          checkov -d . --external-checks-dir ./scan_targets/checkov_policies --output json --compact --output-file-path /tmp/checkov.json --quiet || true
+
+      - name: Aggregate findings and post PR comment
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          import urllib.request
+          from pathlib import Path
+          from datetime import datetime
+
+          def load_json(path):
+              p = Path(path)
+              if not p.exists():
+                  return {}
+              try:
+                  return json.loads(p.read_text(encoding="utf-8"))
+              except Exception:
+                  return {}
+
+          trivy = load_json("/tmp/trivy.json")
+          checkov = load_json("/tmp/checkov.json")
+
+          trivy_critical = trivy_high = trivy_medium = trivy_low = 0
+          for result in trivy.get("Results", []) or []:
+              for vuln in result.get("Vulnerabilities", []) or []:
+                  sev = (vuln.get("Severity") or "medium").lower()
+                  if sev == "critical":
+                      trivy_critical += 1
+                  elif sev == "high":
+                      trivy_high += 1
+                  elif sev == "medium":
+                      trivy_medium += 1
+                  else:
+                      trivy_low += 1
+              for misc in result.get("Misconfigurations", []) or []:
+                  sev = (misc.get("Severity") or "medium").lower()
+                  if sev == "critical":
+                      trivy_critical += 1
+                  elif sev == "high":
+                      trivy_high += 1
+                  elif sev == "medium":
+                      trivy_medium += 1
+                  else:
+                      trivy_low += 1
+
+          checkov_results = checkov.get("results", {}) if isinstance(checkov, dict) else {}
+          checkov_failed = checkov_results.get("failed_checks", []) or []
+          custom_checks = [c for c in checkov_failed if str(c.get("check_id", "")).startswith("CKV_COMPLISOC_")]
+          builtin_checks = [c for c in checkov_failed if not str(c.get("check_id", "")).startswith("CKV_COMPLISOC_")]
+
+          def sev_counts(checks):
+              counts = {"critical": 0, "high": 0, "medium": 0, "low": 0, "info": 0}
+              for c in checks:
+                  sev = (c.get("severity") or "medium").lower()
+                  counts[sev] = counts.get(sev, 0) + 1
+              return counts
+
+          checkov_sev = sev_counts(checkov_failed)
+          custom_sev = sev_counts(custom_checks)
+          builtin_sev = sev_counts(builtin_checks)
+
+          total_findings = trivy_critical + trivy_high + trivy_medium + trivy_low + len(checkov_failed)
+          status = "PASS" if (trivy_critical == 0 and trivy_high == 0 and len(custom_checks) == 0) else "FAIL"
+
+          body = f"""## COMPLISOC COMPLIANCE CHECK
+
+**Status:** {status}
+
+### Summary
+| Metric | Count |
+|--------|------:|
+| Total findings | {total_findings} |
+| Trivy critical | {trivy_critical} |
+| Trivy high | {trivy_high} |
+| Trivy medium | {trivy_medium} |
+| Trivy low | {trivy_low} |
+| Checkov failed | {len(checkov_failed)} |
+| Custom policy violations | {len(custom_checks)} |
+| Built-in Checkov violations | {len(builtin_checks)} |
+
+### Checkov Breakdown
+| Severity | Custom | Built-in |
+|----------|-------:|---------:|
+| Critical | {custom_sev['critical']} | {builtin_sev['critical']} |
+| High | {custom_sev['high']} | {builtin_sev['high']} |
+| Medium | {custom_sev['medium']} | {builtin_sev['medium']} |
+| Low | {custom_sev['low']} | {builtin_sev['low']} |
+
+### Top Issues
+"""
+
+          top_issues = []
+          for c in checkov_failed[:5]:
+              top_issues.append(f"- **{c.get('check_id', 'N/A')}** — {c.get('check_name', c.get('description', 'N/A'))} (`{c.get('file_path', 'N/A')}`)")
+          for vuln in (trivy.get("Results", []) or [])[:3]:
+              for v in vuln.get("Vulnerabilities", []) or []:
+                  top_issues.append(f"- **{v.get('VulnerabilityID', 'N/A')}** — {v.get('Title', v.get('PkgName', 'N/A'))} (`{vuln.get('Target', 'N/A')}`)")
+                  break
+
+          if not top_issues:
+              body += "_No critical or high-severity issues found._\n"
+          else:
+              body += "\n".join(top_issues[:8]) + "\n"
+
+          body += f"""
+---
+<details>
+<summary>Raw scanner outputs</summary>
+
+Trivy: `/tmp/trivy.json`
+Checkov: `/tmp/checkov.json`
+</details>
+
+*Generated by Complisoc PR Compliance Gate at {datetime.utcnow().isoformat(timespec='seconds')} UTC*
+"""
+
+          api_url = f"https://api.github.com/repos/{os.environ['REPO']}/issues/{os.environ['PR_NUMBER']}/comments"
+          req = urllib.request.Request(
+              api_url,
+              data=json.dumps({"body": body}).encode("utf-8"),
+              headers={
+                  "Authorization": f"Bearer {os.environ['GITHUB_TOKEN']}",
+                  "Accept": "application/vnd.github+json",
+                  "X-GitHub-Api-Version": "2022-11-28",
+                  "Content-Type": "application/json",
+              },
+              method="POST",
+          )
+          with urllib.request.urlopen(req, timeout=30) as resp:
+              print(f"Posted PR comment: {resp.status}")
+
+          if status == "FAIL":
+              raise SystemExit("Compliance gate failed: critical/high findings or custom policy violations detected.")
+          PY

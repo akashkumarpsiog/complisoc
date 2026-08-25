@@ -190,6 +190,7 @@ def test_audit_bundles_schema():
         "scan_run_id",
         "generated_at",
         "bundle_path",
+        "manifest_path",
         "checksum",
         "created_at",
         "updated_at",

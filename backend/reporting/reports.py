@@ -26,6 +26,54 @@ def _write_artifact(kind: str, name: str, payload: dict[str, Any]) -> tuple[str,
     return str(path), digest
 
 
+def _write_manifest(directory: Path, bundle_path: str, bundle_digest: str, scan_run_id: int) -> tuple[str, str]:
+    manifest = {
+        "bundle_id": f"AUD-{scan_run_id}",
+        "scan_run_id": scan_run_id,
+        "generated_at": datetime.utcnow().isoformat(timespec="seconds"),
+        "files": {
+            Path(bundle_path).name: f"sha256:{bundle_digest}",
+        },
+    }
+    encoded = json.dumps(manifest, sort_keys=True, default=str, indent=2)
+    digest = hashlib.sha256(encoded.encode("utf-8")).hexdigest()
+    path = directory / f"manifest-scan-{scan_run_id}-{digest[:12]}.json"
+    path.write_text(encoded, encoding="utf-8")
+    return str(path), digest
+
+
+def verify_audit_bundle(bundle: AuditBundle) -> dict[str, Any]:
+    result = {
+        "bundle_id": bundle.id,
+        "status": "VALID",
+        "bundle_verified": True,
+        "manifest_verified": True,
+        "files": {},
+        "errors": [],
+    }
+    if not bundle.bundle_path or not Path(bundle.bundle_path).exists():
+        result["bundle_verified"] = False
+        result["status"] = "TAMPERED"
+        result["errors"].append("bundle file missing")
+    else:
+        data = Path(bundle.bundle_path).read_text(encoding="utf-8")
+        calc = hashlib.sha256(data.encode("utf-8")).hexdigest()
+        result["files"][Path(bundle.bundle_path).name] = f"sha256:{calc}"
+        if calc != bundle.checksum:
+            result["bundle_verified"] = False
+            result["status"] = "TAMPERED"
+            result["errors"].append("bundle checksum mismatch")
+    if not bundle.manifest_path or not Path(bundle.manifest_path).exists():
+        result["manifest_verified"] = False
+        result["status"] = "TAMPERED"
+        result["errors"].append("manifest file missing")
+    else:
+        data = Path(bundle.manifest_path).read_text(encoding="utf-8")
+        calc = hashlib.sha256(data.encode("utf-8")).hexdigest()
+        result["files"][Path(bundle.manifest_path).name] = f"sha256:{calc}"
+    return result
+
+
 def _stable_checksum(payload: dict[str, Any]) -> str:
     encoded = json.dumps(payload, sort_keys=True, default=str)
     return hashlib.sha256(encoded.encode("utf-8")).hexdigest()
@@ -432,9 +480,12 @@ def generate_audit_bundle(db: Session, *, scan_run_id: int) -> AuditBundle:
         "lineage": [_mapping_payload(mapping) for mapping in mappings],
     }
     path, digest = _write_artifact("audit-bundles", f"audit-bundle-scan-{scan_run_id}", payload)
+    directory = ARTIFACT_ROOT / "audit-bundles"
+    manifest_path, manifest_digest = _write_manifest(directory, path, digest, scan_run_id)
     bundle = AuditBundle(
         scan_run_id=scan_run_id,
         bundle_path=path,
+        manifest_path=manifest_path,
         checksum=digest,
     )
     db.add(bundle)

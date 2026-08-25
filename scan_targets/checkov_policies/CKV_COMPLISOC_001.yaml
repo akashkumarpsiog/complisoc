@@ -1,0 +1,11 @@
+metadata:
+  name: S3 bucket must have server-side encryption enabled
+  id: CKV_COMPLISOC_001
+  category: encryption
+  severity: MEDIUM
+definition:
+  cond_type: attribute
+  resource_types:
+    - aws_s3_bucket
+  attribute: server_side_encryption_configuration
+  operator: exists

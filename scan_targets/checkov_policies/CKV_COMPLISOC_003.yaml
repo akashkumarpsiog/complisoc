@@ -1,0 +1,12 @@
+metadata:
+  name: IAM policy must not use unrestricted wildcard actions
+  id: CKV_COMPLISOC_003
+  category: access_control
+  severity: HIGH
+definition:
+  cond_type: attribute
+  resource_types:
+    - aws_iam_policy
+  attribute: policy
+  operator: contains
+  value: '"Action": "*"'

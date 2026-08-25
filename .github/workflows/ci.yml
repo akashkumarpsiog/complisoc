@@ -110,7 +110,7 @@ jobs:
 
       - name: Run Checkov against scan_targets
         run: |
-          checkov -d ./scan_targets --output json --compact > /tmp/checkov.json || true
+          checkov -d ./scan_targets --external-checks-dir ./scan_targets/checkov_policies --output json --compact > /tmp/checkov.json || true
           python - <<'PY'
           import json, pathlib
           p = pathlib.Path("/tmp/checkov.json")

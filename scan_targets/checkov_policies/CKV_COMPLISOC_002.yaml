@@ -1,0 +1,12 @@
+metadata:
+  name: Security group must not expose SSH to 0.0.0.0/0
+  id: CKV_COMPLISOC_002
+  category: access_control
+  severity: HIGH
+definition:
+  cond_type: attribute
+  resource_types:
+    - aws_security_group
+  attribute: ingress
+  operator: contains
+  value: '{"from_port": 22, "to_port": 22, "cidr_blocks": ["0.0.0.0/0"]}'

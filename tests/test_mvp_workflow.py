@@ -290,3 +290,41 @@ def test_audit_bundle_contains_lineage_checksums(client):
     assert set(payload["raw_finding_checksums"]) == {str(raw_id) for raw_id in payload["raw_finding_ids"]}
     assert payload["normalized_findings"][0]["raw_finding_id"] in payload["raw_finding_ids"]
     assert payload["lineage"][0]["finding"]["raw_finding_id"] in payload["raw_finding_ids"]
+
+
+def test_audit_bundle_generates_manifest_and_verify_endpoint(client):
+    with patch("complisoc.backend.compliance.langchain_pipeline.GeminiMapper") as MockMapper, patch(
+        "complisoc.backend.compliance.langchain_pipeline.GroqVerifier"
+    ) as MockVerifier:
+        MockMapper.return_value.map_batch.side_effect = lambda items: {
+            items[0][0].id: [CandidateDecision(control_id=items[0][1][0].control_catalog.control_id, maps=True, confidence=0.95, rationale="oracle")]
+        }
+        MockVerifier.return_value.verify_batch.return_value = {
+            1: VerificationDecision(result="agree", agreement_value=1.0, explanation="oracle")
+        }
+        response = client.post(
+            "/api/v1/scan-runs",
+            json={"target_environment": "manifest-test", "findings": [high_signal_finding()]},
+        )
+    scan_run_id = response.json()["id"]
+
+    bundle = client.post("/api/v1/audit-bundles", json={"scan_run_id": scan_run_id})
+    assert bundle.status_code == 201
+    bundle_data = bundle.json()
+    assert bundle_data["manifest_path"] is not None
+    assert Path(bundle_data["manifest_path"]).exists()
+
+    manifest = json.loads(Path(bundle_data["manifest_path"]).read_text(encoding="utf-8"))
+    assert manifest["bundle_id"] == f"AUD-{scan_run_id}"
+    assert manifest["scan_run_id"] == scan_run_id
+    assert "files" in manifest
+    bundle_file = Path(bundle_data["bundle_path"]).name
+    assert bundle_file in manifest["files"]
+    assert manifest["files"][bundle_file].startswith("sha256:")
+
+    verify = client.get(f"/api/v1/audit-bundles/{bundle_data['id']}/verify")
+    assert verify.status_code == 200
+    body = verify.json()
+    assert body["status"] == "VALID"
+    assert body["bundle_verified"] is True
+    assert body["manifest_verified"] is True

@@ -1,5 +1,6 @@
 from datetime import datetime, timedelta
 from pathlib import Path
+from typing import Any
 
 from fastapi import Depends, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -14,6 +15,7 @@ from complisoc.backend.core.json_extract import extract_json
 from complisoc.backend.database.session import get_db
 
 from complisoc.backend.api.schemas import (
+    AIMetricsRead,
     AuditBundleRead,
     BulkReviewDecision,
     ComplianceReportRead,
@@ -45,7 +47,7 @@ from complisoc.backend.models import (
     ScannerExecution,
     VerificationRecord,
 )
-from complisoc.backend.reporting.reports import generate_audit_bundle, generate_compliance_report, generate_scenario_report
+from complisoc.backend.reporting.reports import generate_audit_bundle, generate_compliance_report, generate_scenario_report, verify_audit_bundle
 
 app = FastAPI(title="Complisoc API")
 
@@ -438,6 +440,14 @@ def download_audit_bundle(bundle_id: int, db: Session = Depends(get_db)):
     return _file_response(bundle.bundle_path, f"audit-bundle-{bundle_id}.json", "application/json")
 
 
+@app.get("/api/v1/audit-bundles/{bundle_id}/verify")
+def verify_audit_bundle_endpoint(bundle_id: int, db: Session = Depends(get_db)):
+    bundle = db.get(AuditBundle, bundle_id)
+    if bundle is None:
+        not_found("Audit bundle")
+    return verify_audit_bundle(bundle)
+
+
 def _dashboard_control_coverage(db: Session) -> dict[str, int]:
     mappings = db.query(ControlMapping).filter(ControlMapping.mapping_status == "published").all()
     covered = {mapping.control_catalog_id for mapping in mappings}
@@ -624,6 +634,38 @@ def _dashboard_cloud_findings(db: Session) -> dict[str, int]:
 @app.get("/api/v1/dashboard/cloud-findings")
 def dashboard_cloud_findings(db: Session = Depends(get_db)):
     return _dashboard_cloud_findings(db)
+
+
+def _dashboard_ai_metrics(db: Session) -> dict[str, Any]:
+    mappings = db.query(ControlMapping).all()
+    total = len(mappings)
+    published = [m for m in mappings if m.mapping_status == "published"]
+    manual_review = [m for m in mappings if m.mapping_status == "manual_review"]
+    published_confidences = [m.final_confidence for m in published if m.final_confidence is not None]
+    gemini_confidences = [m.gemini_confidence for m in mappings if m.gemini_confidence is not None]
+    groq_agreements = [m.groq_agreement_value for m in mappings if m.groq_agreement_value is not None]
+    verified_records = (
+        db.query(VerificationRecord)
+        .filter(VerificationRecord.result == "agree")
+        .count()
+    )
+    total_verified = db.query(VerificationRecord).count()
+    manual_review_rate = len(manual_review) / total if total else 0.0
+    return {
+        "total_mappings": total,
+        "published_mappings": len(published),
+        "manual_review_mappings": len(manual_review),
+        "avg_gemini_confidence": sum(gemini_confidences) / len(gemini_confidences) if gemini_confidences else None,
+        "avg_groq_agreement": sum(groq_agreements) / len(groq_agreements) if groq_agreements else None,
+        "avg_final_confidence": sum(published_confidences) / len(published_confidences) if published_confidences else None,
+        "agreement_rate": verified_records / total_verified if total_verified else None,
+        "manual_review_rate": manual_review_rate,
+    }
+
+
+@app.get("/api/v1/dashboard/ai-metrics", response_model=AIMetricsRead)
+def dashboard_ai_metrics(db: Session = Depends(get_db)):
+    return _dashboard_ai_metrics(db)
 
 
 def _ensure_scan_run(db: Session, scan_run_id: int):

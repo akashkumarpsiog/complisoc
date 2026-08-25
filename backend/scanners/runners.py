@@ -190,12 +190,17 @@ class CheckovScanner(BaseScanner):
                 if candidate.exists():
                     script = candidate
                     break
+        external_checks = Path(__file__).resolve().parent.parent.parent / "scan_targets" / "checkov_policies"
+        parts: list[str] = []
         if venv_python and script:
-            return [venv_python, str(script), flag, target, "--output", "json", "--compact"]
-        exe = shutil.which(self.name)
-        if exe:
-            return [exe, flag, target, "--output", "json", "--compact"]
-        return ["checkov", flag, target, "--output", "json", "--compact"]
+            parts = [venv_python, str(script), flag, target, "--output", "json", "--compact"]
+        elif shutil.which(self.name):
+            parts = [shutil.which(self.name), flag, target, "--output", "json", "--compact"]
+        else:
+            parts = ["checkov", flag, target, "--output", "json", "--compact"]
+        if external_checks.is_dir():
+            parts.extend(["--external-checks-dir", str(external_checks)])
+        return parts
 
     def run(self, target: str, timeout: int = 300) -> tuple[list[dict[str, Any]], str | None]:
         try:

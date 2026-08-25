@@ -165,4 +165,16 @@ class AuditBundleRead(ORMModel):
     scan_run_id: int
     generated_at: datetime | None = None
     bundle_path: str | None = None
+    manifest_path: str | None = None
     checksum: str
+
+
+class AIMetricsRead(ORMModel):
+    total_mappings: int
+    published_mappings: int
+    manual_review_mappings: int
+    avg_gemini_confidence: float | None = None
+    avg_groq_agreement: float | None = None
+    avg_final_confidence: float | None = None
+    agreement_rate: float | None = None
+    manual_review_rate: float | None = None
