@@ -278,7 +278,7 @@ class TestScenarioReports:
             report = generate_scenario_report(db_session, scan_run_id=scan_run_id, scenario="container")
 
         json_path = Path(report.content_path).parent
-        json_files = list(json_path.glob(f"scenario-container-scan-{scan_run_id}.json"))
+        json_files = list(json_path.glob(f"scenario-container-scan-{scan_run_id}-*.json"))
 
         all_control_ids = []
         for jf in json_files:

@@ -416,7 +416,8 @@ def download_report(report_id: int, db: Session = Depends(get_db)):
     report = db.get(ComplianceReport, report_id)
     if report is None:
         not_found("Report")
-    return _file_response(report.content_path, f"report-{report_id}.pdf", "application/pdf")
+    filename = Path(report.content_path).name
+    return _file_response(report.content_path, filename, "application/pdf")
 
 
 @app.get("/api/v1/audit-bundles", response_model=list[AuditBundleRead])

@@ -1,5 +1,6 @@
 import hashlib
 import json
+import unicodedata
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any
@@ -14,6 +15,58 @@ from complisoc.backend.models import AuditBundle, ComplianceReport, ControlMappi
 
 
 ARTIFACT_ROOT = Path("artifacts")
+
+
+def _sanitize_pdf_text(text: str) -> str:
+    if not isinstance(text, str):
+        text = str(text)
+    text = unicodedata.normalize("NFKD", text)
+    text = "".join(ch for ch in text if not unicodedata.combining(ch))
+    replacements = {
+        "\u2011": "-",
+        "\u2010": "-",
+        "\u2012": "-",
+        "\u2013": "-",
+        "\u2014": "--",
+        "\u2015": "--",
+        "\u2018": "'",
+        "\u2019": "'",
+        "\u201a": "'",
+        "\u201c": '"',
+        "\u201d": '"',
+        "\u201e": '"',
+        "\u2026": "...",
+        "\u00a0": " ",
+        "\u00ad": "",
+        "\u200b": "",
+    }
+    for src, dst in replacements.items():
+        text = text.replace(src, dst)
+    try:
+        text = text.encode("latin-1", errors="strict").decode("latin-1")
+    except UnicodeEncodeError:
+        text = text.encode("latin-1", errors="replace").decode("latin-1")
+    return text
+
+
+def _report_base_name(report_type: str, scan_run_id: int, mappings: list[ControlMapping], scenario: str | None = None) -> str:
+    severity_counts = _severity_counts(mappings)
+    critical = severity_counts.get("critical", 0)
+    high = severity_counts.get("high", 0)
+    medium = severity_counts.get("medium", 0)
+    low = severity_counts.get("low", 0)
+    total = len(mappings)
+    published = sum(1 for m in mappings if m.mapping_status == "published")
+    manual_review = sum(1 for m in mappings if m.mapping_status == "manual_review")
+
+    if scenario:
+        scanners = ",".join(sorted(SCENARIO_FILTERS.get(scenario, set())))
+        return f"scenario-{scenario}-scan-{scan_run_id}-{total}mappings-{scanners}"
+    if report_type == "engineering":
+        return f"engineering-scan-{scan_run_id}-{total}mappings-{critical}critical-{high}high-{medium}medium-{low}low"
+    if report_type == "leadership":
+        return f"leadership-scan-{scan_run_id}-{published}published-{manual_review}review"
+    return f"{report_type}-scan-{scan_run_id}-{total}mappings"
 
 
 def _write_artifact(kind: str, name: str, payload: dict[str, Any]) -> tuple[str, str]:
@@ -249,21 +302,21 @@ def _generate_report_narrative(scan_run_id: int, mappings: list[ControlMapping],
 
 def _pdf_heading(pdf: FPDF, text: str) -> None:
     pdf.set_font("Helvetica", "B", 13)
-    pdf.cell(0, 8, text, new_x="LMARGIN", new_y="NEXT")
+    pdf.cell(0, 8, _sanitize_pdf_text(text), new_x="LMARGIN", new_y="NEXT")
     pdf.ln(1)
 
 
 def _pdf_body(pdf: FPDF, text: str, size: int = 10) -> None:
     pdf.set_font("Helvetica", "", size)
     pdf.set_x(pdf.l_margin)
-    pdf.multi_cell(pdf.w - pdf.l_margin - pdf.r_margin, 6, str(text or "n/a"), new_x="LMARGIN", new_y="NEXT")
+    pdf.multi_cell(pdf.w - pdf.l_margin - pdf.r_margin, 6, _sanitize_pdf_text(text or "n/a"), new_x="LMARGIN", new_y="NEXT")
     pdf.ln(2)
 
 
 def _pdf_kv(pdf: FPDF, label: str, value: object) -> None:
     pdf.set_font("Helvetica", "", 10)
     pdf.set_x(pdf.l_margin)
-    pdf.multi_cell(pdf.w - pdf.l_margin - pdf.r_margin, 6, f"{label}: {value if value is not None else 'n/a'}", new_x="LMARGIN", new_y="NEXT")
+    pdf.multi_cell(pdf.w - pdf.l_margin - pdf.r_margin, 6, f"{label}: {_sanitize_pdf_text(value if value is not None else 'n/a')}", new_x="LMARGIN", new_y="NEXT")
 
 
 def _generate_pdf(
@@ -278,9 +331,9 @@ def _generate_pdf(
     pdf.set_auto_page_break(auto=True, margin=15)
     pdf.add_page()
     pdf.set_font("Helvetica", "B", 16)
-    pdf.cell(0, 10, title, new_x="LMARGIN", new_y="NEXT")
+    pdf.cell(0, 10, _sanitize_pdf_text(title), new_x="LMARGIN", new_y="NEXT")
     pdf.set_font("Helvetica", "", 9)
-    pdf.cell(0, 6, f"Scan run {scan_run_id} | Generated {datetime.utcnow().isoformat(timespec='seconds')} UTC", new_x="LMARGIN", new_y="NEXT")
+    pdf.cell(0, 6, _sanitize_pdf_text(f"Scan run {scan_run_id} | Generated {datetime.utcnow().isoformat(timespec='seconds')} UTC"), new_x="LMARGIN", new_y="NEXT")
     pdf.ln(4)
 
     published = [mapping for mapping in mappings if mapping.mapping_status == "published"]
@@ -310,13 +363,13 @@ def _generate_pdf(
         finding = mapping.normalized_finding
         control = mapping.control_catalog
         pdf.set_font("Helvetica", "B", 11)
-        pdf.multi_cell(cell_width, 7, f"{finding.severity.upper()} - {finding.title}", new_x="LMARGIN", new_y="NEXT")
+        pdf.multi_cell(cell_width, 7, _sanitize_pdf_text(f"{finding.severity.upper()} - {finding.title}"), new_x="LMARGIN", new_y="NEXT")
         pdf.set_font("Helvetica", "", 10)
-        pdf.multi_cell(cell_width, 6, f"Resource: {finding.resource_identifier}", new_x="LMARGIN", new_y="NEXT")
-        pdf.multi_cell(cell_width, 6, f"Control: {control.framework_name} {control.control_id} - {control.title}", new_x="LMARGIN", new_y="NEXT")
-        pdf.multi_cell(cell_width, 6, f"Status: {mapping.mapping_status} | Confidence: {_safe_percent(mapping.final_confidence)}", new_x="LMARGIN", new_y="NEXT")
+        pdf.multi_cell(cell_width, 6, _sanitize_pdf_text(f"Resource: {finding.resource_identifier}"), new_x="LMARGIN", new_y="NEXT")
+        pdf.multi_cell(cell_width, 6, _sanitize_pdf_text(f"Control: {control.framework_name} {control.control_id} - {control.title}"), new_x="LMARGIN", new_y="NEXT")
+        pdf.multi_cell(cell_width, 6, _sanitize_pdf_text(f"Status: {mapping.mapping_status} | Confidence: {_safe_percent(mapping.final_confidence)}"), new_x="LMARGIN", new_y="NEXT")
         if report_type == "engineering":
-            pdf.multi_cell(cell_width, 6, f"Remediation: {_remediation_text(mapping)}", new_x="LMARGIN", new_y="NEXT")
+            pdf.multi_cell(cell_width, 6, _sanitize_pdf_text(f"Remediation: {_remediation_text(mapping)}"), new_x="LMARGIN", new_y="NEXT")
         pdf.ln(4)
 
     if manual_review:
@@ -328,8 +381,10 @@ def _generate_pdf(
             pdf.multi_cell(
                 cell_width,
                 6,
-                f"Mapping #{mapping.id}: {finding.title} -> {control.framework_name} {control.control_id} "
-                f"({_safe_percent(mapping.final_confidence)})",
+                _sanitize_pdf_text(
+                    f"Mapping #{mapping.id}: {finding.title} -> {control.framework_name} {control.control_id} "
+                    f"({_safe_percent(mapping.final_confidence)})"
+                ),
                 new_x="LMARGIN",
                 new_y="NEXT",
             )
@@ -343,9 +398,11 @@ def _generate_pdf(
         pdf.multi_cell(
             cell_width,
             5,
-            f"#{mapping.id} | {finding.severity.upper()} | {finding.title} | "
-            f"{control.framework_name} {control.control_id} | {mapping.mapping_status} | "
-            f"{_safe_percent(mapping.final_confidence)}",
+            _sanitize_pdf_text(
+                f"#{mapping.id} | {finding.severity.upper()} | {finding.title} | "
+                f"{control.framework_name} {control.control_id} | {mapping.mapping_status} | "
+                f"{_safe_percent(mapping.final_confidence)}"
+            ),
             new_x="LMARGIN",
             new_y="NEXT",
         )
@@ -377,7 +434,8 @@ def generate_compliance_report(db: Session, *, scan_run_id: int, report_type: st
 
     directory = ARTIFACT_ROOT / "reports"
     directory.mkdir(parents=True, exist_ok=True)
-    pdf_path = directory / f"{report_type}-scan-{scan_run_id}.pdf"
+    base_name = _report_base_name(report_type, scan_run_id, mappings)
+    pdf_path = directory / f"{base_name}.pdf"
     _generate_pdf(
         pdf_path,
         f"{report_type.title()} Compliance Report - Scan #{scan_run_id}",
@@ -416,7 +474,7 @@ def generate_compliance_report(db: Session, *, scan_run_id: int, report_type: st
         }
         payload["published_mappings"] = [_mapping_payload(mapping) for mapping in published]
 
-    _, digest = _write_artifact("reports", f"{report_type}-scan-{scan_run_id}", payload)
+    _, digest = _write_artifact("reports", base_name, payload)
     report = ComplianceReport(
         scan_run_id=scan_run_id,
         report_type=report_type,
@@ -533,9 +591,9 @@ def _generate_scenario_pdf(
     pdf.set_auto_page_break(auto=True, margin=15)
     pdf.add_page()
     pdf.set_font("Helvetica", "B", 16)
-    pdf.cell(0, 10, title, new_x="LMARGIN", new_y="NEXT")
+    pdf.cell(0, 10, _sanitize_pdf_text(title), new_x="LMARGIN", new_y="NEXT")
     pdf.set_font("Helvetica", "", 9)
-    pdf.cell(0, 6, f"Scan run {scan_run_id} | Scenario: {scenario} | Generated {datetime.utcnow().isoformat(timespec='seconds')} UTC", new_x="LMARGIN", new_y="NEXT")
+    pdf.cell(0, 6, _sanitize_pdf_text(f"Scan run {scan_run_id} | Scenario: {scenario} | Generated {datetime.utcnow().isoformat(timespec='seconds')} UTC"), new_x="LMARGIN", new_y="NEXT")
     pdf.ln(4)
 
     published = [mapping for mapping in mappings if mapping.mapping_status == "published"]
@@ -564,12 +622,12 @@ def _generate_scenario_pdf(
         finding = mapping.normalized_finding
         control = mapping.control_catalog
         pdf.set_font("Helvetica", "B", 11)
-        pdf.multi_cell(cell_width, 7, f"{finding.severity.upper()} - {finding.title}", new_x="LMARGIN", new_y="NEXT")
+        pdf.multi_cell(cell_width, 7, _sanitize_pdf_text(f"{finding.severity.upper()} - {finding.title}"), new_x="LMARGIN", new_y="NEXT")
         pdf.set_font("Helvetica", "", 10)
-        pdf.multi_cell(cell_width, 6, f"Resource: {finding.resource_identifier}", new_x="LMARGIN", new_y="NEXT")
-        pdf.multi_cell(cell_width, 6, f"Control: {control.framework_name} {control.control_id} - {control.title}", new_x="LMARGIN", new_y="NEXT")
-        pdf.multi_cell(cell_width, 6, f"Status: {mapping.mapping_status} | Confidence: {_safe_percent(mapping.final_confidence)}", new_x="LMARGIN", new_y="NEXT")
-        pdf.multi_cell(cell_width, 6, f"Remediation: {_remediation_text(mapping)}", new_x="LMARGIN", new_y="NEXT")
+        pdf.multi_cell(cell_width, 6, _sanitize_pdf_text(f"Resource: {finding.resource_identifier}"), new_x="LMARGIN", new_y="NEXT")
+        pdf.multi_cell(cell_width, 6, _sanitize_pdf_text(f"Control: {control.framework_name} {control.control_id} - {control.title}"), new_x="LMARGIN", new_y="NEXT")
+        pdf.multi_cell(cell_width, 6, _sanitize_pdf_text(f"Status: {mapping.mapping_status} | Confidence: {_safe_percent(mapping.final_confidence)}"), new_x="LMARGIN", new_y="NEXT")
+        pdf.multi_cell(cell_width, 6, _sanitize_pdf_text(f"Remediation: {_remediation_text(mapping)}"), new_x="LMARGIN", new_y="NEXT")
         pdf.ln(4)
 
     _pdf_heading(pdf, "Scenario Mapping Appendix")
@@ -580,9 +638,11 @@ def _generate_scenario_pdf(
         pdf.multi_cell(
             cell_width,
             5,
-            f"#{mapping.id} | {finding.severity.upper()} | {finding.title} | "
-            f"{control.framework_name} {control.control_id} | {mapping.mapping_status} | "
-            f"{_safe_percent(mapping.final_confidence)}",
+            _sanitize_pdf_text(
+                f"#{mapping.id} | {finding.severity.upper()} | {finding.title} | "
+                f"{control.framework_name} {control.control_id} | {mapping.mapping_status} | "
+                f"{_safe_percent(mapping.final_confidence)}"
+            ),
             new_x="LMARGIN",
             new_y="NEXT",
         )
@@ -615,7 +675,8 @@ def generate_scenario_report(
 
     directory = ARTIFACT_ROOT / "reports"
     directory.mkdir(parents=True, exist_ok=True)
-    pdf_path = directory / f"scenario-{scenario}-scan-{scan_run_id}.pdf"
+    base_name = _report_base_name("scenario", scan_run_id, mappings, scenario=scenario)
+    pdf_path = directory / f"{base_name}.pdf"
     _generate_scenario_pdf(
         pdf_path,
         f"{SCENARIO_TITLES[scenario]} - Scan #{scan_run_id}",
@@ -643,7 +704,7 @@ def generate_scenario_report(
         ),
         "findings": [_mapping_payload(mapping) for mapping in mappings],
     }
-    _, digest = _write_artifact("reports", f"scenario-{scenario}-scan-{scan_run_id}", payload)
+    _, digest = _write_artifact("reports", base_name, payload)
 
     report = ComplianceReport(
         scan_run_id=scan_run_id,
