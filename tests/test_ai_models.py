@@ -264,6 +264,32 @@ class TestGroqVerifier:
         assert decision.result == "agree"
         assert decision.agreement_value == 1.0
 
+    def test_verify_batch_falls_back_when_groq_reports_a_decommissioned_model(self, db_session):
+        from complisoc.backend.compliance.verification import GroqVerifier, PendingVerification
+
+        finding = _make_finding(db_session)
+        control = db_session.query(ControlCatalog).first()
+        response_text = json.dumps({"results": [{"ref": 1, "result": "agree", "explanation": "correct mapping"}]})
+        mock_client = MagicMock()
+        mock_client.chat.completions.create.side_effect = [
+            RuntimeError("The model `retired-model` has been decommissioned and is no longer supported."),
+            MagicMock(choices=[MagicMock(message=MagicMock(content=response_text))]),
+        ]
+
+        with patch("complisoc.backend.compliance.verification.GROQ_API_KEY", "fake"), patch(
+            "complisoc.backend.compliance.verification.GROQ_MODEL", "retired-model"
+        ), patch("complisoc.backend.compliance.verification.GROQ_MODEL_FALLBACKS", ["openai/gpt-oss-20b"]), patch(
+            "complisoc.backend.compliance.verification.Groq", return_value=mock_client
+        ):
+            verifier = GroqVerifier()
+            item = PendingVerification(ref=1, finding=finding, control=control, confidence=0.95, rationale="test")
+            result = verifier.verify_batch([item])
+
+        assert result[1].model == "openai/gpt-oss-20b"
+        assert [call.kwargs["model"] for call in mock_client.chat.completions.create.call_args_list] == [
+            "retired-model", "openai/gpt-oss-20b"
+        ]
+
     def test_verify_batch_filters_unknown_refs(self, db_session):
         from complisoc.backend.compliance.verification import GroqVerifier, PendingVerification
 

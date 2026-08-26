@@ -1,5 +1,5 @@
 import type { ReactNode, CSSProperties } from "react";
-import { useState } from "react";
+import { Fragment, useState } from "react";
 import { AlertCircle, ChevronDown, ChevronUp, Inbox, Loader2, RefreshCw, ChevronLeft, ChevronRight, MoreHorizontal } from "lucide-react";
 import { accentBar, progressTone, severityBarClass, severityBadgeClass, type Accent, type BarTone, type ProgressTone } from "../theme";
 
@@ -212,17 +212,17 @@ export function ErrorState({ message, onRetry }: { message: string; onRetry: () 
   );
 }
 
-export function DataTable({ columns, rows, expandableRows }: { columns: string[]; rows: ReactNode[][]; expandableRows?: ReactNode[] }) {
+export function DataTable({ columns, rows, expandableRows }: { columns: string[]; rows: ReactNode[][]; expandableRows?: (ReactNode | null)[] }) {
   if (rows.length === 0) {
     return <EmptyState label="No records found." icon={<Inbox className="h-5 w-5" aria-hidden />} />;
   }
   return (
     <div className="overflow-x-auto -mx-5">
-      <table className="w-full min-w-[720px] border-collapse text-left text-sm">
+      <table className="w-full min-w-[960px] table-fixed border-collapse text-left text-sm">
         <thead>
           <tr className="border-b border-line-strong bg-panel/60 text-xs font-bold uppercase tracking-wider text-subtle">
             {columns.map((column, idx) => (
-              <th className="px-5 py-3 select-none first:pl-5 last:pr-5" key={column}>
+              <th className="overflow-hidden px-5 py-3 select-none first:pl-5 last:pr-5" key={column}>
                 <span className="inline-flex items-center gap-1.5 cursor-pointer hover:text-ink transition-colors duration-150 group">
                   {column}
                   <span className="flex flex-col">
@@ -236,22 +236,24 @@ export function DataTable({ columns, rows, expandableRows }: { columns: string[]
         </thead>
         <tbody className="divide-y divide-line">
           {rows.map((row, rowIndex) => (
-            <tr className="data-table-row animate-fade-in" key={rowIndex} style={staggerStyle(rowIndex)}>
-              {row.map((cell, cellIndex) => (
-                <td className="max-w-[320px] px-5 py-3 align-top break-words first:pl-5 last:pr-5 text-ink/90" key={`${rowIndex}-${cellIndex}`}>
-                  {cell}
-                </td>
-              ))}
-            </tr>
-          ))}
-          {expandableRows?.filter(Boolean).map((row, index) => (
-            <tr key={`expand-${index}`} className="bg-panel/40 animate-fade-in" style={staggerStyle(rows.length + index)}>
-              <td colSpan={columns.length} className="px-5 py-4 first:pl-5 last:pr-5">
-                <div className="rounded-lg border border-line bg-white p-4 shadow-sm">
-                  {row}
-                </div>
-              </td>
-            </tr>
+            <Fragment key={rowIndex}>
+              <tr className="data-table-row animate-fade-in" style={staggerStyle(rowIndex)}>
+                {row.map((cell, cellIndex) => (
+                  <td className="overflow-hidden px-5 py-3 align-top break-words first:pl-5 last:pr-5 text-ink/90" key={`${rowIndex}-${cellIndex}`}>
+                    {cell}
+                  </td>
+                ))}
+              </tr>
+              {expandableRows?.[rowIndex] ? (
+                <tr className="bg-panel/40 animate-fade-in" style={staggerStyle(rowIndex)}>
+                  <td colSpan={columns.length} className="px-5 py-4 first:pl-5 last:pr-5">
+                    <div className="rounded-lg border border-line bg-white p-4 shadow-sm">
+                      {expandableRows[rowIndex]}
+                    </div>
+                  </td>
+                </tr>
+              ) : null}
+            </Fragment>
           ))}
         </tbody>
       </table>

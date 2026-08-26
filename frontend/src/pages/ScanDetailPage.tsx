@@ -216,9 +216,9 @@ function FindingsTab({
                 finding.scanner_name,
                 finding.resource_identifier,
                 finding.title,
-                <span className="max-w-[320px] truncate text-muted" title={description}>{description}</span>,
+                <span className="block max-w-full truncate text-muted" title={description}>{description}</span>,
                 isDefender ? (
-                  <button className="text-sm font-semibold text-brand-600 hover:text-brand-700 transition-colors duration-150" onClick={() => toggle(finding.id)}>
+                  <button className="whitespace-nowrap text-sm font-semibold text-brand-600 hover:text-brand-700 transition-colors duration-150" onClick={() => toggle(finding.id)}>
                     {expanded.has(finding.id) ? "Hide" : "Show"} details
                   </button>
                 ) : null,
@@ -237,7 +237,7 @@ function FindingsTab({
                   {remediationSteps ? <div><span className="font-semibold text-ink">Remediation:</span> {remediationSteps}</div> : null}
                 </div>
               );
-            }).filter(Boolean)}
+            })}
           />
         )}
       </ResourceBoundary>
@@ -274,7 +274,7 @@ function MappingsTab({ mappings, resource, scanRunId }: { mappings: ControlMappi
   }, [controlMap.data]);
 
   return (
-    <div className="grid gap-5 2xl:grid-cols-[1fr_420px]">
+    <div>
       <Section title="Mappings" description="Findings mapped to compliance controls for this scan.">
         <ResourceBoundary resource={{ ...resource, data: mappings }}>
           {(data) => (
@@ -286,15 +286,15 @@ function MappingsTab({ mappings, resource, scanRunId }: { mappings: ControlMappi
                 return [
                   mapping.id,
                   finding ? (
-                    <span key={`f-${mapping.id}`} className="flex items-center gap-2">
+                    <span key={`f-${mapping.id}`} className="flex min-w-0 items-center gap-2">
                       <StatusBadge value={finding.severity} />
-                      <span className="truncate font-medium text-ink" title={finding.title}>{finding.title}</span>
+                      <span className="min-w-0 truncate font-medium text-ink" title={finding.title}>{finding.title}</span>
                     </span>
                   ) : (
                     <span key={`f-${mapping.id}`} className="text-subtle">#{mapping.normalized_finding_id}</span>
                   ),
                   control ? (
-                    <span key={`c-${mapping.id}`} className="truncate" title={`${control.framework} - ${control.title}`}>
+                    <span key={`c-${mapping.id}`} className="block truncate" title={`${control.framework} - ${control.title}`}>
                       <span className="font-mono text-xs text-subtle">{control.control_id}</span>
                       <span className="mx-1.5 text-line-strong">·</span>
                       <span className="font-medium text-ink">{control.title}</span>
@@ -313,7 +313,7 @@ function MappingsTab({ mappings, resource, scanRunId }: { mappings: ControlMappi
           )}
         </ResourceBoundary>
       </Section>
-      <Section title="Mapping Detail">
+      <Section title="Mapping Detail" className="hidden">
         {selected ? (
           <div key={selected.id} className="space-y-4 animate-slide-in-right">
             <Detail label="Mapping" value={selected.id} />

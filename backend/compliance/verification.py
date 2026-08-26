@@ -1,10 +1,11 @@
 import logging
 import re
 from dataclasses import dataclass
+from typing import Any
 
 from groq import Groq
 
-from complisoc.backend.core.config import GROQ_API_KEY, GROQ_MODEL, PROMPT_VERSION
+from complisoc.backend.core.config import GROQ_API_KEY, GROQ_MODEL, GROQ_MODEL_FALLBACKS, PROMPT_VERSION
 
 logger = logging.getLogger(__name__)
 from complisoc.backend.core.json_extract import extract_json
@@ -13,6 +14,22 @@ from complisoc.backend.models import ControlCatalog, NormalizedFinding
 
 
 DELAY_RE = re.compile(r"(\d+(?:\.\d+)?)\s*s", re.IGNORECASE)
+
+
+def is_unavailable_model_error(exc: Exception) -> bool:
+    """Return whether Groq rejected the requested model, so a fallback is safe."""
+    text = str(exc).lower()
+    markers = (
+        "model_not_found",
+        "does not exist",
+        "not found",
+        "decommissioned",
+        "retired",
+        "deprecated",
+        "no longer supported",
+        "not available",
+    )
+    return "model" in text and any(marker in text for marker in markers)
 
 
 def is_quota_exhausted(exc: Exception) -> bool:
@@ -65,6 +82,37 @@ _SYSTEM_ONE = (
     '{"result": "agree"|"disagree", "explanation": "<concise reason>"}.'
 )
 
+_STRICT_STRUCTURED_MODELS = {"openai/gpt-oss-20b", "openai/gpt-oss-120b"}
+_BATCH_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "results": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "ref": {"type": "integer"},
+                    "result": {"type": "string", "enum": ["agree", "disagree"]},
+                    "explanation": {"type": "string"},
+                },
+                "required": ["ref", "result", "explanation"],
+                "additionalProperties": False,
+            },
+        }
+    },
+    "required": ["results"],
+    "additionalProperties": False,
+}
+_ONE_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "result": {"type": "string", "enum": ["agree", "disagree"]},
+        "explanation": {"type": "string"},
+    },
+    "required": ["result", "explanation"],
+    "additionalProperties": False,
+}
+
 
 def _finding_block(finding: NormalizedFinding) -> str:
     lines = [
@@ -108,7 +156,53 @@ class GroqVerifier:
             raise RuntimeError("GROQ_API_KEY is not configured; cannot perform AI verification.")
         self._client = Groq(api_key=GROQ_API_KEY)
         self._timeout = timeout
-        logger.info("Groq verifier initialized: model=%s, key_configured=%s", GROQ_MODEL, bool(GROQ_API_KEY))
+        # Try the configured model first, then known-good fallbacks. Groq
+        # retires models (e.g. llama-3.3-70b-versatile on 2026-08-16), so a
+        # fallback avoids a hard failure when the primary is no longer served.
+        self._models: list[str] = list(dict.fromkeys([GROQ_MODEL, *GROQ_MODEL_FALLBACKS]))
+        logger.info("Groq verifier initialized: models=%s, key_configured=%s", self._models, bool(GROQ_API_KEY))
+
+    def _completion(self, messages: list[dict[str, str]], timeout: float, schema_name: str, schema: dict[str, Any]) -> tuple[str, Any]:
+        last_exc: Exception | None = None
+        for model in self._models:
+            try:
+                request = {
+                    "model": model,
+                    "messages": messages,
+                    # Groq recommends strict JSON Schema mode for GPT-OSS. It
+                    # eliminates json_validate_failed responses that JSON mode
+                    # can return even when the prompt requests JSON. Keep JSON
+                    # object mode for the non-GPT fallback model.
+                    "response_format": (
+                        {
+                            "type": "json_schema",
+                            "json_schema": {"name": schema_name, "strict": True, "schema": schema},
+                        }
+                        if model in _STRICT_STRUCTURED_MODELS
+                        else {"type": "json_object"}
+                    ),
+                    "temperature": 0.0,
+                    "timeout": timeout,
+                }
+                if model in _STRICT_STRUCTURED_MODELS:
+                    # GPT-OSS spends completion tokens on reasoning. A low
+                    # budget leaves none for the schema-constrained answer and
+                    # yields Groq's json_validate_failed error.
+                    request.update({"reasoning_effort": "low", "max_completion_tokens": 768})
+                response = self._client.chat.completions.create(**request)
+                return model, response
+            except Exception as exc:
+                text = str(exc)
+                # Groq can describe a disabled model as unknown, decommissioned,
+                # retired, or no longer supported. Only these model-specific
+                # errors warrant changing models; authentication and request
+                # errors must remain visible to the caller.
+                if is_unavailable_model_error(exc):
+                    last_exc = exc
+                    continue
+                raise
+        assert last_exc is not None
+        raise last_exc
 
     def verify_batch(self, items: list[PendingVerification]) -> dict[int, VerificationDecision]:
         if not items:
@@ -118,15 +212,14 @@ class GroqVerifier:
         expected_refs = {item.ref for item in items}
 
         def _attempt() -> dict[int, VerificationDecision]:
-            response = self._client.chat.completions.create(
-                model=GROQ_MODEL,
-                messages=[
+            model_used, response = self._completion(
+                [
                     {"role": "system", "content": _SYSTEM_BATCH},
                     {"role": "user", "content": prompt},
                 ],
-                response_format={"type": "json_object"},
-                temperature=0.0,
-                timeout=self._timeout,
+                self._timeout,
+                "verification_batch",
+                _BATCH_SCHEMA,
             )
             data = extract_json(response.choices[0].message.content)
             out: dict[int, VerificationDecision] = {}
@@ -149,6 +242,7 @@ class GroqVerifier:
                     result=result,
                     agreement_value=1.0 if result == "agree" else 0.0,
                     explanation=explanation,
+                    model=model_used,
                 )
             if not out:
                 raise ValueError("Groq batch response contained no usable results.")
@@ -173,15 +267,14 @@ class GroqVerifier:
         item = PendingVerification(ref=1, finding=finding, control=control, confidence=confidence, rationale=rationale)
 
         def _attempt() -> VerificationDecision:
-            response = self._client.chat.completions.create(
-                model=GROQ_MODEL,
-                messages=[
+            model_used, response = self._completion(
+                [
                     {"role": "system", "content": _SYSTEM_ONE},
                     {"role": "user", "content": _entry_block(item)},
                 ],
-                response_format={"type": "json_object"},
-                temperature=0.0,
-                timeout=self._timeout,
+                self._timeout,
+                "verification_result",
+                _ONE_SCHEMA,
             )
             data = extract_json(response.choices[0].message.content)
             result_raw = data.get("result", "")
@@ -195,6 +288,7 @@ class GroqVerifier:
                 result=result,
                 agreement_value=1.0 if result == "agree" else 0.0,
                 explanation=str(data.get("explanation") or "No explanation provided by model.").strip(),
+                model=model_used,
             )
 
         return call_with_retry(

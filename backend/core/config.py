@@ -23,6 +23,9 @@ GEMINI_API_KEY = _read_secret("GEMINI_API_KEY")
 GROQ_API_KEY = _read_secret("GROQ_API_KEY")
 
 GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
-GROQ_MODEL = os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile")
+# Groq retired `llama-3.3-70b-versatile` / `llama-3.1-8b-instant` on 2026-08-16.
+# `openai/gpt-oss-20b` is the currently-supported model that works with JSON mode.
+GROQ_MODEL = os.getenv("GROQ_MODEL", "openai/gpt-oss-20b")
+GROQ_MODEL_FALLBACKS: list[str] = ["openai/gpt-oss-20b", "openai/gpt-oss-120b", "qwen/qwen3.6-27b"]
 
 PROMPT_VERSION = "mvp-v1"

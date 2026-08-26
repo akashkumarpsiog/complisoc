@@ -378,11 +378,12 @@ def test_resolve_scanners_uses_profile_when_present():
     assert set(runners.resolve_scanners(None, None)) == {"trivy", "checkov", "sonarqube", "defender"}
 
 
-def test_groq_model_has_no_duplicated_prefix():
-    from complisoc.backend.core.config import GROQ_MODEL
+def test_groq_model_is_currently_supported():
+    from complisoc.backend.core.config import GROQ_MODEL, GROQ_MODEL_FALLBACKS
 
-    assert "llama-llama" not in GROQ_MODEL, "GROQ_MODEL must not contain a doubled 'llama-' prefix"
-    assert GROQ_MODEL.startswith("llama-")
+    retired = {"llama-3.3-70b-versatile", "llama-3.1-8b-instant"}
+    assert GROQ_MODEL not in retired, "GROQ_MODEL must not use a retired Groq model (e.g. llama-3.3-70b-versatile)"
+    assert GROQ_MODEL in GROQ_MODEL_FALLBACKS, "GROQ_MODEL must be part of the supported fallback list"
 
 
 def test_ingest_records_selected_scanner_without_findings(db_session):

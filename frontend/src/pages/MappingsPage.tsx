@@ -1,10 +1,9 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { api } from "../services/api";
 import { useResource } from "../hooks/useResource";
-import type { ControlMapping, VerificationRecord } from "../types";
-import { Detail } from "../components/Detail";
+import type { ControlMapping } from "../types";
 import { ResourceBoundary } from "../components/ResourceBoundary";
-import { DataTable, EmptyState, LoadingState, Section, StatusBadge } from "../components/Primitives";
+import { DataTable, Section, StatusBadge } from "../components/Primitives";
 import { formatPercent } from "../utils/format";
 
 const statuses = ["published", "manual_review", "rejected", "validated", "verified"];
@@ -12,19 +11,14 @@ const statuses = ["published", "manual_review", "rejected", "validated", "verifi
 export function MappingsPage() {
   const mappings = useResource(api.mappings.list);
   const [status, setStatus] = useState("");
-  const [selectedId, setSelectedId] = useState<number | null>(null);
-  const selected = mappings.data?.find((item) => item.id === selectedId) || null;
   const filtered = useMemo(() => (mappings.data || []).filter((item) => !status || item.mapping_status === status), [mappings.data, status]);
 
   return (
-    <div className="grid gap-5 2xl:grid-cols-[1fr_420px]">
-      <Section title="Mappings" description="Control mappings generated from findings" actions={<MappingStatusFilter value={status} onChange={setStatus} />}>
-        <ResourceBoundary resource={{ ...mappings, data: filtered }}>
-          {(data) => <MappingTable data={data} onSelect={setSelectedId} />}
-        </ResourceBoundary>
-      </Section>
-      <MappingDetail mapping={selected} />
-    </div>
+    <Section title="Mappings" description="Control mappings generated from findings" actions={<MappingStatusFilter value={status} onChange={setStatus} />}>
+      <ResourceBoundary resource={{ ...mappings, data: filtered }}>
+        {(data) => <MappingTable data={data} />}
+      </ResourceBoundary>
+    </Section>
   );
 }
 
@@ -39,7 +33,7 @@ function MappingStatusFilter({ value, onChange }: { value: string; onChange: (va
   );
 }
 
-function MappingTable({ data, onSelect }: { data: ControlMapping[]; onSelect: (id: number) => void }) {
+function MappingTable({ data }: { data: ControlMapping[] }) {
   return (
     <DataTable
       columns={["ID", "Finding", "Control", "AI Verdict", "Gemini Score", "Groq Score", "Final Confidence", "Groq Verdict"]}
@@ -53,49 +47,6 @@ function MappingTable({ data, onSelect }: { data: ControlMapping[]; onSelect: (i
         formatPercent(mapping.final_confidence),
         <StatusBadge key={`gv-${mapping.id}`} value={mapping.verification_status || "pending"} />,
       ])}
-    />
-  );
-}
-
-function MappingDetail({ mapping }: { mapping: ControlMapping | null }) {
-  const [verification, setVerification] = useState<VerificationRecord[] | null>(null);
-
-  useEffect(() => {
-    if (!mapping) {
-      setVerification(null);
-      return;
-    }
-    void api.mappings.verification(mapping.id).then(setVerification);
-  }, [mapping]);
-
-  return (
-    <Section title="Mapping Detail">
-      {mapping ? (
-        <div key={mapping.id} className="space-y-3 animate-slide-in-right">
-          <Detail label="Mapping" value={mapping.id} />
-          <Detail label="Finding" value={mapping.normalized_finding_id} />
-          <Detail label="Control" value={mapping.control_catalog_id} />
-          <Detail label="AI Verdict" value={<StatusBadge value={mapping.mapping_status} />} />
-          <Detail label="Gemini Score" value={formatPercent(mapping.gemini_confidence)} />
-          <Detail label="Groq Score" value={formatPercent(mapping.groq_agreement_value)} />
-          <Detail label="Final Confidence" value={formatPercent(mapping.final_confidence)} />
-          <Detail label="Model" value={mapping.mapping_model} />
-          <Detail label="Rationale" value={mapping.rationale || "n/a"} />
-          <h3 className="pt-3 text-sm font-bold text-ink border-t border-line mt-1">Verification</h3>
-          {verification ? <VerificationTable data={verification} /> : <LoadingState label="Loading verification" />}
-        </div>
-      ) : (
-        <EmptyState label="Select a mapping." />
-      )}
-    </Section>
-  );
-}
-
-function VerificationTable({ data }: { data: VerificationRecord[] }) {
-  return (
-    <DataTable
-      columns={["ID", "Result", "Agreement", "Model", "Explanation"]}
-      rows={data.map((record) => [record.id, <StatusBadge key={`vr-${record.id}`} value={record.result} />, formatPercent(record.agreement_value), record.verification_model, record.explanation || "n/a"])}
     />
   );
 }
