@@ -164,6 +164,33 @@ def test_process_scan_run_creates_full_lineage(db_session):
     assert manual_review.groq_agreement_value == pytest.approx(0.0)
 
 
+def test_groq_verifies_a_gemini_rejected_candidate(db_session):
+    with patch("complisoc.backend.compliance.langchain_pipeline.GeminiMapper") as MockMapper, patch(
+        "complisoc.backend.compliance.langchain_pipeline.GroqVerifier"
+    ) as MockVerifier:
+        MockMapper.return_value.map_batch.side_effect = lambda items: {
+            items[0][0].id: [
+                CandidateDecision(
+                    control_id=items[0][1][0].control_catalog.control_id,
+                    maps=False,
+                    confidence=0.1,
+                    rationale="Not a direct mapping",
+                )
+            ]
+        }
+        MockVerifier.return_value.verify_batch.return_value = {
+            1: VerificationDecision(result="disagree", agreement_value=0.0, explanation="Independent rejection")
+        }
+
+        process_scan_run(db_session, target_environment="aws-iac", findings=[high_signal_finding()])
+
+    mapping = db_session.query(ControlMapping).one()
+    assert MockVerifier.return_value.verify_batch.call_count == 1
+    assert mapping.verification_status == "disagree"
+    assert mapping.groq_agreement_value == pytest.approx(0.0)
+    assert mapping.mapping_status == "manual_review"
+
+
 def test_api_scan_run_and_reports(client):
     with patch("complisoc.backend.compliance.langchain_pipeline.GeminiMapper") as MockMapper, patch(
         "complisoc.backend.compliance.langchain_pipeline.GroqVerifier"

@@ -306,7 +306,7 @@ function MappingsTab({ mappings, resource, scanRunId }: { mappings: ControlMappi
                   formatPercent(mapping.gemini_confidence),
                   formatPercent(mapping.groq_agreement_value),
                   formatPercent(mapping.final_confidence),
-                  <StatusBadge key={`v-${mapping.id}`} value={mapping.verification_status || "pending"} />,
+                  <StatusBadge key={`v-${mapping.id}`} value={mapping.verification_status || "not verified"} />,
                 ];
               })}
             />

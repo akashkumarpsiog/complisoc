@@ -246,6 +246,11 @@ def stage_build_mappings(state: _ChainState) -> _ChainState:
             if best_guess:
                 rationale = f"Gemini rejected top candidate: {best_guess.rationale}"
 
+            # A Gemini rejection is a mapping-quality signal, not a Groq
+            # outage. Still send the deterministic top candidate to the
+            # independent verifier so every evaluated finding has an auditable
+            # Groq verdict. Its low Gemini confidence keeps the result in
+            # manual review even if Groq independently agrees.
             mapping = ControlMapping(
                 normalized_finding_id=finding.id,
                 candidate_control_id=top_candidate.id,
@@ -255,19 +260,24 @@ def stage_build_mappings(state: _ChainState) -> _ChainState:
                 prompt_version=PROMPT_VERSION,
                 rationale=rationale,
                 gemini_confidence=confidence,
-                verification_status=None,
-                final_confidence=confidence,
+                verification_status="pending",
+                final_confidence=None,
                 groq_agreement_value=None,
-                mapping_status=publication_status(confidence or 0.0),
+                mapping_status="validated",
             )
             state.db.add(mapping)
             state.db.flush()
             state.mappings.append(mapping)
-            _add_review_item(
-                state.review_items,
-                mapping,
-                "AI_MAPPER_REJECTED",
-                "Gemini indicated this finding does not map to any evaluated candidate.",
+            ref += 1
+            state.ref_to_mapping[ref] = mapping
+            state.pending_verifications.append(
+                PendingVerification(
+                    ref=ref,
+                    finding=finding,
+                    control=top_control,
+                    confidence=confidence or 0.0,
+                    rationale=rationale,
+                )
             )
             continue
 
