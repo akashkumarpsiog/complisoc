@@ -57,6 +57,7 @@ class _ChainState:
     findings: list[dict]
     scanner_failures: list[dict] | None = None
     framework: str | None = None
+    selected_scanners: list[str] | None = None
 
     scan_run: Any = None
     raw_findings: list = field(default_factory=list)
@@ -102,6 +103,7 @@ def stage_ingest(state: _ChainState) -> _ChainState:
         target_environment=state.target_environment,
         findings=state.findings,
         scanner_failures=state.scanner_failures,
+        selected_scanners=state.selected_scanners,
     )
     state.scan_run = scan_run
     state.raw_findings = raw_findings
@@ -442,6 +444,7 @@ def run_pipeline(
     findings: list[dict],
     scanner_failures: list[dict] | None = None,
     framework: str | None = None,
+    selected_scanners: list[str] | None = None,
 ) -> dict:
     """Run the compliance pipeline through the LangChain/LCEL path.
 
@@ -454,6 +457,7 @@ def run_pipeline(
         findings=findings,
         scanner_failures=scanner_failures,
         framework=framework,
+        selected_scanners=selected_scanners,
     )
     chain = _build_chain()
     final: _ChainState = chain.invoke(state)

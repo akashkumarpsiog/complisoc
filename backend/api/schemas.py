@@ -23,6 +23,7 @@ class ScannerInfo(BaseModel):
     description: str | None = None
     required_inputs: list[str] | None = None
     missing_config: list[str] | None = None
+    scope: str | None = None
 
 
 class ScanRequest(BaseModel):
@@ -63,6 +64,16 @@ class ORMModel(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
+class ScannerExecutionRead(ORMModel):
+    id: int
+    scan_run_id: int
+    scanner_name: str
+    status: str
+    started_at: datetime | None = None
+    completed_at: datetime | None = None
+    error_message: str | None = None
+
+
 class ScanRunRead(ORMModel):
     id: int
     target_environment: str
@@ -72,6 +83,7 @@ class ScanRunRead(ORMModel):
     created_at: datetime | None = None
     updated_at: datetime | None = None
     archived_at: datetime | None = None
+    scanner_executions: list[ScannerExecutionRead] = []
 
 
 class RawFindingRead(ORMModel):

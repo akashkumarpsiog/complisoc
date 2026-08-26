@@ -1,9 +1,12 @@
+import logging
 import re
 from dataclasses import dataclass
 
 from groq import Groq
 
 from complisoc.backend.core.config import GROQ_API_KEY, GROQ_MODEL, PROMPT_VERSION
+
+logger = logging.getLogger(__name__)
 from complisoc.backend.core.json_extract import extract_json
 from complisoc.backend.core.retry import call_with_retry
 from complisoc.backend.models import ControlCatalog, NormalizedFinding
@@ -105,6 +108,7 @@ class GroqVerifier:
             raise RuntimeError("GROQ_API_KEY is not configured; cannot perform AI verification.")
         self._client = Groq(api_key=GROQ_API_KEY)
         self._timeout = timeout
+        logger.info("Groq verifier initialized: model=%s, key_configured=%s", GROQ_MODEL, bool(GROQ_API_KEY))
 
     def verify_batch(self, items: list[PendingVerification]) -> dict[int, VerificationDecision]:
         if not items:

@@ -7,7 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from groq import Groq
 from sqlalchemy import func
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 
 from complisoc.backend.core.config import GROQ_API_KEY, GROQ_MODEL
 from complisoc.backend.core.json_extract import extract_json
@@ -36,7 +36,7 @@ from complisoc.backend.compliance.workflow import process_scan_run
 from complisoc.backend.compliance.langchain_pipeline import run_pipeline
 from complisoc.backend.compliance.diff import compare_scans
 from complisoc.backend.compliance.lineage import get_finding_lineage as get_finding_lineage_data
-from complisoc.backend.scanners.runners import list_scanners, run_scanners
+from complisoc.backend.scanners.runners import list_scanners, resolve_scanners, run_scanners
 from complisoc.backend.models import (
     AuditBundle,
     ComplianceReport,
@@ -61,6 +61,7 @@ def _run_compliance_pipeline(
     findings: list[dict],
     scanner_failures: list[dict] | None = None,
     framework: str | None = None,
+    selected_scanners: list[str] | None = None,
 ) -> dict:
     """Run the compliance pipeline.
 
@@ -75,6 +76,7 @@ def _run_compliance_pipeline(
         findings=findings,
         scanner_failures=scanner_failures,
         framework=framework,
+        selected_scanners=selected_scanners,
     )
 
 app.add_middleware(
@@ -127,19 +129,21 @@ def run_scan(payload: ScanRequest, db: Session = Depends(get_db)):
         scanners=payload.scanners,
         scan_profile=payload.scan_profile,
     )
+    selected = resolve_scanners(payload.scanners, payload.scan_profile)
     result = _run_compliance_pipeline(
         db,
         target_environment=payload.target,
         findings=findings,
         scanner_failures=scanner_failures,
         framework=payload.framework,
+        selected_scanners=selected,
     )
     return result["scan_run"]
 
 
 @app.get("/api/v1/scan-runs", response_model=list[ScanRunRead])
 def list_scan_runs(include_archived: bool = False, archived_only: bool = False, db: Session = Depends(get_db)):
-    query = db.query(ScanRun)
+    query = db.query(ScanRun).options(joinedload(ScanRun.scanner_executions))
     if archived_only:
         query = query.filter(ScanRun.archived_at.is_not(None))
     elif not include_archived:
@@ -149,7 +153,7 @@ def list_scan_runs(include_archived: bool = False, archived_only: bool = False, 
 
 @app.get("/api/v1/scan-runs/{scan_run_id}", response_model=ScanRunRead)
 def get_scan_run(scan_run_id: int, db: Session = Depends(get_db)):
-    scan_run = db.get(ScanRun, scan_run_id)
+    scan_run = db.get(ScanRun, scan_run_id, options=[joinedload(ScanRun.scanner_executions)])
     if scan_run is None:
         not_found("Scan run")
     return scan_run

@@ -85,7 +85,11 @@ class BaseScanner(ABC):
             "description": self.description or "",
             "required_inputs": self.required_inputs,
             "missing_config": missing,
+            "scope": self.scope(),
         }
+
+    def scope(self) -> str | None:
+        return None
 
     def _emit(self, raw: dict[str, Any]) -> dict[str, Any]:
         return {
@@ -130,10 +134,15 @@ class TrivyScanner(BaseScanner):
         if proc.returncode != 0 and not proc.stdout.strip():
             return [], f"trivy exited with {proc.returncode}: {proc.stderr[:500]}"
 
-        try:
-            report = json.loads(proc.stdout or "{}")
-        except json.JSONDecodeError as exc:
-            return [], f"trivy produced invalid JSON: {exc}"
+        findings: list[dict[str, Any]] = []
+        report = None
+        if proc.stdout.strip():
+            try:
+                report = json.loads(proc.stdout)
+            except json.JSONDecodeError as exc:
+                return [], f"trivy produced invalid JSON: {exc}"
+        if report is None:
+            return findings, f"trivy exited with {proc.returncode}: {proc.stderr[:500]}"
 
         findings: list[dict[str, Any]] = []
         for result in report.get("Results", []) or []:
@@ -339,6 +348,14 @@ class DefenderScanner(BaseScanner):
             missing.append("requests library")
         return missing
 
+    def scope(self) -> str | None:
+        subscription = os.environ.get("AZURE_SUBSCRIPTION_ID")
+        if not subscription:
+            return None
+        if len(subscription) <= 8:
+            return subscription
+        return f"{subscription[:4]}…{subscription[-4:]}"
+
     def _authenticate(self, timeout: int = 300) -> tuple[_requests.Session | None, str | None]:
         tenant = os.environ["AZURE_TENANT_ID"]
         client_id = os.environ["AZURE_CLIENT_ID"]
@@ -364,16 +381,36 @@ class DefenderScanner(BaseScanner):
         session.headers.update(headers)
         return session, None
 
-    def _fetch_alerts(self, subscription: str, session: _requests.Session, target: str, timeout: int) -> tuple[list[dict[str, Any]], str | None]:
-        url = f"https://management.azure.com/subscriptions/{subscription}/providers/Microsoft.Security/alerts?api-version=2020-01-01-preview"
-        try:
-            def _get():
-                resp = session.get(url, timeout=timeout)
+    # Each `Microsoft.Security` resource type supports a different set of API
+    # versions (some preview suffixes that look valid are actually retired and
+    # return 404). Use the documented versions per resource type.
+    ALERTS_API_VERSIONS: tuple[str, ...] = ("2022-01-01", "2021-06-01", "2020-01-01-preview")
+    ASSESSMENTS_API_VERSIONS: tuple[str, ...] = ("2021-06-01", "2020-01-01", "2025-05-04")
+    SECURE_SCORES_API_VERSIONS: tuple[str, ...] = ("2020-01-01-preview", "2020-01-01")
+
+    def _request_with_version_fallback(
+        self, session: _requests.Session, path: str, params: dict[str, Any], timeout: int, versions: tuple[str, ...]
+    ) -> tuple[Any | None, str | None, str | None]:
+        last_error: str | None = None
+        for version in versions:
+            url = f"https://management.azure.com/{path}?api-version={version}"
+            try:
+                resp = session.get(url, params=params, timeout=timeout)
                 resp.raise_for_status()
-                return resp
-            resp = call_with_retry(_get, attempts=3, backoff=1.0, max_delay=30.0)
-        except Exception as exc:
-            return [], f"defender alerts request failed: {exc}"
+                return resp, version, None
+            except Exception as exc:  # noqa: BLE001 - surface the final failure
+                last_error = str(exc)
+                # Auth/permission problems are version-independent; stop early.
+                if "401" in last_error or "403" in last_error:
+                    break
+                continue
+        return None, None, f"tried {', '.join(versions)}: {last_error}"
+
+    def _fetch_alerts(self, subscription: str, session: _requests.Session, target: str, timeout: int) -> tuple[list[dict[str, Any]], str | None]:
+        path = f"subscriptions/{subscription}/providers/Microsoft.Security/alerts"
+        resp, _version, error = self._request_with_version_fallback(session, path, {}, timeout, self.ALERTS_API_VERSIONS)
+        if error:
+            return [], f"defender alerts request failed ({error})"
         alerts = resp.json().get("value") or []
         findings: list[dict[str, Any]] = []
         for alert in alerts:
@@ -393,19 +430,22 @@ class DefenderScanner(BaseScanner):
         return findings, None
 
     def _fetch_assessments(self, subscription: str, session: _requests.Session, target: str, timeout: int) -> tuple[list[dict[str, Any]], str | None]:
+        path = f"subscriptions/{subscription}/providers/Microsoft.Security/assessments"
         findings: list[dict[str, Any]] = []
         page = 0
+        version: str | None = None
         while True:
-            url = f"https://management.azure.com/subscriptions/{subscription}/providers/Microsoft.Security/assessments?api-version=2020-01-01-preview"
-            params = {"$top": 100, "$skip": page * 100}
-            try:
-                def _get():
-                    resp = session.get(url, params=params, timeout=timeout)
+            if page == 0:
+                resp, version, error = self._request_with_version_fallback(session, path, {"$top": 100, "$skip": 0}, timeout, self.ASSESSMENTS_API_VERSIONS)
+                if error:
+                    return findings, f"defender assessments request failed ({error})"
+            else:
+                url = f"https://management.azure.com/{path}?api-version={version}"
+                try:
+                    resp = session.get(url, params={"$top": 100, "$skip": page * 100}, timeout=timeout)
                     resp.raise_for_status()
-                    return resp
-                resp = call_with_retry(_get, attempts=3, backoff=1.0, max_delay=30.0)
-            except Exception as exc:
-                return findings, f"defender assessments request failed: {exc}"
+                except Exception as exc:
+                    return findings, f"defender assessments request failed: {exc}"
             items = resp.json().get("value") or []
             if not items:
                 break
@@ -433,19 +473,22 @@ class DefenderScanner(BaseScanner):
         return findings, None
 
     def _fetch_secure_scores(self, subscription: str, session: _requests.Session, target: str, timeout: int) -> tuple[list[dict[str, Any]], str | None]:
+        path = f"subscriptions/{subscription}/providers/Microsoft.Security/secureScores"
         findings: list[dict[str, Any]] = []
         page = 0
+        version: str | None = None
         while True:
-            url = f"https://management.azure.com/subscriptions/{subscription}/providers/Microsoft.Security/secureScores?api-version=2020-01-01-preview"
-            params = {"$top": 100, "$skip": page * 100}
-            try:
-                def _get():
-                    resp = session.get(url, params=params, timeout=timeout)
+            if page == 0:
+                resp, version, error = self._request_with_version_fallback(session, path, {"$top": 100, "$skip": 0}, timeout, self.SECURE_SCORES_API_VERSIONS)
+                if error:
+                    return findings, f"defender secure scores request failed ({error})"
+            else:
+                url = f"https://management.azure.com/{path}?api-version={version}"
+                try:
+                    resp = session.get(url, params={"$top": 100, "$skip": page * 100}, timeout=timeout)
                     resp.raise_for_status()
-                    return resp
-                resp = call_with_retry(_get, attempts=3, backoff=1.0, max_delay=30.0)
-            except Exception as exc:
-                return findings, f"defender secure scores request failed: {exc}"
+                except Exception as exc:
+                    return findings, f"defender secure scores request failed: {exc}"
             items = resp.json().get("value") or []
             if not items:
                 break
@@ -481,13 +524,21 @@ class DefenderScanner(BaseScanner):
         if error:
             return [], error
 
+        # Each source (alerts / assessments / secure scores) is independent. A
+        # failure in one (e.g. a retired API version returning 404) must not
+        # abort the whole cloud scan — keep what we fetched and report the rest.
         findings: list[dict[str, Any]] = []
+        errors: list[str] = []
         for fetcher in (self._fetch_alerts, self._fetch_assessments, self._fetch_secure_scores):
-            scanned, error = fetcher(os.environ["AZURE_SUBSCRIPTION_ID"], session, target, timeout)
-            if error:
-                return findings, error
-            findings.extend(scanned)
-        return findings, None
+            scanned, fetcher_error = fetcher(os.environ["AZURE_SUBSCRIPTION_ID"], session, target, timeout)
+            if fetcher_error:
+                errors.append(f"{fetcher.__name__.replace('_fetch_', '')}: {fetcher_error}")
+            else:
+                findings.extend(scanned)
+
+        if findings:
+            return findings, "; ".join(errors) if errors else None
+        return [], errors[0] if errors else None
 
 
 SCANNER_RUNNERS: dict[str, BaseScanner] = {
@@ -517,14 +568,39 @@ def scanners_for_profile(profile: str | None) -> list[str] | None:
     return SCAN_PROFILE_SCANNERS[profile]
 
 
+def _resolve_target(target: str) -> str:
+    if os.path.isabs(target):
+        return target
+    candidates = [
+        Path(target).resolve(),
+        Path(__file__).resolve().parent.parent.parent / target,
+        Path(__file__).resolve().parent.parent.parent.parent / target,
+    ]
+    for candidate in candidates:
+        if candidate.exists():
+            return str(candidate)
+    return str(candidates[0])
+
+
+def resolve_scanners(scanners: list[str] | None, scan_profile: str | None) -> list[str]:
+    """Resolve the concrete scanner list for a scan request.
+
+    An explicit ``scanners`` list wins over the convenience ``scan_profile`` so
+    callers (e.g. the UI "cloud-only" toggle) can request exactly the sources
+    they want. When neither is supplied, all configured runners are used.
+    """
+    profile_scanners = scanners_for_profile(scan_profile)
+    return scanners or profile_scanners or list(SCANNER_RUNNERS.keys())
+
+
 def run_scanners(
     target: str,
     scanners: list[str] | None = None,
     scan_profile: str | None = None,
     timeout: int = 300,
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
-    profile_scanners = scanners_for_profile(scan_profile)
-    selected = profile_scanners or scanners or list(SCANNER_RUNNERS.keys())
+    target = _resolve_target(target)
+    selected = resolve_scanners(scanners, scan_profile)
     findings: list[dict[str, Any]] = []
     failures: list[dict[str, Any]] = []
     for name in selected:

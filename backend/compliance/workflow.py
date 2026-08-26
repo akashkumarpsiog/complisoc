@@ -20,6 +20,7 @@ def process_scan_run(
     findings: list[dict],
     scanner_failures: list[dict] | None = None,
     framework: str | None = None,
+    selected_scanners: list[str] | None = None,
 ) -> dict:
     return run_pipeline(
         db,
@@ -27,4 +28,5 @@ def process_scan_run(
         findings=findings,
         scanner_failures=scanner_failures,
         framework=framework,
+        selected_scanners=selected_scanners,
     )

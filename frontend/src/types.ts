@@ -1,5 +1,15 @@
 export type Status = "idle" | "loading" | "success" | "error";
 
+export interface ScannerExecution {
+  id: number;
+  scan_run_id: number;
+  scanner_name: string;
+  status: string;
+  started_at?: string | null;
+  completed_at?: string | null;
+  error_message?: string | null;
+}
+
 export interface ScanRun {
   id: number;
   target_environment: string;
@@ -9,6 +19,7 @@ export interface ScanRun {
   created_at?: string | null;
   updated_at?: string | null;
   archived_at?: string | null;
+  scanner_executions?: ScannerExecution[];
 }
 
 export interface ScanRunSummary {
@@ -196,6 +207,7 @@ export interface ScannerInfo {
   description?: string | null;
   required_inputs?: string[] | null;
   missing_config?: string[] | null;
+  scope?: string | null;
 }
 
 export interface ScanRequest {

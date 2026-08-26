@@ -1,15 +1,21 @@
 import { useState } from "react";
 import { api } from "../services/api";
 import { useResource } from "../hooks/useResource";
-import type { FindingLineage } from "../types";
+import type { FindingLineage, ScanRun } from "../types";
 import { ResourceBoundary } from "../components/ResourceBoundary";
 import { Section, StatusBadge } from "../components/Primitives";
 import { formatDate } from "../utils/format";
 import { ChevronDown, ChevronUp, GitBranch, FileJson, ShieldCheck, Scan, CheckCircle2, XCircle, Loader2 } from "lucide-react";
 
 export function EvidenceLineagePage({ onViewChange }: { onViewChange?: (viewId: string) => void }) {
+  const [scanRunId, setScanRunId] = useState("");
   const [findingId, setFindingId] = useState("");
   const [submittedId, setSubmittedId] = useState<number | null>(null);
+  const scanRuns = useResource(api.scanRuns.list);
+  const findings = useResource(
+    () => (scanRunId ? api.findings.list({ scan_run_id: Number(scanRunId) }) : Promise.resolve([])),
+    [scanRunId],
+  );
 
   const lineage = useResource(
     () => (submittedId ? api.findings.lineage(submittedId) : Promise.reject("No finding selected")),
@@ -22,21 +28,44 @@ export function EvidenceLineagePage({ onViewChange }: { onViewChange?: (viewId: 
     setSubmittedId(id);
   };
 
+  const handleScanRunChange = (value: string) => {
+    setScanRunId(value);
+    setFindingId("");
+    setSubmittedId(null);
+  };
+
   return (
     <Section
       title="Evidence Lineage"
-      description="Trace a finding through the full compliance evidence chain"
+      description="Choose a scan, then a finding, to trace its full compliance evidence chain"
       actions={
         <div className="flex flex-wrap items-center gap-2">
-          <input
+          <select
             className="control"
-            type="number"
-            min="1"
-            placeholder="Finding ID"
+            value={scanRunId}
+            onChange={(e) => handleScanRunChange(e.target.value)}
+            disabled={scanRuns.status === "loading"}
+          >
+            <option value="">1. Choose a scan run</option>
+            {(scanRuns.data || []).map((scanRun: ScanRun) => (
+              <option key={scanRun.id} value={scanRun.id}>
+                Scan #{scanRun.id} - {scanRun.target_environment} - {scanRun.status}
+              </option>
+            ))}
+          </select>
+          <select
+            className="control"
             value={findingId}
             onChange={(e) => setFindingId(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && handleView()}
-          />
+            disabled={!scanRunId || findings.status === "loading"}
+          >
+            <option value="">Choose a finding…</option>
+            {(findings.data || []).map((finding) => (
+              <option key={finding.id} value={finding.id}>
+                #{finding.id} · {finding.severity.toUpperCase()} · {finding.title} · {finding.resource_identifier}
+              </option>
+            ))}
+          </select>
           <button className="icon-button" disabled={!findingId} onClick={handleView}>
             View lineage
           </button>
@@ -44,7 +73,9 @@ export function EvidenceLineagePage({ onViewChange }: { onViewChange?: (viewId: 
       }
     >
       {!submittedId ? (
-        <div className="text-sm text-muted">Enter a normalized finding ID to inspect its evidence lineage.</div>
+        <div className="text-sm text-muted">
+          Start with a scan run, choose one of its findings, then view the evidence lineage.
+        </div>
       ) : (
         <ResourceBoundary resource={lineage}>
           {(data) => <LineageView data={data} />}

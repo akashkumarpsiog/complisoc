@@ -1,32 +1,27 @@
-import { useEffect, useState } from "react";
-import { Archive, ArrowRight, RotateCcw } from "lucide-react";
+import { useState } from "react";
+import { Archive, ArrowRight, CheckCircle2, Play, RotateCcw } from "lucide-react";
 import { api } from "../services/api";
 import { useResource } from "../hooks/useResource";
-import type { ScanRun, ScanRunSummary } from "../types";
-import { Detail } from "../components/Detail";
+import type { ScanRun } from "../types";
 import { ResourceBoundary } from "../components/ResourceBoundary";
-import { DataTable, EmptyState, LoadingState, MetricCard, Section, StatusBadge } from "../components/Primitives";
+import { DataTable, Section, StatusBadge } from "../components/Primitives";
 import { formatDate } from "../utils/format";
 import { ScanRunCreator } from "../components/ScanRunCreator";
 
 export function ScanRunsPage({ onSelectScan }: { onSelectScan: (id: number) => void }) {
   const [showArchived, setShowArchived] = useState(false);
   const scanRuns = useResource(() => api.scanRuns.list(showArchived), [showArchived]);
-  const [selectedId, setSelectedId] = useState<number | null>(null);
-  const selected = scanRuns.data?.find((item) => item.id === selectedId) || null;
-  const [summary, setSummary] = useState<ScanRunSummary | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+  const [createdScan, setCreatedScan] = useState<ScanRun | null>(null);
+  const [scanCreatorOpen, setScanCreatorOpen] = useState(false);
 
-  useEffect(() => {
-    if (!selected) {
-      setSummary(null);
-      return;
-    }
-    void api.scanRuns.summary(selected.id).then(setSummary);
-  }, [selected]);
+  async function handleCreated(scanRun: ScanRun) {
+    await scanRuns.reload();
+    setCreatedScan(scanRun);
+  }
 
   return (
-    <div className="grid gap-5 2xl:grid-cols-[1fr_420px]">
+    <div className="grid gap-5">
       <Section
         title="Scan Runs"
         description={showArchived ? "Archived scan history only. Restore a scan to return it to active views." : "Active scans only. Archived scans remain available for audit."}
@@ -35,10 +30,22 @@ export function ScanRunsPage({ onSelectScan }: { onSelectScan: (id: number) => v
             <button className="secondary-button" onClick={() => setShowArchived((value) => !value)}>
               {showArchived ? "Show active" : "Show archived"}
             </button>
-            <ScanRunCreator onCreated={scanRuns.reload} />
+            <button className="primary-button" onClick={() => setScanCreatorOpen(true)}>
+              <Play className="h-4 w-4" aria-hidden />
+              New scan
+            </button>
           </div>
         }
       >
+        {createdScan && (
+          <div className="mb-4 flex items-center justify-between gap-3 rounded-xl border border-success/20 bg-success-light px-4 py-3 text-sm font-medium text-success-dark">
+            <span className="inline-flex items-center gap-2">
+              <CheckCircle2 className="h-4 w-4" aria-hidden />
+              Scan #{createdScan.id} was created. Open it from the table below.
+            </span>
+            <button className="text-xs font-semibold underline" onClick={() => setCreatedScan(null)}>Dismiss</button>
+          </div>
+        )}
         <div className="mb-4 flex flex-wrap items-center gap-2">
           <button className="secondary-button" disabled={selectedIds.size === 0} onClick={() => { void api.scanRuns.bulkArchive(Array.from(selectedIds)).then(() => { setSelectedIds(new Set()); void scanRuns.reload(); }); }}>
             Archive Selected ({selectedIds.size})
@@ -48,19 +55,19 @@ export function ScanRunsPage({ onSelectScan }: { onSelectScan: (id: number) => v
           </button>
         </div>
         <ResourceBoundary resource={scanRuns}>
-          {(data) => <ScanRunTable data={data} onSelect={setSelectedId} onOpen={onSelectScan} onChanged={scanRuns.reload} selectedIds={selectedIds} onToggleSelect={(id) => setSelectedIds((prev) => { const next = new Set(prev); if (next.has(id)) next.delete(id); else next.add(id); return next; })} />}
+          {(data) => <ScanRunTable data={data} onOpen={onSelectScan} onChanged={scanRuns.reload} selectedIds={selectedIds} onToggleSelect={(id) => setSelectedIds((prev) => { const next = new Set(prev); if (next.has(id)) next.delete(id); else next.add(id); return next; })} />}
         </ResourceBoundary>
       </Section>
-      <ScanRunDetail scanRun={selected} summary={summary} onOpen={onSelectScan} />
+      <ScanRunCreator open={scanCreatorOpen} onOpenChange={setScanCreatorOpen} onCreated={handleCreated} />
     </div>
   );
 }
 
-function ScanRunTable({ data, onSelect, onOpen, onChanged, selectedIds, onToggleSelect }: { data: ScanRun[]; onSelect: (id: number) => void; onOpen: (id: number) => void; onChanged: () => Promise<void>; selectedIds: Set<number>; onToggleSelect: (id: number) => void }) {
+function ScanRunTable({ data, onOpen, onChanged, selectedIds, onToggleSelect }: { data: ScanRun[]; onOpen: (id: number) => void; onChanged: () => Promise<void>; selectedIds: Set<number>; onToggleSelect: (id: number) => void }) {
   return (
     <DataTable
       columns={["", "ID", "Environment", "Status", "Created", "Open", "Retention"]}
-      rows={data.map((scanRun, index) => [
+      rows={data.map((scanRun) => [
         <input
           key={scanRun.id}
           type="checkbox"
@@ -82,39 +89,5 @@ function ScanRunTable({ data, onSelect, onOpen, onChanged, selectedIds, onToggle
         </button>,
       ])}
     />
-  );
-}
-
-function ScanRunDetail({ scanRun, summary, onOpen }: { scanRun: ScanRun | null; summary: ScanRunSummary | null; onOpen: (id: number) => void }) {
-  return (
-    <Section title="Scan Detail">
-      {scanRun ? (
-        <div className="space-y-4 animate-slide-in-right">
-          <Detail label="Scan run" value={scanRun.id} />
-          <Detail label="Environment" value={scanRun.target_environment} />
-          <Detail label="Status" value={<StatusBadge value={scanRun.status} />} />
-          <Detail label="Started" value={formatDate(scanRun.started_at)} />
-          {summary ? (
-            <div className="grid grid-cols-2 gap-3 pt-3">
-              <MetricCard label="Raw" value={summary.raw_findings} className="!p-4" />
-              <MetricCard label="Normalized" value={summary.normalized_findings} className="!p-4" />
-              <MetricCard label="Mappings" value={summary.mappings} className="!p-4" />
-              <MetricCard label="Published" value={summary.published_mappings} accent="emerald" className="!p-4" />
-              <MetricCard label="Manual review" value={summary.manual_review_mappings} accent="amber" className="!p-4" />
-            </div>
-          ) : (
-            <LoadingState label="Loading summary" />
-          )}
-          <div className="pt-3">
-            <button className="primary-button w-full justify-center" onClick={() => onOpen(scanRun.id)}>
-              Open scan workspace
-              <ArrowRight className="h-4 w-4" aria-hidden />
-            </button>
-          </div>
-        </div>
-      ) : (
-        <EmptyState label="Select a scan run to see details." />
-      )}
-    </Section>
   );
 }

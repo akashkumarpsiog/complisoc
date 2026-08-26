@@ -107,6 +107,7 @@ export const api = {
       scanner_failures: ScannerFailureInput[];
     }) => request<ScanRun>("/scan-runs", { method: "POST", body: JSON.stringify(payload) }),
     summary: (id: number) => request<ScanRunSummary>(`/scan-runs/${id}/summary`),
+    get: (id: number) => request<ScanRun>(`/scan-runs/${id}`),
     archive: (id: number) => request<ScanRun>(`/scan-runs/${id}/archive`, { method: "POST" }),
     restore: (id: number) => request<ScanRun>(`/scan-runs/${id}/restore`, { method: "POST" }),
     bulkArchive: (scanRunIds: number[]) =>

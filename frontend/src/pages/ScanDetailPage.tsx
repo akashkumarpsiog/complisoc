@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { ChevronLeft, Loader2 } from "lucide-react";
 import { api } from "../services/api";
 import { useResource } from "../hooks/useResource";
-import type { AuditBundle, BulkReviewDecision, ComplianceReport, ControlMapping, NormalizedFinding, ReviewQueueItem, ScanRunSummary, VerificationRecord } from "../types";
+import type { AuditBundle, BulkReviewDecision, ComplianceReport, ControlMapping, NormalizedFinding, ReviewQueueItem, ScanRun, ScanRunSummary, ScannerExecution, VerificationRecord } from "../types";
 import { Detail } from "../components/Detail";
 import { ResourceBoundary } from "../components/ResourceBoundary";
 import { DataTable, EmptyState, LoadingState, MetricCard, Section, StatusBadge } from "../components/Primitives";
@@ -22,6 +22,7 @@ type TabId = (typeof TABS)[number]["id"];
 export function ScanDetailPage({ scanRunId, onBack }: { scanRunId: number; onBack: () => void }) {
   const [activeTab, setActiveTab] = useState<TabId>("summary");
   const summaryResource = useResource(() => api.scanRuns.summary(scanRunId));
+  const scanRunResource = useResource(() => api.scanRuns.get(scanRunId));
   const findingsResource = useResource(() => api.findings.list({ scan_run_id: scanRunId }));
   const mappingsResource = useResource(() => api.mappings.list({ scan_run_id: scanRunId }));
   const reviewResource = useResource(api.reviewQueue.list);
@@ -45,7 +46,7 @@ export function ScanDetailPage({ scanRunId, onBack }: { scanRunId: number; onBac
   const renderTab = () => {
     switch (activeTab) {
       case "summary":
-        return <SummaryTab summary={summaryResource.data} />;
+        return <SummaryTab summary={summaryResource.data} scanRun={scanRunResource.data} />;
       case "findings":
         return <FindingsTab findings={scanFindings} resource={findingsResource} onRefresh={findingsResource.reload} />;
       case "mappings":
@@ -101,7 +102,7 @@ export function ScanDetailPage({ scanRunId, onBack }: { scanRunId: number; onBac
   );
 }
 
-function SummaryTab({ summary }: { summary: ScanRunSummary | undefined | null }) {
+function SummaryTab({ summary, scanRun }: { summary: ScanRunSummary | undefined | null; scanRun?: ScanRun | undefined | null }) {
   if (!summary) {
     return (
       <Section title="Scan Summary">
@@ -109,6 +110,15 @@ function SummaryTab({ summary }: { summary: ScanRunSummary | undefined | null })
       </Section>
     );
   }
+
+  const executions: ScannerExecution[] = scanRun?.scanner_executions ?? [];
+  const SOURCE_LABELS: Record<string, string> = {
+    checkov: "Checkov (local IaC)",
+    trivy: "Trivy (local vulns)",
+    sonarqube: "SonarQube (local static)",
+    defender: "Azure Defender (live cloud)",
+    manual: "Manual / sample",
+  };
 
   return (
     <Section title="Scan Summary">
@@ -119,6 +129,25 @@ function SummaryTab({ summary }: { summary: ScanRunSummary | undefined | null })
         <MetricCard label="Published" value={summary.published_mappings} accent="emerald" />
         <MetricCard label="Manual review" value={summary.manual_review_mappings} accent="amber" />
       </div>
+      {executions.length > 0 && (
+        <div className="mt-4">
+          <p className="text-xs font-semibold uppercase tracking-wide text-subtle mb-2">Sources consulted</p>
+          <div className="grid gap-2">
+            {executions.map((execution) => (
+              <div key={execution.id} className="flex items-center justify-between rounded-xl border border-line bg-white px-4 py-2.5 text-sm">
+                <span className="font-medium text-ink">{SOURCE_LABELS[execution.scanner_name] ?? execution.scanner_name}</span>
+                {execution.status === "failed" ? (
+                  <span className="text-xs font-semibold text-danger" title={execution.error_message ?? undefined}>
+                    Failed{execution.error_message ? `: ${execution.error_message.slice(0, 120)}` : ""}
+                  </span>
+                ) : (
+                  <span className="text-xs font-semibold text-success">Ran</span>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </Section>
   );
 }

@@ -365,3 +365,38 @@ def test_defender_missing_env_returns_failure():
         findings, failures = runners.run_scanners(".", ["defender"])
     assert findings == []
     assert failures and failures[0]["scanner_name"] == "defender"
+
+
+def test_resolve_scanners_uses_profile_when_present():
+    assert runners.resolve_scanners(None, "azure") == ["defender", "checkov", "trivy", "sonarqube"]
+    assert runners.resolve_scanners(None, "local") == ["checkov", "trivy", "sonarqube"]
+    # Explicit scanner list wins over profile.
+    assert runners.resolve_scanners(["trivy"], "azure") == ["trivy"]
+    # Cloud-only Azure run requests Defender alone.
+    assert runners.resolve_scanners(["defender"], "azure") == ["defender"]
+    # Fallback when nothing is supplied.
+    assert set(runners.resolve_scanners(None, None)) == {"trivy", "checkov", "sonarqube", "defender"}
+
+
+def test_groq_model_has_no_duplicated_prefix():
+    from complisoc.backend.core.config import GROQ_MODEL
+
+    assert "llama-llama" not in GROQ_MODEL, "GROQ_MODEL must not contain a doubled 'llama-' prefix"
+    assert GROQ_MODEL.startswith("llama-")
+
+
+def test_ingest_records_selected_scanner_without_findings(db_session):
+    from complisoc.backend.scanners.ingestion import ingest_findings
+
+    scan_run, _ = ingest_findings(
+        db_session,
+        target_environment="azure-demo",
+        findings=[],
+        scanner_failures=[],
+        selected_scanners=["defender", "checkov", "trivy", "sonarqube"],
+    )
+    recorded = {e.scanner_name: e for e in scan_run.scanner_executions}
+    # A cloud scanner that ran but produced nothing must still be recorded so the
+    # UI can show it was consulted.
+    assert recorded["defender"].status == "completed"
+    assert "no findings" in (recorded["defender"].error_message or "").lower()
