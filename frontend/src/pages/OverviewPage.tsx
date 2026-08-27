@@ -193,7 +193,7 @@ export function OverviewPage({ onViewChange }: { onViewChange?: (viewId: ViewId)
               {data.items.length > 0 ? (
                 <>
                   <DataTable
-                    columns={["Mapping", "Status", "Severity", "Resource", "Control", "Gemini", "Groq", "Guidance"]}
+                    columns={["Mapping", "Status", "Severity", "Resource", "Control", "Gemini", "Groq"]}
                     rows={data.items.map((item) => [
                       item.mapping_id,
                       <StatusBadge key={`status-${item.mapping_id}`} value={item.status} />,
@@ -202,8 +202,10 @@ export function OverviewPage({ onViewChange }: { onViewChange?: (viewId: ViewId)
                       <button key={`control-${item.mapping_id}`} className="text-left font-semibold text-brand-600 hover:text-brand-700 underline-offset-2 hover:underline transition-colors duration-150 focus:outline-none focus:ring-2 focus:ring-brand-500 rounded" onClick={() => setSelectedControlId(item.control_catalog_id)}>{item.control_id} {item.control_title}</button>,
                       formatPercent(item.gemini_confidence),
                       formatPercent(item.groq_agreement_value),
-                      <RemediationSuggestionPanel key={`guide-${item.mapping_id}`} item={item} />,
                     ])}
+                    expandableRows={data.items.map((item) => (
+                      <RemediationSuggestionPanel key={`guide-${item.mapping_id}`} item={item} />
+                    ))}
                   />
                   {data.total > data.items.length && (
                     <p className="text-sm text-muted">
