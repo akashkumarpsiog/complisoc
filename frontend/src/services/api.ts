@@ -175,6 +175,9 @@ export const api = {
         body: JSON.stringify({ scan_run_id: scanRunId }),
       }),
     downloadUrl: (id: number) => buildUrl(`/audit-bundles/${id}/download`),
-    verify: (id: number) => request<{ status: string; bundle_verified: boolean; manifest_verified: boolean; files: Record<string, string>; errors: string[] }>(`/audit-bundles/${id}/verify`),
+    verify: (id: number) =>
+      request<{ status: string; bundle_verified: boolean; manifest_verified: boolean; files: Record<string, string>; errors: string[] }>(`/audit-bundles/${id}/verify`),
+    verifyAll: () =>
+      request<{ status: string; bundle_verified: boolean; manifest_verified: boolean; files: Record<string, string>; errors: string[] }[]>("/audit-bundles/verify-all", { method: "POST" }),
   },
 };

@@ -478,6 +478,12 @@ def verify_audit_bundle_endpoint(bundle_id: int, db: Session = Depends(get_db)):
     return verify_audit_bundle(bundle)
 
 
+@app.post("/api/v1/audit-bundles/verify-all")
+def verify_all_audit_bundles(db: Session = Depends(get_db)):
+    bundles = db.query(AuditBundle).order_by(AuditBundle.id.desc()).all()
+    return [verify_audit_bundle(bundle) for bundle in bundles]
+
+
 def _dashboard_control_coverage(db: Session) -> dict[str, int]:
     mappings = db.query(ControlMapping).filter(ControlMapping.mapping_status == "published").all()
     covered = {mapping.control_catalog_id for mapping in mappings}
