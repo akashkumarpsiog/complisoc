@@ -372,7 +372,7 @@ function MappingsTab({ mappings, resource, scanRunId }: { mappings: ControlMappi
 }
 
 function ReviewTab({ items, resource, onRefresh }: { items: ReviewQueueItem[]; resource: ReturnType<typeof useResource<ReviewQueueItem[]>>; onRefresh: () => void }) {
-  const [comment, setComment] = useState("Reviewed from frontend.");
+  const [comment, setComment] = useState("");
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
 
   async function decide(id: number, action: "approve" | "reject") {

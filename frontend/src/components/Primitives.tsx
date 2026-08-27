@@ -212,7 +212,7 @@ export function ErrorState({ message, onRetry }: { message: string; onRetry: () 
   );
 }
 
-export function DataTable({ columns, rows, expandableRows }: { columns: string[]; rows: ReactNode[][]; expandableRows?: (ReactNode | null)[] }) {
+export function DataTable({ columns, rows, expandableRows }: { columns: ReactNode[]; rows: ReactNode[][]; expandableRows?: (ReactNode | null)[] }) {
   if (rows.length === 0) {
     return <EmptyState label="No records found." icon={<Inbox className="h-5 w-5" aria-hidden />} />;
   }
@@ -222,7 +222,7 @@ export function DataTable({ columns, rows, expandableRows }: { columns: string[]
         <thead>
           <tr className="border-b border-line-strong bg-panel/60 text-xs font-bold uppercase tracking-wider text-subtle">
             {columns.map((column, idx) => (
-              <th className="overflow-hidden px-5 py-3 select-none first:pl-5 last:pr-5" key={column}>
+              <th className="overflow-hidden px-5 py-3 select-none first:pl-5 last:pr-5" key={idx}>
                 <span className="inline-flex items-center gap-1.5 cursor-pointer hover:text-ink transition-colors duration-150 group">
                   {column}
                   <span className="flex flex-col">

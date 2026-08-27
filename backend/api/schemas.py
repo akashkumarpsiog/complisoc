@@ -45,7 +45,7 @@ class ReviewDecision(BaseModel):
 
 
 class BulkReviewDecision(BaseModel):
-    item_ids: list[int] = Field(min_length=1, max_length=100)
+    item_ids: list[int] = Field(min_length=1)
     reviewer_id: str | None = None
     comments: str | None = None
     action: str = Field(default="approve", pattern="^(approve|reject)$")
@@ -160,6 +160,19 @@ class ReviewQueueItemRead(ORMModel):
     review_reason_code: str
     comments: str | None = None
     reviewed_at: datetime | None = None
+
+
+class ReviewQueueItemDetailRead(ORMModel):
+    id: int
+    control_mapping_id: int
+    status: str
+    reviewer_id: str | None = None
+    review_reason_code: str
+    comments: str | None = None
+    reviewed_at: datetime | None = None
+    severity: str | None = None
+    control_id: str | None = None
+    scan_run_id: int | None = None
 
 
 class ComplianceReportRead(ORMModel):

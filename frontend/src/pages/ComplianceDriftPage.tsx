@@ -9,14 +9,25 @@ import { formatDate } from "../utils/format";
 export function ComplianceDriftPage({ onViewChange }: { onViewChange?: (viewId: string) => void }) {
   const [scanRunId, setScanRunId] = useState("");
   const [compareToId, setCompareToId] = useState("");
-  const [selectedScanId, setSelectedScanId] = useState<number | null>(null);
+  const [selectedScans, setSelectedScans] = useState<{ current: number | null; previous: number | null }>({ current: null, previous: null });
   const scanRuns = useResource(api.scanRuns.list);
-  const drift = useResource(() => (scanRunId && parseInt(scanRunId, 10) ? api.dashboard.drift(parseInt(scanRunId, 10), compareToId ? parseInt(compareToId, 10) : undefined) : Promise.reject("No scan selected")), [scanRunId, compareToId]);
+  const drift = useResource(
+    () => (
+      selectedScans.current && selectedScans.previous
+        ? api.dashboard.drift(selectedScans.current, selectedScans.previous)
+        : Promise.reject("Select two scan runs to compare")
+    ),
+    [selectedScans.current, selectedScans.previous],
+  );
 
   const handleAnalyze = () => {
-    if (!scanRunId) return;
-    setSelectedScanId(parseInt(scanRunId, 10));
+    const current = parseInt(scanRunId, 10);
+    const previous = parseInt(compareToId, 10);
+    if (!current || !previous) return;
+    setSelectedScans({ current, previous });
   };
+
+  const completedScans = (scanRuns.data || []).filter((s) => s.status === "completed");
 
   return (
     <Section
@@ -25,29 +36,29 @@ export function ComplianceDriftPage({ onViewChange }: { onViewChange?: (viewId: 
       actions={
         <div className="flex flex-wrap items-center gap-2">
           <select className="control" value={scanRunId} onChange={(e) => setScanRunId(e.target.value)}>
-            <option value="">Current scan</option>
-            {(scanRuns.data || []).filter((s) => s.status === "completed").map((scanRun) => (
+            <option value="">Select current scan</option>
+            {completedScans.map((scanRun) => (
               <option key={scanRun.id} value={scanRun.id}>
                 #{scanRun.id} {scanRun.target_environment} ({formatDate(scanRun.created_at)})
               </option>
             ))}
           </select>
           <select className="control" value={compareToId} onChange={(e) => setCompareToId(e.target.value)}>
-            <option value="">Previous scan (auto)</option>
-            {(scanRuns.data || []).filter((s) => s.status === "completed" && s.id !== parseInt(scanRunId, 10)).map((scanRun) => (
+            <option value="">Select previous scan</option>
+            {completedScans.filter((s) => s.id !== parseInt(scanRunId, 10)).map((scanRun) => (
               <option key={scanRun.id} value={scanRun.id}>
                 #{scanRun.id} {scanRun.target_environment} ({formatDate(scanRun.created_at)})
               </option>
             ))}
           </select>
-          <button className="icon-button" disabled={!scanRunId} onClick={handleAnalyze}>
+          <button className="icon-button" disabled={!scanRunId || !compareToId} onClick={handleAnalyze}>
             Analyze drift
           </button>
         </div>
       }
     >
-      {!selectedScanId ? (
-        <div className="text-sm text-muted">Select a completed scan run and click Analyze drift to compare.</div>
+      {!selectedScans.current ? (
+        <div className="text-sm text-muted">Select two completed scan runs and click Analyze drift to compare.</div>
       ) : (
         <ResourceBoundary resource={drift}>
           {(data) => <DriftResults data={data} />}

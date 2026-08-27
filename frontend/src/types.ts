@@ -108,6 +108,9 @@ export interface ReviewQueueItem {
   review_reason_code: string;
   comments?: string | null;
   reviewed_at?: string | null;
+  severity?: string | null;
+  control_id?: string | null;
+  scan_run_id?: number | null;
 }
 
 export interface ComplianceReport {

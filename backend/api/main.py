@@ -24,6 +24,7 @@ from complisoc.backend.api.schemas import (
     NormalizedFindingRead,
     ReportCreate,
     ReviewDecision,
+    ReviewQueueItemDetailRead,
     ReviewQueueItemRead,
     ScenarioReportCreate,
     ScanRequest,
@@ -266,7 +267,7 @@ def get_mapping_verification(mapping_id: int, db: Session = Depends(get_db)):
     return db.query(VerificationRecord).filter(VerificationRecord.control_mapping_id == mapping_id).all()
 
 
-@app.get("/api/v1/review-queue", response_model=list[ReviewQueueItemRead])
+@app.get("/api/v1/review-queue", response_model=list[ReviewQueueItemDetailRead])
 def list_review_queue(
     status: str | None = None,
     severity: str | None = None,
@@ -275,24 +276,43 @@ def list_review_queue(
     db: Session = Depends(get_db),
 ):
     query = (
-        db.query(ReviewQueueItem)
+        db.query(
+            ReviewQueueItem,
+            NormalizedFinding.severity,
+            ControlCatalog.control_id,
+            ScanRun.id,
+        )
         .join(ControlMapping, ReviewQueueItem.control_mapping_id == ControlMapping.id)
         .join(NormalizedFinding, ControlMapping.normalized_finding_id == NormalizedFinding.id)
+        .join(ControlCatalog, ControlMapping.control_catalog_id == ControlCatalog.id)
+        .join(RawFinding, NormalizedFinding.raw_finding_id == RawFinding.id)
+        .join(ScannerExecution, RawFinding.scanner_execution_id == ScannerExecution.id)
+        .join(ScanRun, ScannerExecution.scan_run_id == ScanRun.id)
     )
     if status:
         query = query.filter(ReviewQueueItem.status == status)
     if severity:
         query = query.filter(NormalizedFinding.severity == severity)
     if control_id:
-        query = query.join(ControlCatalog, ControlMapping.control_catalog_id == ControlCatalog.id).filter(ControlCatalog.control_id == control_id)
+        query = query.filter(ControlCatalog.control_id == control_id)
     if scan_run_id:
-        query = (
-            query.join(RawFinding, NormalizedFinding.raw_finding_id == RawFinding.id)
-            .join(ScannerExecution, RawFinding.scanner_execution_id == ScannerExecution.id)
-            .join(ScanRun, ScannerExecution.scan_run_id == ScanRun.id)
-            .filter(ScanRun.id == scan_run_id)
+        query = query.filter(ScanRun.id == scan_run_id)
+    rows = query.order_by(ReviewQueueItem.id.desc()).all()
+    return [
+        ReviewQueueItemDetailRead(
+            id=item.id,
+            control_mapping_id=item.control_mapping_id,
+            status=item.status,
+            reviewer_id=item.reviewer_id,
+            review_reason_code=item.review_reason_code,
+            comments=item.comments,
+            reviewed_at=item.reviewed_at,
+            severity=sev,
+            control_id=cid,
+            scan_run_id=srid,
         )
-    return query.order_by(ReviewQueueItem.id.desc()).all()
+        for item, sev, cid, srid in rows
+    ]
 
 
 @app.get("/api/v1/review-queue/{item_id}", response_model=ReviewQueueItemRead)
@@ -316,7 +336,7 @@ def reject_review_item(item_id: int, payload: ReviewDecision, db: Session = Depe
 @app.post("/api/v1/review-queue/bulk-decide", response_model=list[ReviewQueueItemRead])
 def bulk_decide_review_items(payload: BulkReviewDecision, db: Session = Depends(get_db)):
     results = []
-    for item_id in payload.item_ids[:100]:
+    for item_id in payload.item_ids:
         item = db.get(ReviewQueueItem, item_id)
         if item is None or item.status != "pending":
             continue
@@ -324,12 +344,15 @@ def bulk_decide_review_items(payload: BulkReviewDecision, db: Session = Depends(
         result = _decide_review_item(
             db,
             item_id,
-            payload.action,
+            "approved" if payload.action == "approve" else "rejected",
             mapping_status,
             ReviewDecision(reviewer_id=payload.reviewer_id, comments=payload.comments),
+            commit=False,
         )
         results.append(result)
     db.commit()
+    for result in results:
+        db.refresh(result)
     return results
 
 
@@ -689,7 +712,7 @@ def _file_response(path: str | None, filename: str, media_type: str = "applicati
     return FileResponse(path, media_type=media_type, filename=filename)
 
 
-def _decide_review_item(db: Session, item_id: int, item_status: str, mapping_status: str, payload: ReviewDecision):
+def _decide_review_item(db: Session, item_id: int, item_status: str, mapping_status: str, payload: ReviewDecision, commit: bool = True):
     item = db.get(ReviewQueueItem, item_id)
     if item is None:
         not_found("Review item")
@@ -701,8 +724,9 @@ def _decide_review_item(db: Session, item_id: int, item_status: str, mapping_sta
     item.comments = payload.comments
     item.reviewed_at = datetime.utcnow()
     mapping.mapping_status = mapping_status
-    db.commit()
-    db.refresh(item)
+    if commit:
+        db.commit()
+        db.refresh(item)
     return item
 
 
@@ -850,17 +874,13 @@ def get_scan_drift(scan_run_id: int, compare_to: int | None = None, db: Session 
     scan_run = db.get(ScanRun, scan_run_id)
     if scan_run is None:
         not_found("Scan run")
-    previous_id = compare_to
-    if previous_id is None:
-        previous = (
-            db.query(ScanRun)
-            .filter(ScanRun.status == "completed", ScanRun.id != scan_run_id)
-            .order_by(ScanRun.id.desc())
-            .first()
+    if compare_to is None:
+        raise HTTPException(
+            status_code=400,
+            detail={"code": "MISSING_COMPARE_TO", "message": "Query parameter 'compare_to' is required."},
         )
-        previous_id = previous.id if previous else None
     try:
-        diff = compare_scans(db, previous_id, scan_run_id)
+        diff = compare_scans(db, compare_to, scan_run_id)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
     return _serialize_scan_diff(diff)
