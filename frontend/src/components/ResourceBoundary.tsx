@@ -4,7 +4,7 @@ import { EmptyState, ErrorState, LoadingState } from "./Primitives";
 
 export function ResourceBoundary<T>({
   resource,
-  emptyLabel = "No data returned.",
+  emptyLabel = "No data available.",
   children,
 }: {
   resource: Pick<ResourceState<T>, "data" | "status" | "error" | "reload">;

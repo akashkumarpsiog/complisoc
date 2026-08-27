@@ -47,7 +47,7 @@ export function ScanRunsPage({ onSelectScan }: { onSelectScan: (id: number) => v
           </div>
         )}
         <div className="mb-4 flex flex-wrap items-center gap-2">
-          <button className="secondary-button" disabled={selectedIds.size === 0} onClick={() => { void api.scanRuns.bulkArchive(Array.from(selectedIds)).then(() => { setSelectedIds(new Set()); void scanRuns.reload(); }); }}>
+          <button className="secondary-button" disabled={selectedIds.size === 0} onClick={() => { void api.scanRuns.bulkArchive(Array.from(selectedIds)).then(() => { setSelectedIds(new Set()); void scanRuns.reload(); }).catch(() => { alert("Archive failed. Please try again."); }); }}>
             Archive Selected ({selectedIds.size})
           </button>
           <button className="secondary-button" onClick={() => setSelectedIds(new Set())} disabled={selectedIds.size === 0}>

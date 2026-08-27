@@ -5,7 +5,7 @@ import type { ControlMapping, NormalizedFinding } from "../types";
 import { Detail } from "../components/Detail";
 import { ResourceBoundary } from "../components/ResourceBoundary";
 import { DataTable, EmptyState, LoadingState, Section, StatusBadge } from "../components/Primitives";
-import { formatPercent, includesText, severityOrder } from "../utils/format";
+import { formatPercent, severityOrder } from "../utils/format";
 
 export function FindingsPage() {
   const findings = useResource(api.findings.list);
@@ -13,14 +13,18 @@ export function FindingsPage() {
   const [scanner, setScanner] = useState("");
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const selected = findings.data?.find((item) => item.id === selectedId) || null;
+  const scannerOptions = useMemo(
+    () => Array.from(new Set((findings.data || []).map((f) => f.scanner_name))).sort(),
+    [findings.data],
+  );
   const filtered = useMemo(
-    () => (findings.data || []).filter((item) => (!severity || item.severity === severity) && (!scanner || includesText(item.scanner_name, scanner))),
+    () => (findings.data || []).filter((item) => (!severity || item.severity === severity) && (!scanner || item.scanner_name === scanner)),
     [findings.data, severity, scanner],
   );
 
   return (
     <div className="grid gap-5 2xl:grid-cols-[1fr_420px]">
-      <Section title="Findings" description="Security findings discovered during scans" actions={<FindingFilters severity={severity} scanner={scanner} setSeverity={setSeverity} setScanner={setScanner} />}>
+      <Section title="Findings" description="Security findings discovered during scans" actions={<FindingFilters severity={severity} scanner={scanner} scannerOptions={scannerOptions} setSeverity={setSeverity} setScanner={setScanner} />}>
         <ResourceBoundary resource={{ ...findings, data: filtered }}>
           {(data) => <FindingTable data={data} onSelect={setSelectedId} />}
         </ResourceBoundary>
@@ -33,6 +37,7 @@ export function FindingsPage() {
 function FindingFilters(props: {
   severity: string;
   scanner: string;
+  scannerOptions: string[];
   setSeverity: (value: string) => void;
   setScanner: (value: string) => void;
 }) {
@@ -44,7 +49,12 @@ function FindingFilters(props: {
           <option key={item}>{item}</option>
         ))}
       </select>
-      <input className="control" placeholder="Scanner" value={props.scanner} onChange={(event) => props.setScanner(event.target.value)} />
+      <select className="control" value={props.scanner} onChange={(event) => props.setScanner(event.target.value)}>
+        <option value="">All scanners</option>
+        {props.scannerOptions.map((item) => (
+          <option key={item}>{item}</option>
+        ))}
+      </select>
     </>
   );
 }

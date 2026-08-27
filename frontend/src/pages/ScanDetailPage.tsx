@@ -25,7 +25,7 @@ export function ScanDetailPage({ scanRunId, onBack }: { scanRunId: number; onBac
   const scanRunResource = useResource(() => api.scanRuns.get(scanRunId));
   const findingsResource = useResource(() => api.findings.list({ scan_run_id: scanRunId }));
   const mappingsResource = useResource(() => api.mappings.list({ scan_run_id: scanRunId }));
-  const reviewResource = useResource(api.reviewQueue.list);
+  const reviewResource = useResource(() => api.reviewQueue.list({ scan_run_id: scanRunId }), [scanRunId]);
   const reportsResource = useResource(api.reports.list);
   const bundlesResource = useResource(api.auditBundles.list);
 

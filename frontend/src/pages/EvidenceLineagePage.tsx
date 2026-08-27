@@ -60,11 +60,14 @@ export function EvidenceLineagePage({ onViewChange }: { onViewChange?: (viewId: 
             disabled={!scanRunId || findings.status === "loading"}
           >
             <option value="">Choose a finding…</option>
-            {(findings.data || []).map((finding) => (
+            {(findings.data || []).slice(0, 100).map((finding) => (
               <option key={finding.id} value={finding.id}>
                 #{finding.id} · {finding.severity.toUpperCase()} · {finding.title} · {finding.resource_identifier}
               </option>
             ))}
+            {(findings.data || []).length > 100 && (
+              <option disabled>…and {(findings.data || []).length - 100} more (refine search)</option>
+            )}
           </select>
           <button className="icon-button" disabled={!findingId} onClick={handleView}>
             View lineage

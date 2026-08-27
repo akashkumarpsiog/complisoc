@@ -10,6 +10,3 @@ export function formatPercent(value?: number | null) {
   return `${Math.round(value * 100)}%`;
 }
 
-export function includesText(value: string, needle: string) {
-  return value.toLowerCase().includes(needle.trim().toLowerCase());
-}

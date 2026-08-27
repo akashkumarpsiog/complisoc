@@ -12,15 +12,12 @@ export function ReportsPage() {
   const scanRuns = useResource(api.scanRuns.list);
   const [scanRunId, setScanRunId] = useState("");
   const [creating, setCreating] = useState<"engineering" | "leadership" | null>(null);
-  const [cooldowns, setCooldowns] = useState<Record<string, number>>({});
 
   async function create(type: "engineering" | "leadership") {
-    const key = `${scanRunId}:${type}`;
-    if (!scanRunId || creating || Date.now() < (cooldowns[key] || 0)) return;
+    if (!scanRunId || creating) return;
     setCreating(type);
     try {
       await api.reports.create(type, Number(scanRunId));
-      setCooldowns((prev) => ({ ...prev, [key]: Date.now() + 5000 }));
       await reports.reload();
     } finally {
       setCreating(null);
@@ -33,7 +30,6 @@ export function ReportsPage() {
       description="Generate engineering and leadership reports"
       actions={
         <ReportActions
-          cooldowns={cooldowns}
           creating={creating}
           scanRuns={scanRuns.data || []}
           scanRunId={scanRunId}
@@ -50,22 +46,18 @@ export function ReportsPage() {
 }
 
 function ReportActions({
-  cooldowns,
   creating,
   scanRuns,
   scanRunId,
   setScanRunId,
   onCreate,
 }: {
-  cooldowns: Record<string, number>;
   creating: "engineering" | "leadership" | null;
   scanRuns: ScanRun[];
   scanRunId: string;
   setScanRunId: (value: string) => void;
   onCreate: (type: "engineering" | "leadership") => void;
 }) {
-  const engineeringCooling = Date.now() < (cooldowns[`${scanRunId}:engineering`] || 0);
-  const leadershipCooling = Date.now() < (cooldowns[`${scanRunId}:leadership`] || 0);
   return (
     <>
       <select className="control" disabled={Boolean(creating)} value={scanRunId} onChange={(event) => setScanRunId(event.target.value)}>
@@ -76,11 +68,11 @@ function ReportActions({
           </option>
         ))}
       </select>
-      <button className="icon-button" disabled={!scanRunId || Boolean(creating) || engineeringCooling} onClick={() => onCreate("engineering")}>
+      <button className="icon-button" disabled={!scanRunId || Boolean(creating)} onClick={() => onCreate("engineering")}>
         {creating === "engineering" ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : null}
         {creating === "engineering" ? "Generating..." : "Engineering"}
       </button>
-      <button className="icon-button" disabled={!scanRunId || Boolean(creating) || leadershipCooling} onClick={() => onCreate("leadership")}>
+      <button className="icon-button" disabled={!scanRunId || Boolean(creating)} onClick={() => onCreate("leadership")}>
         {creating === "leadership" ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : null}
         {creating === "leadership" ? "Generating..." : "Leadership"}
       </button>

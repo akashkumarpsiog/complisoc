@@ -188,15 +188,17 @@ def get_scan_run_summary(scan_run_id: int, db: Session = Depends(get_db)):
     scan_run = db.get(ScanRun, scan_run_id)
     if scan_run is None:
         not_found("Scan run")
+    raw_count = _raw_findings_for_scan_run(db, scan_run_id).count()
+    normalized_count = _normalized_findings_for_scan_run(db, scan_run_id).count()
     mappings = _mappings_for_scan_run(db, scan_run_id)
     return {
         "scan_run_id": scan_run_id,
         "status": scan_run.status,
-        "raw_findings": _raw_findings_for_scan_run(db, scan_run_id).count(),
-        "normalized_findings": _normalized_findings_for_scan_run(db, scan_run_id).count(),
+        "raw_findings": raw_count,
+        "normalized_findings": normalized_count,
         "mappings": len(mappings),
-        "published_mappings": len([mapping for mapping in mappings if mapping.mapping_status == "published"]),
-        "manual_review_mappings": len([mapping for mapping in mappings if mapping.mapping_status == "manual_review"]),
+        "published_mappings": sum(1 for m in mappings if m.mapping_status == "published"),
+        "manual_review_mappings": sum(1 for m in mappings if m.mapping_status == "manual_review"),
     }
 
 

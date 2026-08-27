@@ -214,11 +214,11 @@ export function ErrorState({ message, onRetry }: { message: string; onRetry: () 
 
 export function DataTable({ columns, rows, expandableRows }: { columns: ReactNode[]; rows: ReactNode[][]; expandableRows?: (ReactNode | null)[] }) {
   if (rows.length === 0) {
-    return <EmptyState label="No records found." icon={<Inbox className="h-5 w-5" aria-hidden />} />;
+    return <EmptyState label="No data available." icon={<Inbox className="h-5 w-5" aria-hidden />} />;
   }
   return (
     <div className="overflow-x-auto -mx-5">
-      <table className="w-full min-w-[960px] table-fixed border-collapse text-left text-sm">
+      <table className="w-full table-fixed border-collapse text-left text-sm">
         <thead>
           <tr className="border-b border-line-strong bg-panel/60 text-xs font-bold uppercase tracking-wider text-subtle">
             {columns.map((column, idx) => (

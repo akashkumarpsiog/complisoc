@@ -6,15 +6,14 @@ import { ResourceBoundary } from "../components/ResourceBoundary";
 import { DataTable, Section, StatusBadge } from "../components/Primitives";
 import { formatPercent } from "../utils/format";
 
-const statuses = ["published", "manual_review", "rejected", "validated", "verified"];
-
 export function MappingsPage() {
   const mappings = useResource(api.mappings.list);
   const [status, setStatus] = useState("");
   const filtered = useMemo(() => (mappings.data || []).filter((item) => !status || item.mapping_status === status), [mappings.data, status]);
+  const statusOptions = useMemo(() => Array.from(new Set((mappings.data || []).map((m) => m.mapping_status))).sort(), [mappings.data]);
 
   return (
-    <Section title="Mappings" description="Control mappings generated from findings" actions={<MappingStatusFilter value={status} onChange={setStatus} />}>
+    <Section title="Mappings" description="Control mappings generated from findings" actions={<MappingStatusFilter value={status} options={statusOptions} onChange={setStatus} />}>
       <ResourceBoundary resource={{ ...mappings, data: filtered }}>
         {(data) => <MappingTable data={data} />}
       </ResourceBoundary>
@@ -22,11 +21,11 @@ export function MappingsPage() {
   );
 }
 
-function MappingStatusFilter({ value, onChange }: { value: string; onChange: (value: string) => void }) {
+function MappingStatusFilter({ value, options, onChange }: { value: string; options: string[]; onChange: (value: string) => void }) {
   return (
     <select className="control" value={value} onChange={(event) => onChange(event.target.value)}>
       <option value="">All statuses</option>
-      {statuses.map((item) => (
+      {options.map((item) => (
         <option key={item}>{item}</option>
       ))}
     </select>

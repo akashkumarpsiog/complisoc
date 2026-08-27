@@ -5,6 +5,7 @@ import { useResource } from "../hooks/useResource";
 import { ResourceBoundary } from "../components/ResourceBoundary";
 import { BarList, DataTable, DonutChart, MetricCard, ProgressBar, Section, StatusBadge, staggerStyle } from "../components/Primitives";
 import { ControlDrillDownDrawer, RemediationSuggestionPanel } from "../components/DashboardDetails";
+import { ComplianceScoreCard, AutomatedInsightsPanel } from "../components/ComplianceScore";
 import { formatPercent } from "../utils/format";
 
 export function OverviewPage({ onViewChange }: { onViewChange?: (viewId: ViewId) => void }) {
@@ -22,6 +23,8 @@ export function OverviewPage({ onViewChange }: { onViewChange?: (viewId: ViewId)
 
   return (
     <>
+      <ComplianceScoreCard />
+      <AutomatedInsightsPanel />
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
         <ResourceBoundary resource={coverage}>
           {(data) => (

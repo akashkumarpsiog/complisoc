@@ -342,14 +342,3 @@ export interface FindingLineage {
     }>;
   }>;
 }
-
-export interface DashboardAIMetrics {
-  total_mappings: number;
-  published_mappings: number;
-  manual_review_mappings: number;
-  avg_gemini_confidence: number | null;
-  avg_groq_agreement: number | null;
-  avg_final_confidence: number | null;
-  agreement_rate: number | null;
-  manual_review_rate: number | null;
-}
