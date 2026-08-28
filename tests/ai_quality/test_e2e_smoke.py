@@ -16,7 +16,6 @@ class TestPipelineE2E:
 
     def test_full_pipeline_with_mocked_ai(self):
         """Full pipeline should work with mocked AI responses."""
-        # Mock AI responses
         mock_gemini_response = {
             "results": [
                 {
@@ -35,33 +34,6 @@ class TestPipelineE2E:
         assert "results" in mock_gemini_response
         assert "results" in mock_groq_response
 
-    def test_pipeline_handles_gemini_failure(self):
-        """Pipeline should handle Gemini failure gracefully."""
-        # Simulate Gemini failure
-        gemini_failed = True
-        if gemini_failed:
-            # Should fall back to deterministic top candidate
-            fallback_decision = {"control_id": "AC-1", "confidence": 0.5, "rationale": "fallback"}
-        assert "control_id" in fallback_decision
-
-    def test_pipeline_handles_groq_failure(self):
-        """Pipeline should handle Groq failure gracefully."""
-        # Simulate Groq failure
-        groq_failed = True
-        if groq_failed:
-            # Should use Gemini confidence only
-            final_confidence = 0.85
-        assert 0 <= final_confidence <= 1
-
-    def test_pipeline_handles_both_failures(self):
-        """Pipeline should handle both AI failures."""
-        gemini_failed = True
-        groq_failed = True
-        if gemini_failed and groq_failed:
-            # Should route to manual review
-            status = "manual_review"
-        assert status == "manual_review"
-
     def test_pipeline_publishes_high_confidence(self):
         """High confidence mappings should be published."""
         confidence = 0.85
@@ -77,20 +49,6 @@ class TestPipelineE2E:
         if confidence < threshold:
             status = "manual_review"
         assert status == "manual_review"
-
-    def test_pipeline_handles_empty_findings(self):
-        """Empty findings list should be handled."""
-        findings = []
-        if not findings:
-            result = {"status": "no_findings", "mappings": []}
-        assert result["status"] == "no_findings"
-
-    def test_pipeline_handles_no_candidates(self):
-        """Findings with no candidates should be handled."""
-        finding = {"id": 1, "candidates": []}
-        if not finding["candidates"]:
-            result = {"finding_id": 1, "status": "no_candidates"}
-        assert result["status"] == "no_candidates"
 
 
 class TestAPIE2E:

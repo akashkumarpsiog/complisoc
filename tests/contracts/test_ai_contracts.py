@@ -54,12 +54,6 @@ class TestGeminiResponseSchema:
         assert isinstance(response["confidence"], (int, float))
         assert isinstance(response["rationale"], str)
 
-    def test_confidence_bounds(self):
-        """Confidence must be between 0 and 1."""
-        valid_confidences = [0.0, 0.01, 0.5, 0.99, 1.0]
-        for conf in valid_confidences:
-            assert 0 <= conf <= 1
-
     def test_maps_can_be_string_or_bool(self):
         """AI may return maps as string 'true'/'false' or boolean."""
         valid_values = [True, False, "true", "false", "1", "0", "yes", "no"]
@@ -95,35 +89,3 @@ class TestGroqResponseSchema:
         assert "result" in response
         assert "explanation" in response
         assert response["result"] in ("agree", "disagree")
-
-    def test_result_must_be_agree_or_disagree(self):
-        """Result field must be exactly 'agree' or 'disagree'."""
-        valid_results = ["agree", "disagree"]
-        for result in valid_results:
-            assert result in ("agree", "disagree")
-
-
-class TestConfidenceCalculationContract:
-    """Contract tests for confidence calculation rules."""
-
-    def test_final_confidence_within_bounds(self):
-        """Final confidence must always be between 0 and 1."""
-        test_cases = [
-            (0.9, 1.0, 0.93),  # High agreement
-            (0.5, 0.0, 0.35),  # Disagreement
-            (0.8, 0.5, 0.71),  # Partial agreement
-        ]
-        for gemini_conf, groq_agreement, expected in test_cases:
-            calculated = gemini_conf * 0.7 + groq_agreement * 0.3
-            assert 0 <= calculated <= 1
-
-    def test_publication_threshold(self):
-        """Mappings below 0.70 confidence must go to manual review."""
-        threshold = 0.70
-        assert threshold == 0.70
-        below_threshold = [0.0, 0.35, 0.69, 0.699]
-        above_threshold = [0.70, 0.71, 0.85, 0.99, 1.0]
-        for conf in below_threshold:
-            assert conf < threshold
-        for conf in above_threshold:
-            assert conf >= threshold

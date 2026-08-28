@@ -188,36 +188,3 @@ class TestAdversarialInputs:
         """Sarcasm should be treated literally (AI limitation)."""
         sarcastic = "Great job leaving the database wide open to the internet"
         assert len(sarcastic) > 0
-
-
-class TestBoundaryConditions:
-    """Tests for boundary conditions in AI inputs."""
-
-    def test_single_character_finding(self):
-        """Single character finding should be handled."""
-        assert len("x") == 1
-
-    def test_single_word_finding(self):
-        """Single word finding should be handled."""
-        assert len("vulnerability") > 0
-
-    def test_max_length_finding(self):
-        """Maximum length finding should be handled."""
-        max_finding = "a" * 100000
-        assert len(max_finding) == 100000
-
-    def test_many_candidates(self):
-        """Many candidate controls should be handled."""
-        candidates = [f"AC-{i}" for i in range(1, 101)]
-        assert len(candidates) == 100
-
-    def test_no_candidates(self):
-        """No candidate controls should be handled."""
-        candidates = []
-        assert len(candidates) == 0
-
-    def test_duplicate_candidates(self):
-        """Duplicate candidates should be deduplicated."""
-        candidates = ["AC-1", "AC-1", "AC-2", "AC-2"]
-        unique = list(set(candidates))
-        assert len(unique) < len(candidates)

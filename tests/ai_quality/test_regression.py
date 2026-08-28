@@ -194,17 +194,9 @@ class TestRationaleDrift:
         drift = abs(avg_len_1 - avg_len_2)
         assert drift < 20, f"Rationale length drifted by {drift}"
 
-    def test_rationale_quality_stable(self):
-        """Rationale quality should be stable."""
-        run_1 = ["direct match to control requirement", "partial match with evidence"]
-        run_2 = ["direct match to control requirement", "partial match with evidence"]
-        # Quality should be similar
-        assert len(run_1) == len(run_2)
-
     def test_no_degenerate_rationales(self):
         """Rationales should not become degenerate."""
         rationales = ["direct match", "partial match", "no match found", "weak alignment", "strong evidence"]
-        # If all are single character, it's degenerate
         assert not all(len(r) == 1 for r in rationales), "Rationales are degenerate"
 
     def test_rationale_vocabulary_stable(self):
@@ -213,60 +205,3 @@ class TestRationaleDrift:
         run_2_words = {"match", "control", "finding", "direct", "partial"}
         overlap = run_1_words & run_2_words
         assert len(overlap) >= len(run_1_words) * 0.5, "Rationale vocabulary changed significantly"
-
-
-class TestPerformanceRegression:
-    """Tests for performance regression."""
-
-    def test_latency_not_increased(self):
-        """Response latency should not have increased significantly."""
-        baseline_latency_ms = 500
-        current_latency_ms = 550
-        increase = (current_latency_ms - baseline_latency_ms) / baseline_latency_ms
-        assert increase < 0.5, f"Latency increased by {increase:.1%}"
-
-    def test_throughput_not_decreased(self):
-        """Throughput should not have decreased significantly."""
-        baseline_throughput = 100  # requests per minute
-        current_throughput = 95
-        decrease = (baseline_throughput - current_throughput) / baseline_throughput
-        assert decrease < 0.3, f"Throughput decreased by {decrease:.1%}"
-
-    def test_error_rate_not_increased(self):
-        """Error rate should not have increased."""
-        baseline_error_rate = 0.01
-        current_error_rate = 0.015
-        increase = current_error_rate - baseline_error_rate
-        assert increase < 0.05, f"Error rate increased by {increase:.1%}"
-
-    def test_timeout_rate_acceptable(self):
-        """Timeout rate should be acceptable."""
-        timeout_rate = 0.02
-        assert timeout_rate < 0.05, f"Timeout rate {timeout_rate:.1%} too high"
-
-
-class TestModelVersionRegression:
-    """Tests for model version changes."""
-
-    def test_model_output_hash_stable(self):
-        """Same input should produce same output hash."""
-        output = {"maps": True, "confidence": 0.85, "rationale": "direct match"}
-        output_hash = hashlib.sha256(json.dumps(output, sort_keys=True).encode()).hexdigest()
-        assert len(output_hash) == 64
-
-    def test_model_version_recorded(self):
-        """Model version should be recorded."""
-        model_version = "gemini-2.0-flash"
-        assert len(model_version) > 0
-
-    def test_model_config_stable(self):
-        """Model config should be stable."""
-        config = {"temperature": 0.1, "max_tokens": 1024, "top_p": 0.9}
-        assert "temperature" in config
-        assert 0 <= config["temperature"] <= 1
-
-    def test_output_format_stable(self):
-        """Output format should be stable."""
-        expected_keys = {"maps", "confidence", "rationale"}
-        actual_keys = {"maps", "confidence", "rationale"}
-        assert expected_keys == actual_keys
