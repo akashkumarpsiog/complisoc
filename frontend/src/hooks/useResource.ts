@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { Status } from "../types";
 
 export interface ResourceState<T> {
@@ -13,8 +13,11 @@ export function useResource<T>(load: () => Promise<T>, deps: unknown[] = []): Re
   const [data, setData] = useState<T | null>(null);
   const [status, setStatus] = useState<Status>("idle");
   const [error, setError] = useState<string | null>(null);
+  const loadingRef = useRef(false);
 
   const reload = useCallback(async () => {
+    if (loadingRef.current) return;
+    loadingRef.current = true;
     setStatus("loading");
     setError(null);
     try {
@@ -23,6 +26,8 @@ export function useResource<T>(load: () => Promise<T>, deps: unknown[] = []): Re
     } catch (err) {
       setError(err instanceof Error ? err.message : "Request failed.");
       setStatus("error");
+    } finally {
+      loadingRef.current = false;
     }
   }, deps);
 

@@ -11,14 +11,19 @@ export function EvidenceLineagePage({ onViewChange }: { onViewChange?: (viewId: 
   const [scanRunId, setScanRunId] = useState("");
   const [findingId, setFindingId] = useState("");
   const [submittedId, setSubmittedId] = useState<number | null>(null);
+
   const scanRuns = useResource(api.scanRuns.list);
+
   const findings = useResource(
     () => (scanRunId ? api.findings.list({ scan_run_id: Number(scanRunId) }) : Promise.resolve([])),
     [scanRunId],
   );
 
-  const lineage = useResource(
-    () => (submittedId ? api.findings.lineage(submittedId) : Promise.reject("No finding selected")),
+  const lineage = useResource<FindingLineage | null>(
+    () => {
+      if (!submittedId) return Promise.resolve(null);
+      return api.findings.lineage(submittedId);
+    },
     [submittedId]
   );
 
@@ -33,6 +38,9 @@ export function EvidenceLineagePage({ onViewChange }: { onViewChange?: (viewId: 
     setFindingId("");
     setSubmittedId(null);
   };
+
+  const findingsList = findings.data ?? [];
+  const lineageData = lineage.data ?? null;
 
   return (
     <Section
@@ -59,14 +67,16 @@ export function EvidenceLineagePage({ onViewChange }: { onViewChange?: (viewId: 
             onChange={(e) => setFindingId(e.target.value)}
             disabled={!scanRunId || findings.status === "loading"}
           >
-            <option value="">Choose a finding…</option>
-            {(findings.data || []).slice(0, 100).map((finding) => (
+            <option value="">
+              {!scanRunId ? "Select a scan first" : findings.status === "loading" ? "Loading findings..." : `Choose a finding (${findingsList.length} available)`}
+            </option>
+            {findingsList.slice(0, 100).map((finding) => (
               <option key={finding.id} value={finding.id}>
                 #{finding.id} · {finding.severity.toUpperCase()} · {finding.title} · {finding.resource_identifier}
               </option>
             ))}
-            {(findings.data || []).length > 100 && (
-              <option disabled>…and {(findings.data || []).length - 100} more (refine search)</option>
+            {findingsList.length > 100 && (
+              <option disabled>…and {findingsList.length - 100} more (refine search)</option>
             )}
           </select>
           <button className="icon-button" disabled={!findingId} onClick={handleView}>
@@ -79,6 +89,8 @@ export function EvidenceLineagePage({ onViewChange }: { onViewChange?: (viewId: 
         <div className="text-sm text-muted">
           Start with a scan run, choose one of its findings, then view the evidence lineage.
         </div>
+      ) : lineageData ? (
+        <LineageView data={lineageData} />
       ) : (
         <ResourceBoundary resource={lineage}>
           {(data) => <LineageView data={data} />}

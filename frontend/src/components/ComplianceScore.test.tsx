@@ -1,6 +1,6 @@
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
-import { ComplianceScoreCard, AutomatedInsightsPanel } from "./ComplianceScore";
+import { ComplianceScoreCard, ComplianceInsightsPanel } from "./ComplianceScore";
 
 const mockUseResource = vi.fn();
 
@@ -36,10 +36,10 @@ describe("ComplianceScoreCard", () => {
   });
 });
 
-describe("AutomatedInsightsPanel", () => {
+describe("ComplianceInsightsPanel", () => {
   it("renders analyzing state when no data", () => {
     mockUseResource.mockReturnValue({ data: null, status: "loading", error: null, reload: vi.fn() });
-    render(<AutomatedInsightsPanel />);
+    render(<ComplianceInsightsPanel />);
     expect(screen.getByText("Analyzing data...")).toBeInTheDocument();
   });
 
@@ -49,7 +49,7 @@ describe("AutomatedInsightsPanel", () => {
     mockUseResource.mockReturnValueOnce({ data: { total_mappings: 50, published_mappings: 40, avg_final_confidence: 0.85 }, status: "success", error: null, reload });
     mockUseResource.mockReturnValueOnce({ data: { manual_review_mappings: 5, rejected_mappings: 3 }, status: "success", error: null, reload });
     mockUseResource.mockReturnValueOnce({ data: { trends: [{ published: 10, manual_review: 5, created_at: "2024-01-01", scan_run_id: 1 }] }, status: "success", error: null, reload });
-    render(<AutomatedInsightsPanel />);
-    expect(screen.getByText("Automated Insights")).toBeInTheDocument();
+    render(<ComplianceInsightsPanel />);
+    expect(screen.getByText("Compliance Insights")).toBeInTheDocument();
   });
 });

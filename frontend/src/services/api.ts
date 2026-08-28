@@ -58,12 +58,45 @@ function buildUrl(path: string, query?: Record<string, QueryValue>): string {
   return queryString ? `${prefix}?${queryString}` : prefix;
 }
 
+const _cache = new Map<string, { data: unknown; timestamp: number }>();
+const CACHE_TTL_MS = 30_000;
+
+function cacheKey(path: string, query?: Record<string, QueryValue>): string {
+  return buildUrl(path, query);
+}
+
+function getCached<T>(key: string): T | null {
+  const entry = _cache.get(key);
+  if (!entry) return null;
+  if (Date.now() - entry.timestamp > CACHE_TTL_MS) {
+    _cache.delete(key);
+    return null;
+  }
+  return entry.data as T;
+}
+
+function setCache<T>(key: string, data: T): void {
+  _cache.set(key, { data, timestamp: Date.now() });
+}
+
+export function clearApiCache(): void {
+  _cache.clear();
+}
+
 async function request<T>(
   path: string,
   options: RequestInit = {},
   query?: Record<string, QueryValue>,
 ): Promise<T> {
-  const response = await fetch(buildUrl(path, query), {
+  const url = buildUrl(path, query);
+  const isRead = !options.method || options.method === "GET";
+
+  if (isRead) {
+    const cached = getCached<T>(url);
+    if (cached !== null) return cached;
+  }
+
+  const response = await fetch(url, {
     headers: {
       "Content-Type": "application/json",
       ...(options.headers || {}),
@@ -80,7 +113,13 @@ async function request<T>(
     }
     throw new ApiError(String(message), response.status);
   }
-  return response.json() as Promise<T>;
+  const data = (await response.json()) as T;
+
+  if (isRead) {
+    setCache(url, data);
+  }
+
+  return data;
 }
 
 export const api = {

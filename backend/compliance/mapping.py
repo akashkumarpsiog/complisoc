@@ -130,6 +130,15 @@ class GeminiMapper:
             raise RuntimeError("GEMINI_API_KEY is not configured; cannot perform AI mapping.")
         self._client = genai.Client(api_key=GEMINI_API_KEY)
         self._timeout = timeout
+        self._cache: dict[str, dict[int, list[CandidateDecision]]] = {}
+
+    def _cache_key(self, items: list[tuple[NormalizedFinding, list[CandidateControl]]]) -> str:
+        """Generate a cache key from finding IDs and candidate control IDs."""
+        parts = []
+        for finding, candidates in sorted(items, key=lambda x: x[0].id):
+            control_ids = sorted(c.id for c in candidates)
+            parts.append(f"{finding.id}:{','.join(str(c) for c in control_ids)}")
+        return "|".join(parts)
 
     def map_batch(
         self,
@@ -137,6 +146,10 @@ class GeminiMapper:
     ) -> dict[int, list[CandidateDecision]]:
         if not items:
             return {}
+
+        cache_key = self._cache_key(items)
+        if cache_key in self._cache:
+            return self._cache[cache_key]
 
         blocks: list[str] = []
         expected: dict[int, list[str]] = {}
@@ -178,6 +191,7 @@ class GeminiMapper:
                 out[finding_id] = decisions
             if not out:
                 raise ValueError("Gemini batch response contained no usable results.")
+            self._cache[cache_key] = out
             return out
 
         return call_with_retry(
@@ -188,6 +202,10 @@ class GeminiMapper:
             give_up_on=is_quota_exhausted,
             max_delay=30.0,
         )
+
+    def clear_cache(self) -> None:
+        """Clear the AI result cache."""
+        self._cache.clear()
 
     def map_one(self, finding: NormalizedFinding, control: ControlCatalog) -> MappingDecision:
         prompt = f"CONTROL:\n{_control_block(control)}\n\nFINDING:\n{_finding_header(finding)}"

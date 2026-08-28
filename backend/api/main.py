@@ -679,6 +679,7 @@ def _dashboard_ai_metrics(db: Session) -> dict[str, Any]:
     total = len(mappings)
     published = [m for m in mappings if m.mapping_status == "published"]
     manual_review = [m for m in mappings if m.mapping_status == "manual_review"]
+    rejected = [m for m in mappings if m.mapping_status == "rejected"]
     published_confidences = [m.final_confidence for m in published if m.final_confidence is not None]
     gemini_confidences = [m.gemini_confidence for m in mappings if m.gemini_confidence is not None]
     groq_agreements = [m.groq_agreement_value for m in mappings if m.groq_agreement_value is not None]
@@ -689,15 +690,32 @@ def _dashboard_ai_metrics(db: Session) -> dict[str, Any]:
     )
     total_verified = db.query(VerificationRecord).count()
     manual_review_rate = len(manual_review) / total if total else 0.0
+
+    # Output quality metrics: track when AI decisions are overridden
+    ai_recommended_published = [
+        m for m in mappings
+        if m.gemini_confidence is not None
+        and m.groq_agreement_value is not None
+        and m.gemini_confidence >= 0.70
+        and m.groq_agreement_value == 1.0
+    ]
+    ai_accepted = [m for m in ai_recommended_published if m.mapping_status == "published"]
+    ai_overridden = [m for m in ai_recommended_published if m.mapping_status in ("manual_review", "rejected")]
+    ai_acceptance_rate = len(ai_accepted) / len(ai_recommended_published) if ai_recommended_published else None
+
     return {
         "total_mappings": total,
         "published_mappings": len(published),
         "manual_review_mappings": len(manual_review),
+        "rejected_mappings": len(rejected),
         "avg_gemini_confidence": sum(gemini_confidences) / len(gemini_confidences) if gemini_confidences else None,
         "avg_groq_agreement": sum(groq_agreements) / len(groq_agreements) if groq_agreements else None,
         "avg_final_confidence": sum(published_confidences) / len(published_confidences) if published_confidences else None,
         "agreement_rate": verified_records / total_verified if total_verified else None,
         "manual_review_rate": manual_review_rate,
+        "ai_acceptance_rate": ai_acceptance_rate,
+        "ai_recommended_count": len(ai_recommended_published),
+        "ai_overridden_count": len(ai_overridden),
     }
 
 

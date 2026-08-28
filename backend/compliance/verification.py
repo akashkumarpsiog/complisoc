@@ -160,7 +160,15 @@ class GroqVerifier:
         # retires models (e.g. llama-3.3-70b-versatile on 2026-08-16), so a
         # fallback avoids a hard failure when the primary is no longer served.
         self._models: list[str] = list(dict.fromkeys([GROQ_MODEL, *GROQ_MODEL_FALLBACKS]))
+        self._cache: dict[str, dict[int, VerificationDecision]] = {}
         logger.info("Groq verifier initialized: models=%s, key_configured=%s", self._models, bool(GROQ_API_KEY))
+
+    def _cache_key(self, items: list[PendingVerification]) -> str:
+        """Generate a cache key from finding IDs and control IDs."""
+        parts = []
+        for item in sorted(items, key=lambda x: x.ref):
+            parts.append(f"{item.ref}:{item.finding.id}:{item.control.id}")
+        return "|".join(parts)
 
     def _completion(self, messages: list[dict[str, str]], timeout: float, schema_name: str, schema: dict[str, Any]) -> tuple[str, Any]:
         last_exc: Exception | None = None
@@ -208,6 +216,10 @@ class GroqVerifier:
         if not items:
             return {}
 
+        cache_key = self._cache_key(items)
+        if cache_key in self._cache:
+            return self._cache[cache_key]
+
         prompt = "\n\n---\n\n".join(_entry_block(item) for item in items)
         expected_refs = {item.ref for item in items}
 
@@ -246,6 +258,7 @@ class GroqVerifier:
                 )
             if not out:
                 raise ValueError("Groq batch response contained no usable results.")
+            self._cache[cache_key] = out
             return out
 
         return call_with_retry(
@@ -299,3 +312,7 @@ class GroqVerifier:
             give_up_on=is_quota_exhausted,
             max_delay=30.0,
         )
+
+    def clear_cache(self) -> None:
+        """Clear the AI result cache."""
+        self._cache.clear()

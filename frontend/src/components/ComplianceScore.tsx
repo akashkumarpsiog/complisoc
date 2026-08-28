@@ -69,7 +69,7 @@ export function ComplianceScoreCard() {
                     </div>
                   </div>
                   <div className="text-xs text-subtle">
-                    Weighted: 40% coverage + 30% published + 30% confidence
+                    Score = 40% coverage + 30% published + 30% confidence. Weights are configurable.
                   </div>
                 </div>
               </div>
@@ -83,7 +83,7 @@ export function ComplianceScoreCard() {
   );
 }
 
-export function AutomatedInsightsPanel() {
+export function ComplianceInsightsPanel() {
   const coverage = useResource(api.dashboard.coverage);
   const aiMetrics = useResource(api.dashboard.aiMetrics);
   const gap = useResource(api.dashboard.gap);
@@ -147,7 +147,7 @@ export function AutomatedInsightsPanel() {
   };
 
   return (
-    <Section title="Automated Insights" description="AI-generated observations about your compliance posture">
+    <Section title="Compliance Insights" description="Automated observations about your compliance posture">
       <div className="space-y-3">
         {insights.length === 0 ? (
           <div className="text-sm text-muted">Analyzing data...</div>

@@ -230,11 +230,15 @@ export interface DashboardAIMetrics {
   total_mappings: number;
   published_mappings: number;
   manual_review_mappings: number;
+  rejected_mappings?: number;
   avg_gemini_confidence: number | null;
   avg_groq_agreement: number | null;
   avg_final_confidence: number | null;
   agreement_rate: number | null;
   manual_review_rate: number | null;
+  ai_acceptance_rate?: number | null;
+  ai_recommended_count?: number;
+  ai_overridden_count?: number;
 }
 
 export interface ScanDiff {
