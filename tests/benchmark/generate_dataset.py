@@ -72,13 +72,15 @@ def _tokens(text: str) -> set[str]:
 def _score_control_keywords(finding_text: str, control: dict) -> int:
     """Count how many control keywords appear in the finding text."""
     finding_tokens = _tokens(finding_text)
-    return sum(1 for kw in control.get("keywords", []) if kw.lower() in finding_tokens)
+    return sum(1 for kw in control.get("keywords", []) if _tokens(kw) <= finding_tokens)
 
 
 def _best_control(finding_text: str, controls: list[dict]) -> dict:
-    """Return the control with the highest keyword overlap."""
-    best = max(controls, key=lambda c: _score_control_keywords(finding_text, c))
-    return best
+    """Return the unique control with the highest keyword overlap."""
+    ranked = sorted(controls, key=lambda c: _score_control_keywords(finding_text, c), reverse=True)
+    if len(ranked) > 1 and _score_control_keywords(finding_text, ranked[0]) == _score_control_keywords(finding_text, ranked[1]):
+        raise ValueError("Synthetic finding has an ambiguous top control candidate")
+    return ranked[0]
 
 
 def expand_benchmark(
@@ -117,10 +119,10 @@ def expand_benchmark(
     i = 0
     while len(expanded) < target_count:
         template = base_mappings[i % len(base_mappings)]
-        sev = SEVERITY_POOL[len(expanded) % len(SEVERITY_POOL)]
-        suffix = RESOURCE_SUFFIXES[(len(expanded) // len(base_mappings)) % len(RESOURCE_SUFFIXES)]
-        title_pert = TITLE_PERTURBATIONS[len(expanded) % len(TITLE_PERTURBATIONS)]
-        desc_pert = DESCRIPTION_PERTURBATIONS[len(expanded) % len(DESCRIPTION_PERTURBATIONS)]
+        sev = rng.choice(SEVERITY_POOL)
+        suffix = rng.choice(RESOURCE_SUFFIXES)
+        title_pert = rng.choice(TITLE_PERTURBATIONS)
+        desc_pert = rng.choice(DESCRIPTION_PERTURBATIONS)
 
         raw = dict(template["raw_json"])
         original_resource = raw.get("resource_identifier", "resource")
@@ -160,6 +162,12 @@ def expand_benchmark(
     return {
         **gold,
         "version": f"expanded-{target_count}",
+        "generation": {
+            "source_version": gold.get("version"),
+            "target_count": target_count,
+            "seed": seed,
+            "generator": "tests/benchmark/generate_dataset.py",
+        },
         "mappings": expanded,
     }
 

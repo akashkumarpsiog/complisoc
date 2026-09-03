@@ -117,6 +117,8 @@ async function request<T>(
 
   if (isRead) {
     setCache(url, data);
+  } else {
+    clearApiCache();
   }
 
   return data;
@@ -176,15 +178,15 @@ export const api = {
   },
   reviewQueue: {
     list: (query?: Record<string, QueryValue>) => request<ReviewQueueItem[]>("/review-queue", {}, query),
-    approve: (id: number, comments: string) =>
+    approve: (id: number) =>
       request<ReviewQueueItem>(`/review-queue/${id}/approve`, {
         method: "POST",
-        body: JSON.stringify({ reviewer_id: "frontend-operator", comments }),
+        body: JSON.stringify({ reviewer_id: "frontend-operator" }),
       }),
-    reject: (id: number, comments: string) =>
+    reject: (id: number) =>
       request<ReviewQueueItem>(`/review-queue/${id}/reject`, {
         method: "POST",
-        body: JSON.stringify({ reviewer_id: "frontend-operator", comments }),
+        body: JSON.stringify({ reviewer_id: "frontend-operator" }),
       }),
     bulkDecide: (payload: BulkReviewDecision) =>
       request<ReviewQueueItem[]>("/review-queue/bulk-decide", {

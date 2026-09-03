@@ -28,10 +28,11 @@ describe("api client", () => {
     });
     vi.stubGlobal("fetch", fetchMock);
 
-    await api.reviewQueue.approve(7, "approved");
+    await api.reviewQueue.approve(7);
 
     expect(String(fetchMock.mock.calls[0][0])).toContain("/review-queue/7/approve");
     expect(fetchMock.mock.calls[0][1].method).toBe("POST");
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toEqual({ reviewer_id: "frontend-operator" });
   });
 
   it("posts scenario reports to the scenario endpoint", async () => {

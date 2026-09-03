@@ -14,7 +14,6 @@ function uniqueValues(values: (string | null | undefined)[]): string[] {
 }
 
 export function ReviewPage() {
-  const [comment, setComment] = useState("");
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [severityFilter, setSeverityFilter] = useState("");
   const [controlIdFilter, setControlIdFilter] = useState("");
@@ -85,9 +84,9 @@ export function ReviewPage() {
     setError(null);
     try {
       if (action === "approve") {
-        await api.reviewQueue.approve(id, comment);
+        await api.reviewQueue.approve(id);
       } else {
-        await api.reviewQueue.reject(id, comment);
+        await api.reviewQueue.reject(id);
       }
       await reviewQueue.reload();
     } catch (err) {
@@ -110,7 +109,6 @@ export function ReviewPage() {
       const payload: BulkReviewDecision = {
         item_ids: itemIds,
         reviewer_id: "frontend-operator",
-        comments: comment || undefined,
         action,
       };
       await api.reviewQueue.bulkDecide(payload);
@@ -172,12 +170,6 @@ export function ReviewPage() {
       )}
 
       <div className="mb-4 flex flex-wrap items-center gap-2">
-        <input
-          className="control w-72"
-          value={comment}
-          onChange={(event) => setComment(event.target.value)}
-          placeholder="Review comment..."
-        />
         <div className="flex gap-2">
           <button
             className="icon-button"

@@ -208,6 +208,38 @@ class TestReviewQueueAPI:
         resp = client.post("/api/v1/review-queue/99999/reject", json={"reviewer_id": "tester", "comments": "no"})
         assert resp.status_code == 404
 
+    def test_approve_updates_review_and_mapping_without_comments(self, client, db_session):
+        from complisoc.backend.models import ReviewQueueItem
+
+        _seed_scan(client, db_session)
+        mapping = db_session.query(ControlMapping).first()
+        mapping.mapping_status = "manual_review"
+        item = ReviewQueueItem(control_mapping_id=mapping.id, status="pending", review_reason_code="LOW_CONFIDENCE")
+        db_session.add(item)
+        db_session.commit()
+
+        resp = client.post(f"/api/v1/review-queue/{item.id}/approve", json={"reviewer_id": "tester"})
+
+        assert resp.status_code == 200
+        db_session.refresh(item)
+        db_session.refresh(mapping)
+        assert item.status == "approved"
+        assert item.comments is None
+        assert mapping.mapping_status == "published"
+
+    def test_cannot_decide_review_item_twice(self, client, db_session):
+        from complisoc.backend.models import ReviewQueueItem
+
+        _seed_scan(client, db_session)
+        mapping = db_session.query(ControlMapping).first()
+        item = ReviewQueueItem(control_mapping_id=mapping.id, status="approved", review_reason_code="LOW_CONFIDENCE")
+        db_session.add(item)
+        db_session.commit()
+
+        resp = client.post(f"/api/v1/review-queue/{item.id}/approve", json={})
+
+        assert resp.status_code == 409
+
 
 class TestReportsAPI:
     def test_list_reports(self, client):

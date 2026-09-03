@@ -1,4 +1,6 @@
-# Complisoc — Week 16 Final QA Evidence Package
+# Complisoc — Historical QA Evidence Package
+
+> **Status:** Historical artifact. The claims and counts in this report are not the current source of truth. See [docs/TESTING_STRATEGY.md](../docs/TESTING_STRATEGY.md) for the authoritative testing strategy and the distinction between executed evidence, scaffolding, deterministic benchmark results and live-AI evidence. Do not use the figures below as current test totals without rerunning the documented commands.
 
 ## Overview
 

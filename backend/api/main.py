@@ -811,6 +811,8 @@ def _decide_review_item(db: Session, item_id: int, item_status: str, mapping_sta
     item = db.get(ReviewQueueItem, item_id)
     if item is None:
         not_found("Review item")
+    if item.status != "pending":
+        raise HTTPException(status_code=409, detail={"code": "REVIEW_ALREADY_DECIDED", "message": "Review item has already been decided"})
     mapping = db.get(ControlMapping, item.control_mapping_id)
     if mapping is None:
         not_found("Mapping")

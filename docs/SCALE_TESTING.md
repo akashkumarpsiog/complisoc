@@ -1,5 +1,7 @@
 # Complisoc — Scale Testing Documentation
 
+> **Interpretation note:** This document describes benchmark mechanics and historical run details. The authoritative claim boundaries and current QA strategy are in [TESTING_STRATEGY.md](TESTING_STRATEGY.md). In particular, oracle-mocked precision/recall are deterministic pipeline checks, not AI accuracy measurements; generated 100/500-finding files are workload variants, not independently curated findings.
+
 **Version:** 1.0
 **Owner:** QA Engineering
 **Last updated:** September 2026

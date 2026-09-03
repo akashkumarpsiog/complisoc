@@ -1,6 +1,6 @@
 {
   "gold_count": 30,
-  "gold_path": "C:\\Users\\akash.kumar\\OneDrive - psiog.com\\Desktop\\sem1\\complisoc\\tests\\benchmark\\gold_standard.json",
+  "gold_path": "tests\\benchmark\\gold_standard.json",
   "metrics": {
     "f1": 1.0,
     "fn": 0,

@@ -193,7 +193,13 @@ def compute_f1(metrics: dict) -> float:
     return 2 * p * r / (p + r) if (p + r) else 0.0
 
 
-def write_snapshot(path: pathlib.Path, gold: dict, predicted: dict, metrics: dict) -> None:
+def write_snapshot(
+    path: pathlib.Path,
+    gold: dict,
+    predicted: dict,
+    metrics: dict,
+    gold_path: pathlib.Path | None = None,
+) -> None:
     """Serialize the current benchmark run as a snapshot file.
 
     Snapshot schema:
@@ -211,7 +217,7 @@ def write_snapshot(path: pathlib.Path, gold: dict, predicted: dict, metrics: dic
     path.parent.mkdir(parents=True, exist_ok=True)
     payload = {
         "version": PROMPT_VERSION,
-        "gold_path": str(_GOLD_PATH_DEFAULT),
+        "gold_path": str(gold_path or _GOLD_PATH_DEFAULT),
         "gold_count": len(gold["mappings"]),
         "metrics": {
             "precision": metrics["precision"],
@@ -453,7 +459,7 @@ def main(argv: list[str] | None = None) -> int:
     print_report(gold, metrics)
 
     if args.update_snapshot:
-        write_snapshot(args.snapshot, gold, predicted, metrics)
+        write_snapshot(args.snapshot, gold, predicted, metrics, gold_path=args.gold)
         print(f"Snapshot updated: {args.snapshot}")
         return 0
 

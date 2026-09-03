@@ -795,10 +795,10 @@
       "raw_json": {
         "finding_type": "iam public access permission",
         "resource_type": "aws_iam_policy",
-        "resource_identifier": "aws_iam_policy.access_public_permission_staging",
-        "severity": "low",
-        "title": "control evaluation noted access iam permission public issue detected",
-        "description": "access iam permission public needs attention on this policy during routine compliance verification"
+        "resource_identifier": "aws_iam_policy.access_public_permission_prod",
+        "severity": "high",
+        "title": "infrastructure assessment found access iam permission public issue detected",
+        "description": "access iam permission public needs attention on this policy as part of the standard audit cycle"
       }
     },
     {
@@ -810,10 +810,10 @@
       "raw_json": {
         "finding_type": "encryption tls at_rest cipher",
         "resource_type": "aws_s3_bucket",
-        "resource_identifier": "aws_s3_bucket.encryption_tls_at_rest_cipher_staging",
-        "severity": "info",
-        "title": "governance inspection observed encryption tls at_rest cipher missing",
-        "description": "encryption tls at_rest cipher should be enabled as part of the standard audit cycle"
+        "resource_identifier": "aws_s3_bucket.encryption_tls_at_rest_cipher_v3",
+        "severity": "medium",
+        "title": "policy audit revealed encryption tls at_rest cipher missing",
+        "description": "encryption tls at_rest cipher should be enabled as identified by automated policy check"
       }
     },
     {
@@ -825,10 +825,10 @@
       "raw_json": {
         "finding_type": "kms key_rotation secrets credential",
         "resource_type": "aws_kms_key",
-        "resource_identifier": "aws_kms_key.kms_key_rotation_secrets_credential_staging",
-        "severity": "critical",
-        "title": "configuration review flagged kms key_rotation secrets credential not rotated",
-        "description": "kms key_rotation secrets credential require rotation while validating against baseline"
+        "resource_identifier": "aws_kms_key.kms_key_rotation_secrets_credential_dr",
+        "severity": "high",
+        "title": "control evaluation noted kms key_rotation secrets credential not rotated",
+        "description": "kms key_rotation secrets credential require rotation during routine compliance verification"
       }
     },
     {
@@ -840,10 +840,10 @@
       "raw_json": {
         "finding_type": "logging audit trail monitor",
         "resource_type": "aws_cloudtrail",
-        "resource_identifier": "aws_cloudtrail.logging_audit_trail_monitor_staging",
-        "severity": "high",
-        "title": "policy audit revealed logging audit trail monitor disabled",
-        "description": "logging audit trail monitor must be enabled during change-management review"
+        "resource_identifier": "aws_cloudtrail.logging_audit_trail_monitor_dev",
+        "severity": "critical",
+        "title": "compliance scan detected logging audit trail monitor disabled",
+        "description": "logging audit trail monitor must be enabled as part of the standard audit cycle"
       }
     },
     {
@@ -855,10 +855,10 @@
       "raw_json": {
         "finding_type": "network firewall ingress port",
         "resource_type": "aws_security_group",
-        "resource_identifier": "aws_security_group.network_firewall_ingress_port_staging",
-        "severity": "high",
-        "title": "automated check identified network firewall ingress port open",
-        "description": "network firewall ingress port should be restricted in the latest infrastructure scan"
+        "resource_identifier": "aws_security_group.network_firewall_ingress_port_replica",
+        "severity": "critical",
+        "title": "compliance scan detected network firewall ingress port open",
+        "description": "network firewall ingress port should be restricted as identified by automated policy check"
       }
     },
     {
@@ -870,10 +870,10 @@
       "raw_json": {
         "finding_type": "backup restore continuity failover",
         "resource_type": "aws_rds_instance",
-        "resource_identifier": "aws_rds_instance.backup_restore_continuity_failover_staging",
-        "severity": "medium",
-        "title": "compliance scan detected backup restore continuity failover missing",
-        "description": "backup restore continuity failover configuration absent as identified by automated policy check"
+        "resource_identifier": "aws_rds_instance.backup_restore_continuity_failover_us-east-1",
+        "severity": "low",
+        "title": "governance inspection observed backup restore continuity failover missing",
+        "description": "backup restore continuity failover configuration absent in the latest infrastructure scan"
       }
     },
     {
@@ -885,10 +885,10 @@
       "raw_json": {
         "finding_type": "privilege admin sudo root",
         "resource_type": "aws_iam_role",
-        "resource_identifier": "aws_iam_role.privilege_admin_sudo_root_staging",
+        "resource_identifier": "aws_iam_role.privilege_admin_sudo_root_prod",
         "severity": "medium",
-        "title": "infrastructure assessment found privilege admin sudo root granted",
-        "description": "privilege admin sudo root assignment is over-permissive during routine compliance verification"
+        "title": "automated check identified privilege admin sudo root granted",
+        "description": "privilege admin sudo root assignment is over-permissive as identified by automated policy check"
       }
     },
     {
@@ -900,9 +900,9 @@
       "raw_json": {
         "finding_type": "dependency vulnerability patch cve",
         "resource_type": "npm_package",
-        "resource_identifier": "npm_package.dependency_vulnerability_patch_cve_staging",
-        "severity": "medium",
-        "title": "security review reported dependency vulnerability patch cve present",
+        "resource_identifier": "npm_package.dependency_vulnerability_patch_cve_tenant-a",
+        "severity": "low",
+        "title": "infrastructure assessment found dependency vulnerability patch cve present",
         "description": "dependency vulnerability patch cve should be remediated as part of the standard audit cycle"
       }
     },
@@ -915,10 +915,10 @@
       "raw_json": {
         "finding_type": "mfa authentication password credential",
         "resource_type": "aws_iam_user",
-        "resource_identifier": "aws_iam_user.mfa_authentication_password_credential_staging",
-        "severity": "low",
-        "title": "control evaluation noted mfa authentication password credential weak",
-        "description": "mfa authentication password credential policy is weak while validating against baseline"
+        "resource_identifier": "aws_iam_user.mfa_authentication_password_credential_tenant-a",
+        "severity": "medium",
+        "title": "policy audit revealed mfa authentication password credential weak",
+        "description": "mfa authentication password credential policy is weak during routine compliance verification"
       }
     },
     {
@@ -930,10 +930,10 @@
       "raw_json": {
         "finding_type": "baseline hardening misconfiguration config",
         "resource_type": "aws_ec2_instance",
-        "resource_identifier": "aws_ec2_instance.baseline_hardening_misconfiguration_config_staging",
-        "severity": "info",
-        "title": "governance inspection observed baseline hardening misconfiguration config drift",
-        "description": "baseline hardening misconfiguration config detected during change-management review"
+        "resource_identifier": "aws_ec2_instance.baseline_hardening_misconfiguration_config_v2",
+        "severity": "low",
+        "title": "security review reported baseline hardening misconfiguration config drift",
+        "description": "baseline hardening misconfiguration config detected while validating against baseline"
       }
     },
     {
@@ -946,8 +946,8 @@
         "finding_type": "boundary segmentation dmz zoning",
         "resource_type": "aws_vpc",
         "resource_identifier": "aws_vpc.boundary_segmentation_dmz_zoning_staging",
-        "severity": "critical",
-        "title": "configuration review flagged boundary segmentation dmz zoning missing",
+        "severity": "medium",
+        "title": "governance inspection observed boundary segmentation dmz zoning missing",
         "description": "boundary segmentation dmz zoning is not configured in the latest infrastructure scan"
       }
     },
@@ -960,10 +960,10 @@
       "raw_json": {
         "finding_type": "datacenter badge physical locks",
         "resource_type": "aws_datacenter",
-        "resource_identifier": "aws_datacenter.datacenter_badge_physical_locks_staging",
+        "resource_identifier": "aws_datacenter.datacenter_badge_physical_locks_shared",
         "severity": "high",
         "title": "policy audit revealed datacenter badge physical locks absent",
-        "description": "datacenter badge physical locks controls missing as identified by automated policy check"
+        "description": "datacenter badge physical locks controls missing in the latest infrastructure scan"
       }
     },
     {
@@ -975,10 +975,10 @@
       "raw_json": {
         "finding_type": "incident response soc alerting",
         "resource_type": "aws_guardduty",
-        "resource_identifier": "aws_guardduty.incident_response_soc_alerting_staging",
-        "severity": "high",
-        "title": "automated check identified incident response soc alerting not wired",
-        "description": "incident response soc alerting pipeline absent during routine compliance verification"
+        "resource_identifier": "aws_guardduty.incident_response_soc_alerting_backup",
+        "severity": "medium",
+        "title": "security review reported incident response soc alerting not wired",
+        "description": "incident response soc alerting pipeline absent in the latest infrastructure scan"
       }
     },
     {
@@ -990,10 +990,10 @@
       "raw_json": {
         "finding_type": "gdpr pii retention privacy",
         "resource_type": "aws_s3_bucket",
-        "resource_identifier": "aws_s3_bucket.gdpr_pii_retention_privacy_staging",
+        "resource_identifier": "aws_s3_bucket.gdpr_pii_retention_privacy_dev",
         "severity": "medium",
-        "title": "compliance scan detected gdpr pii retention privacy violation",
-        "description": "gdpr pii retention privacy controls not enforced as part of the standard audit cycle"
+        "title": "configuration review flagged gdpr pii retention privacy violation",
+        "description": "gdpr pii retention privacy controls not enforced as identified by automated policy check"
       }
     },
     {
@@ -1005,10 +1005,10 @@
       "raw_json": {
         "finding_type": "vendor third_party supply_chain sla",
         "resource_type": "aws_third_party",
-        "resource_identifier": "aws_third_party.vendor_third_party_supply_chain_sla_staging",
+        "resource_identifier": "aws_third_party.vendor_third_party_supply_chain_sla_ap-south-1",
         "severity": "medium",
-        "title": "infrastructure assessment found vendor third_party supply_chain sla risk",
-        "description": "vendor third_party supply_chain sla not assessed while validating against baseline"
+        "title": "policy audit revealed vendor third_party supply_chain sla risk",
+        "description": "vendor third_party supply_chain sla not assessed as part of the standard audit cycle"
       }
     },
     {
@@ -1020,9 +1020,9 @@
       "raw_json": {
         "finding_type": "iam public_access permission",
         "resource_type": "aws_iam_policy",
-        "resource_identifier": "aws_iam_policy.access_public_permission_v2_staging",
-        "severity": "medium",
-        "title": "security review reported access iam permission public issue detected v2",
+        "resource_identifier": "aws_iam_policy.access_public_permission_v2_shared",
+        "severity": "high",
+        "title": "infrastructure assessment found access iam permission public issue detected v2",
         "description": "access iam permission public needs attention on this second policy during change-management review"
       }
     },
@@ -1035,10 +1035,10 @@
       "raw_json": {
         "finding_type": "encryption tls at_rest cipher",
         "resource_type": "aws_s3_bucket",
-        "resource_identifier": "aws_s3_bucket.encryption_tls_at_rest_cipher_v2_staging",
-        "severity": "low",
-        "title": "control evaluation noted encryption tls at_rest cipher missing v2",
-        "description": "encryption tls at_rest cipher should be enabled on bucket v2 in the latest infrastructure scan"
+        "resource_identifier": "aws_s3_bucket.encryption_tls_at_rest_cipher_v2_v4",
+        "severity": "medium",
+        "title": "security review reported encryption tls at_rest cipher missing v2",
+        "description": "encryption tls at_rest cipher should be enabled on bucket v2 while validating against baseline"
       }
     },
     {
@@ -1050,10 +1050,10 @@
       "raw_json": {
         "finding_type": "kms key_rotation secrets credential",
         "resource_type": "aws_kms_key",
-        "resource_identifier": "aws_kms_key.kms_key_rotation_secrets_credential_v2_staging",
-        "severity": "info",
-        "title": "governance inspection observed kms key_rotation secrets credential not rotated v2",
-        "description": "kms key_rotation secrets credential require rotation v2 as identified by automated policy check"
+        "resource_identifier": "aws_kms_key.kms_key_rotation_secrets_credential_v2_us-west-2",
+        "severity": "medium",
+        "title": "policy audit revealed kms key_rotation secrets credential not rotated v2",
+        "description": "kms key_rotation secrets credential require rotation v2 in the latest infrastructure scan"
       }
     },
     {
@@ -1065,10 +1065,10 @@
       "raw_json": {
         "finding_type": "logging audit trail monitor",
         "resource_type": "aws_cloudtrail",
-        "resource_identifier": "aws_cloudtrail.logging_audit_trail_monitor_v2_staging",
-        "severity": "critical",
-        "title": "configuration review flagged logging audit trail monitor disabled v2",
-        "description": "logging audit trail monitor must be enabled v2 during routine compliance verification"
+        "resource_identifier": "aws_cloudtrail.logging_audit_trail_monitor_v2_replica",
+        "severity": "high",
+        "title": "compliance scan detected logging audit trail monitor disabled v2",
+        "description": "logging audit trail monitor must be enabled v2 as part of the standard audit cycle"
       }
     },
     {
@@ -1080,10 +1080,10 @@
       "raw_json": {
         "finding_type": "network firewall ingress port",
         "resource_type": "aws_security_group",
-        "resource_identifier": "aws_security_group.network_firewall_ingress_port_v2_staging",
-        "severity": "high",
-        "title": "policy audit revealed network firewall ingress port open v2",
-        "description": "network firewall ingress port should be restricted v2 as part of the standard audit cycle"
+        "resource_identifier": "aws_security_group.network_firewall_ingress_port_v2_shared",
+        "severity": "info",
+        "title": "infrastructure assessment found network firewall ingress port open v2",
+        "description": "network firewall ingress port should be restricted v2 as identified by automated policy check"
       }
     },
     {
@@ -1095,10 +1095,10 @@
       "raw_json": {
         "finding_type": "backup restore continuity failover",
         "resource_type": "aws_rds_instance",
-        "resource_identifier": "aws_rds_instance.backup_restore_continuity_failover_v2_staging",
-        "severity": "high",
-        "title": "automated check identified backup restore continuity failover missing v2",
-        "description": "backup restore continuity failover configuration absent v2 while validating against baseline"
+        "resource_identifier": "aws_rds_instance.backup_restore_continuity_failover_v2_tenant-a",
+        "severity": "medium",
+        "title": "configuration review flagged backup restore continuity failover missing v2",
+        "description": "backup restore continuity failover configuration absent v2 as part of the standard audit cycle"
       }
     },
     {
@@ -1110,10 +1110,10 @@
       "raw_json": {
         "finding_type": "privilege admin sudo root",
         "resource_type": "aws_iam_role",
-        "resource_identifier": "aws_iam_role.privilege_admin_sudo_root_v2_staging",
-        "severity": "medium",
-        "title": "compliance scan detected privilege admin sudo root granted v2",
-        "description": "privilege admin sudo root assignment is over-permissive v2 during change-management review"
+        "resource_identifier": "aws_iam_role.privilege_admin_sudo_root_v2_tenant-a",
+        "severity": "critical",
+        "title": "control evaluation noted privilege admin sudo root granted v2",
+        "description": "privilege admin sudo root assignment is over-permissive v2 while validating against baseline"
       }
     },
     {
@@ -1125,10 +1125,10 @@
       "raw_json": {
         "finding_type": "dependency vulnerability patch cve",
         "resource_type": "npm_package",
-        "resource_identifier": "npm_package.dependency_vulnerability_patch_cve_v2_staging",
-        "severity": "medium",
-        "title": "infrastructure assessment found dependency vulnerability patch cve present v2",
-        "description": "dependency vulnerability patch cve should be remediated v2 in the latest infrastructure scan"
+        "resource_identifier": "npm_package.dependency_vulnerability_patch_cve_v2_eu-west-1",
+        "severity": "high",
+        "title": "security review reported dependency vulnerability patch cve present v2",
+        "description": "dependency vulnerability patch cve should be remediated v2 as part of the standard audit cycle"
       }
     },
     {
@@ -1140,10 +1140,10 @@
       "raw_json": {
         "finding_type": "mfa authentication password credential",
         "resource_type": "aws_iam_user",
-        "resource_identifier": "aws_iam_user.mfa_authentication_password_credential_v2_staging",
-        "severity": "medium",
-        "title": "security review reported mfa authentication password credential weak v2",
-        "description": "mfa authentication password credential policy is weak v2 as identified by automated policy check"
+        "resource_identifier": "aws_iam_user.mfa_authentication_password_credential_v2_shared",
+        "severity": "info",
+        "title": "governance inspection observed mfa authentication password credential weak v2",
+        "description": "mfa authentication password credential policy is weak v2 as part of the standard audit cycle"
       }
     },
     {
@@ -1155,10 +1155,10 @@
       "raw_json": {
         "finding_type": "baseline hardening misconfiguration config",
         "resource_type": "aws_ec2_instance",
-        "resource_identifier": "aws_ec2_instance.baseline_hardening_misconfiguration_config_v2_staging",
-        "severity": "low",
-        "title": "control evaluation noted baseline hardening misconfiguration config drift v2",
-        "description": "baseline hardening misconfiguration config detected v2 during routine compliance verification"
+        "resource_identifier": "aws_ec2_instance.baseline_hardening_misconfiguration_config_v2_v3",
+        "severity": "medium",
+        "title": "compliance scan detected baseline hardening misconfiguration config drift v2",
+        "description": "baseline hardening misconfiguration config detected v2 as identified by automated policy check"
       }
     },
     {
@@ -1170,10 +1170,10 @@
       "raw_json": {
         "finding_type": "boundary segmentation dmz zoning",
         "resource_type": "aws_vpc",
-        "resource_identifier": "aws_vpc.boundary_segmentation_dmz_zoning_v2_staging",
-        "severity": "info",
-        "title": "governance inspection observed boundary segmentation dmz zoning missing v2",
-        "description": "boundary segmentation dmz zoning is not configured v2 as part of the standard audit cycle"
+        "resource_identifier": "aws_vpc.boundary_segmentation_dmz_zoning_v2_dr",
+        "severity": "medium",
+        "title": "control evaluation noted boundary segmentation dmz zoning missing v2",
+        "description": "boundary segmentation dmz zoning is not configured v2 in the latest infrastructure scan"
       }
     },
     {
@@ -1185,10 +1185,10 @@
       "raw_json": {
         "finding_type": "datacenter badge physical locks",
         "resource_type": "aws_datacenter",
-        "resource_identifier": "aws_datacenter.datacenter_badge_physical_locks_v2_staging",
-        "severity": "critical",
-        "title": "configuration review flagged datacenter badge physical locks absent v2",
-        "description": "datacenter badge physical locks controls missing v2 while validating against baseline"
+        "resource_identifier": "aws_datacenter.datacenter_badge_physical_locks_v2_tenant-b",
+        "severity": "low",
+        "title": "compliance scan detected datacenter badge physical locks absent v2",
+        "description": "datacenter badge physical locks controls missing v2 as part of the standard audit cycle"
       }
     },
     {
@@ -1200,10 +1200,10 @@
       "raw_json": {
         "finding_type": "incident response soc alerting",
         "resource_type": "aws_guardduty",
-        "resource_identifier": "aws_guardduty.incident_response_soc_alerting_v2_staging",
-        "severity": "high",
-        "title": "policy audit revealed incident response soc alerting not wired v2",
-        "description": "incident response soc alerting pipeline absent v2 during change-management review"
+        "resource_identifier": "aws_guardduty.incident_response_soc_alerting_v2_dev",
+        "severity": "info",
+        "title": "configuration review flagged incident response soc alerting not wired v2",
+        "description": "incident response soc alerting pipeline absent v2 during routine compliance verification"
       }
     },
     {
@@ -1215,9 +1215,9 @@
       "raw_json": {
         "finding_type": "gdpr pii retention privacy",
         "resource_type": "aws_s3_bucket",
-        "resource_identifier": "aws_s3_bucket.gdpr_pii_retention_privacy_v2_staging",
+        "resource_identifier": "aws_s3_bucket.gdpr_pii_retention_privacy_v2_v4",
         "severity": "high",
-        "title": "automated check identified gdpr pii retention privacy violation v2",
+        "title": "control evaluation noted gdpr pii retention privacy violation v2",
         "description": "gdpr pii retention privacy controls not enforced v2 in the latest infrastructure scan"
       }
     },
@@ -1230,10 +1230,10 @@
       "raw_json": {
         "finding_type": "vendor third_party supply_chain sla",
         "resource_type": "aws_third_party",
-        "resource_identifier": "aws_third_party.vendor_third_party_supply_chain_sla_v2_staging",
-        "severity": "medium",
-        "title": "compliance scan detected vendor third_party supply_chain sla risk v2",
-        "description": "vendor third_party supply_chain sla not assessed v2 as identified by automated policy check"
+        "resource_identifier": "aws_third_party.vendor_third_party_supply_chain_sla_v2_shared",
+        "severity": "high",
+        "title": "control evaluation noted vendor third_party supply_chain sla risk v2",
+        "description": "vendor third_party supply_chain sla not assessed v2 in the latest infrastructure scan"
       }
     },
     {
@@ -1245,10 +1245,10 @@
       "raw_json": {
         "finding_type": "iam public access permission",
         "resource_type": "aws_iam_policy",
-        "resource_identifier": "aws_iam_policy.access_public_permission_dev",
-        "severity": "medium",
+        "resource_identifier": "aws_iam_policy.access_public_permission_secondary",
+        "severity": "info",
         "title": "infrastructure assessment found access iam permission public issue detected",
-        "description": "access iam permission public needs attention on this policy during routine compliance verification"
+        "description": "access iam permission public needs attention on this policy in the latest infrastructure scan"
       }
     },
     {
@@ -1260,10 +1260,10 @@
       "raw_json": {
         "finding_type": "encryption tls at_rest cipher",
         "resource_type": "aws_s3_bucket",
-        "resource_identifier": "aws_s3_bucket.encryption_tls_at_rest_cipher_dev",
-        "severity": "medium",
-        "title": "security review reported encryption tls at_rest cipher missing",
-        "description": "encryption tls at_rest cipher should be enabled as part of the standard audit cycle"
+        "resource_identifier": "aws_s3_bucket.encryption_tls_at_rest_cipher_v2",
+        "severity": "critical",
+        "title": "infrastructure assessment found encryption tls at_rest cipher missing",
+        "description": "encryption tls at_rest cipher should be enabled as identified by automated policy check"
       }
     },
     {
@@ -1275,10 +1275,10 @@
       "raw_json": {
         "finding_type": "kms key_rotation secrets credential",
         "resource_type": "aws_kms_key",
-        "resource_identifier": "aws_kms_key.kms_key_rotation_secrets_credential_dev",
-        "severity": "low",
-        "title": "control evaluation noted kms key_rotation secrets credential not rotated",
-        "description": "kms key_rotation secrets credential require rotation while validating against baseline"
+        "resource_identifier": "aws_kms_key.kms_key_rotation_secrets_credential_v2",
+        "severity": "medium",
+        "title": "infrastructure assessment found kms key_rotation secrets credential not rotated",
+        "description": "kms key_rotation secrets credential require rotation during change-management review"
       }
     },
     {
@@ -1290,10 +1290,10 @@
       "raw_json": {
         "finding_type": "logging audit trail monitor",
         "resource_type": "aws_cloudtrail",
-        "resource_identifier": "aws_cloudtrail.logging_audit_trail_monitor_dev",
-        "severity": "info",
-        "title": "governance inspection observed logging audit trail monitor disabled",
-        "description": "logging audit trail monitor must be enabled during change-management review"
+        "resource_identifier": "aws_cloudtrail.logging_audit_trail_monitor_external",
+        "severity": "high",
+        "title": "configuration review flagged logging audit trail monitor disabled",
+        "description": "logging audit trail monitor must be enabled as identified by automated policy check"
       }
     },
     {
@@ -1305,9 +1305,9 @@
       "raw_json": {
         "finding_type": "network firewall ingress port",
         "resource_type": "aws_security_group",
-        "resource_identifier": "aws_security_group.network_firewall_ingress_port_dev",
-        "severity": "critical",
-        "title": "configuration review flagged network firewall ingress port open",
+        "resource_identifier": "aws_security_group.network_firewall_ingress_port_secondary",
+        "severity": "medium",
+        "title": "automated check identified network firewall ingress port open",
         "description": "network firewall ingress port should be restricted in the latest infrastructure scan"
       }
     },
@@ -1320,10 +1320,10 @@
       "raw_json": {
         "finding_type": "backup restore continuity failover",
         "resource_type": "aws_rds_instance",
-        "resource_identifier": "aws_rds_instance.backup_restore_continuity_failover_dev",
+        "resource_identifier": "aws_rds_instance.backup_restore_continuity_failover_ap-south-1",
         "severity": "high",
-        "title": "policy audit revealed backup restore continuity failover missing",
-        "description": "backup restore continuity failover configuration absent as identified by automated policy check"
+        "title": "compliance scan detected backup restore continuity failover missing",
+        "description": "backup restore continuity failover configuration absent as part of the standard audit cycle"
       }
     },
     {
@@ -1335,10 +1335,10 @@
       "raw_json": {
         "finding_type": "privilege admin sudo root",
         "resource_type": "aws_iam_role",
-        "resource_identifier": "aws_iam_role.privilege_admin_sudo_root_dev",
-        "severity": "high",
-        "title": "automated check identified privilege admin sudo root granted",
-        "description": "privilege admin sudo root assignment is over-permissive during routine compliance verification"
+        "resource_identifier": "aws_iam_role.privilege_admin_sudo_root_v4",
+        "severity": "medium",
+        "title": "configuration review flagged privilege admin sudo root granted",
+        "description": "privilege admin sudo root assignment is over-permissive in the latest infrastructure scan"
       }
     },
     {
@@ -1350,10 +1350,10 @@
       "raw_json": {
         "finding_type": "dependency vulnerability patch cve",
         "resource_type": "npm_package",
-        "resource_identifier": "npm_package.dependency_vulnerability_patch_cve_dev",
+        "resource_identifier": "npm_package.dependency_vulnerability_patch_cve_primary",
         "severity": "medium",
-        "title": "compliance scan detected dependency vulnerability patch cve present",
-        "description": "dependency vulnerability patch cve should be remediated as part of the standard audit cycle"
+        "title": "configuration review flagged dependency vulnerability patch cve present",
+        "description": "dependency vulnerability patch cve should be remediated during routine compliance verification"
       }
     },
     {
@@ -1365,10 +1365,10 @@
       "raw_json": {
         "finding_type": "mfa authentication password credential",
         "resource_type": "aws_iam_user",
-        "resource_identifier": "aws_iam_user.mfa_authentication_password_credential_dev",
+        "resource_identifier": "aws_iam_user.mfa_authentication_password_credential_ap-south-1",
         "severity": "medium",
-        "title": "infrastructure assessment found mfa authentication password credential weak",
-        "description": "mfa authentication password credential policy is weak while validating against baseline"
+        "title": "compliance scan detected mfa authentication password credential weak",
+        "description": "mfa authentication password credential policy is weak during routine compliance verification"
       }
     },
     {
@@ -1380,10 +1380,10 @@
       "raw_json": {
         "finding_type": "baseline hardening misconfiguration config",
         "resource_type": "aws_ec2_instance",
-        "resource_identifier": "aws_ec2_instance.baseline_hardening_misconfiguration_config_dev",
+        "resource_identifier": "aws_ec2_instance.baseline_hardening_misconfiguration_config_dr",
         "severity": "medium",
-        "title": "security review reported baseline hardening misconfiguration config drift",
-        "description": "baseline hardening misconfiguration config detected during change-management review"
+        "title": "policy audit revealed baseline hardening misconfiguration config drift",
+        "description": "baseline hardening misconfiguration config detected during routine compliance verification"
       }
     },
     {
@@ -1396,9 +1396,9 @@
         "finding_type": "boundary segmentation dmz zoning",
         "resource_type": "aws_vpc",
         "resource_identifier": "aws_vpc.boundary_segmentation_dmz_zoning_dev",
-        "severity": "low",
-        "title": "control evaluation noted boundary segmentation dmz zoning missing",
-        "description": "boundary segmentation dmz zoning is not configured in the latest infrastructure scan"
+        "severity": "info",
+        "title": "automated check identified boundary segmentation dmz zoning missing",
+        "description": "boundary segmentation dmz zoning is not configured as part of the standard audit cycle"
       }
     },
     {
@@ -1410,10 +1410,10 @@
       "raw_json": {
         "finding_type": "datacenter badge physical locks",
         "resource_type": "aws_datacenter",
-        "resource_identifier": "aws_datacenter.datacenter_badge_physical_locks_dev",
+        "resource_identifier": "aws_datacenter.datacenter_badge_physical_locks_replica",
         "severity": "info",
-        "title": "governance inspection observed datacenter badge physical locks absent",
-        "description": "datacenter badge physical locks controls missing as identified by automated policy check"
+        "title": "automated check identified datacenter badge physical locks absent",
+        "description": "datacenter badge physical locks controls missing while validating against baseline"
       }
     },
     {
@@ -1425,10 +1425,10 @@
       "raw_json": {
         "finding_type": "incident response soc alerting",
         "resource_type": "aws_guardduty",
-        "resource_identifier": "aws_guardduty.incident_response_soc_alerting_dev",
-        "severity": "critical",
-        "title": "configuration review flagged incident response soc alerting not wired",
-        "description": "incident response soc alerting pipeline absent during routine compliance verification"
+        "resource_identifier": "aws_guardduty.incident_response_soc_alerting_eu-west-1",
+        "severity": "low",
+        "title": "compliance scan detected incident response soc alerting not wired",
+        "description": "incident response soc alerting pipeline absent as identified by automated policy check"
       }
     },
     {
@@ -1440,10 +1440,10 @@
       "raw_json": {
         "finding_type": "gdpr pii retention privacy",
         "resource_type": "aws_s3_bucket",
-        "resource_identifier": "aws_s3_bucket.gdpr_pii_retention_privacy_dev",
-        "severity": "high",
-        "title": "policy audit revealed gdpr pii retention privacy violation",
-        "description": "gdpr pii retention privacy controls not enforced as part of the standard audit cycle"
+        "resource_identifier": "aws_s3_bucket.gdpr_pii_retention_privacy_shared",
+        "severity": "medium",
+        "title": "security review reported gdpr pii retention privacy violation",
+        "description": "gdpr pii retention privacy controls not enforced during change-management review"
       }
     },
     {
@@ -1455,10 +1455,10 @@
       "raw_json": {
         "finding_type": "vendor third_party supply_chain sla",
         "resource_type": "aws_third_party",
-        "resource_identifier": "aws_third_party.vendor_third_party_supply_chain_sla_dev",
-        "severity": "high",
-        "title": "automated check identified vendor third_party supply_chain sla risk",
-        "description": "vendor third_party supply_chain sla not assessed while validating against baseline"
+        "resource_identifier": "aws_third_party.vendor_third_party_supply_chain_sla_v2",
+        "severity": "info",
+        "title": "compliance scan detected vendor third_party supply_chain sla risk",
+        "description": "vendor third_party supply_chain sla not assessed as part of the standard audit cycle"
       }
     },
     {
@@ -1470,10 +1470,10 @@
       "raw_json": {
         "finding_type": "iam public_access permission",
         "resource_type": "aws_iam_policy",
-        "resource_identifier": "aws_iam_policy.access_public_permission_v2_dev",
-        "severity": "medium",
-        "title": "compliance scan detected access iam permission public issue detected v2",
-        "description": "access iam permission public needs attention on this second policy during change-management review"
+        "resource_identifier": "aws_iam_policy.access_public_permission_v2_tenant-a",
+        "severity": "high",
+        "title": "configuration review flagged access iam permission public issue detected v2",
+        "description": "access iam permission public needs attention on this second policy in the latest infrastructure scan"
       }
     },
     {
@@ -1485,10 +1485,10 @@
       "raw_json": {
         "finding_type": "encryption tls at_rest cipher",
         "resource_type": "aws_s3_bucket",
-        "resource_identifier": "aws_s3_bucket.encryption_tls_at_rest_cipher_v2_dev",
+        "resource_identifier": "aws_s3_bucket.encryption_tls_at_rest_cipher_v2_dr",
         "severity": "medium",
-        "title": "infrastructure assessment found encryption tls at_rest cipher missing v2",
-        "description": "encryption tls at_rest cipher should be enabled on bucket v2 in the latest infrastructure scan"
+        "title": "compliance scan detected encryption tls at_rest cipher missing v2",
+        "description": "encryption tls at_rest cipher should be enabled on bucket v2 during routine compliance verification"
       }
     },
     {
@@ -1500,10 +1500,10 @@
       "raw_json": {
         "finding_type": "kms key_rotation secrets credential",
         "resource_type": "aws_kms_key",
-        "resource_identifier": "aws_kms_key.kms_key_rotation_secrets_credential_v2_dev",
-        "severity": "medium",
-        "title": "security review reported kms key_rotation secrets credential not rotated v2",
-        "description": "kms key_rotation secrets credential require rotation v2 as identified by automated policy check"
+        "resource_identifier": "aws_kms_key.kms_key_rotation_secrets_credential_v2_staging",
+        "severity": "high",
+        "title": "compliance scan detected kms key_rotation secrets credential not rotated v2",
+        "description": "kms key_rotation secrets credential require rotation v2 during routine compliance verification"
       }
     },
     {
@@ -1515,10 +1515,10 @@
       "raw_json": {
         "finding_type": "logging audit trail monitor",
         "resource_type": "aws_cloudtrail",
-        "resource_identifier": "aws_cloudtrail.logging_audit_trail_monitor_v2_dev",
-        "severity": "low",
-        "title": "control evaluation noted logging audit trail monitor disabled v2",
-        "description": "logging audit trail monitor must be enabled v2 during routine compliance verification"
+        "resource_identifier": "aws_cloudtrail.logging_audit_trail_monitor_v2_tenant-a",
+        "severity": "critical",
+        "title": "policy audit revealed logging audit trail monitor disabled v2",
+        "description": "logging audit trail monitor must be enabled v2 in the latest infrastructure scan"
       }
     },
     {
@@ -1530,8 +1530,8 @@
       "raw_json": {
         "finding_type": "network firewall ingress port",
         "resource_type": "aws_security_group",
-        "resource_identifier": "aws_security_group.network_firewall_ingress_port_v2_dev",
-        "severity": "info",
+        "resource_identifier": "aws_security_group.network_firewall_ingress_port_v2_us-west-2",
+        "severity": "medium",
         "title": "governance inspection observed network firewall ingress port open v2",
         "description": "network firewall ingress port should be restricted v2 as part of the standard audit cycle"
       }
@@ -1545,10 +1545,10 @@
       "raw_json": {
         "finding_type": "backup restore continuity failover",
         "resource_type": "aws_rds_instance",
-        "resource_identifier": "aws_rds_instance.backup_restore_continuity_failover_v2_dev",
-        "severity": "critical",
-        "title": "configuration review flagged backup restore continuity failover missing v2",
-        "description": "backup restore continuity failover configuration absent v2 while validating against baseline"
+        "resource_identifier": "aws_rds_instance.backup_restore_continuity_failover_v2_dr",
+        "severity": "high",
+        "title": "governance inspection observed backup restore continuity failover missing v2",
+        "description": "backup restore continuity failover configuration absent v2 as part of the standard audit cycle"
       }
     },
     {
@@ -1560,10 +1560,10 @@
       "raw_json": {
         "finding_type": "privilege admin sudo root",
         "resource_type": "aws_iam_role",
-        "resource_identifier": "aws_iam_role.privilege_admin_sudo_root_v2_dev",
-        "severity": "high",
-        "title": "policy audit revealed privilege admin sudo root granted v2",
-        "description": "privilege admin sudo root assignment is over-permissive v2 during change-management review"
+        "resource_identifier": "aws_iam_role.privilege_admin_sudo_root_v2_internal",
+        "severity": "info",
+        "title": "compliance scan detected privilege admin sudo root granted v2",
+        "description": "privilege admin sudo root assignment is over-permissive v2 during routine compliance verification"
       }
     },
     {
@@ -1575,10 +1575,10 @@
       "raw_json": {
         "finding_type": "dependency vulnerability patch cve",
         "resource_type": "npm_package",
-        "resource_identifier": "npm_package.dependency_vulnerability_patch_cve_v2_dev",
+        "resource_identifier": "npm_package.dependency_vulnerability_patch_cve_v2_internal",
         "severity": "high",
-        "title": "automated check identified dependency vulnerability patch cve present v2",
-        "description": "dependency vulnerability patch cve should be remediated v2 in the latest infrastructure scan"
+        "title": "security review reported dependency vulnerability patch cve present v2",
+        "description": "dependency vulnerability patch cve should be remediated v2 during change-management review"
       }
     },
     {
@@ -1590,9 +1590,9 @@
       "raw_json": {
         "finding_type": "mfa authentication password credential",
         "resource_type": "aws_iam_user",
-        "resource_identifier": "aws_iam_user.mfa_authentication_password_credential_v2_dev",
-        "severity": "medium",
-        "title": "compliance scan detected mfa authentication password credential weak v2",
+        "resource_identifier": "aws_iam_user.mfa_authentication_password_credential_v2_external",
+        "severity": "low",
+        "title": "configuration review flagged mfa authentication password credential weak v2",
         "description": "mfa authentication password credential policy is weak v2 as identified by automated policy check"
       }
     },
@@ -1605,10 +1605,10 @@
       "raw_json": {
         "finding_type": "baseline hardening misconfiguration config",
         "resource_type": "aws_ec2_instance",
-        "resource_identifier": "aws_ec2_instance.baseline_hardening_misconfiguration_config_v2_dev",
-        "severity": "medium",
-        "title": "infrastructure assessment found baseline hardening misconfiguration config drift v2",
-        "description": "baseline hardening misconfiguration config detected v2 during routine compliance verification"
+        "resource_identifier": "aws_ec2_instance.baseline_hardening_misconfiguration_config_v2_staging",
+        "severity": "high",
+        "title": "control evaluation noted baseline hardening misconfiguration config drift v2",
+        "description": "baseline hardening misconfiguration config detected v2 as identified by automated policy check"
       }
     },
     {
@@ -1620,9 +1620,9 @@
       "raw_json": {
         "finding_type": "boundary segmentation dmz zoning",
         "resource_type": "aws_vpc",
-        "resource_identifier": "aws_vpc.boundary_segmentation_dmz_zoning_v2_dev",
+        "resource_identifier": "aws_vpc.boundary_segmentation_dmz_zoning_v2_v2",
         "severity": "medium",
-        "title": "security review reported boundary segmentation dmz zoning missing v2",
+        "title": "compliance scan detected boundary segmentation dmz zoning missing v2",
         "description": "boundary segmentation dmz zoning is not configured v2 as part of the standard audit cycle"
       }
     },
@@ -1635,10 +1635,10 @@
       "raw_json": {
         "finding_type": "datacenter badge physical locks",
         "resource_type": "aws_datacenter",
-        "resource_identifier": "aws_datacenter.datacenter_badge_physical_locks_v2_dev",
-        "severity": "low",
-        "title": "control evaluation noted datacenter badge physical locks absent v2",
-        "description": "datacenter badge physical locks controls missing v2 while validating against baseline"
+        "resource_identifier": "aws_datacenter.datacenter_badge_physical_locks_v2_replica",
+        "severity": "medium",
+        "title": "governance inspection observed datacenter badge physical locks absent v2",
+        "description": "datacenter badge physical locks controls missing v2 as part of the standard audit cycle"
       }
     },
     {
@@ -1650,9 +1650,9 @@
       "raw_json": {
         "finding_type": "incident response soc alerting",
         "resource_type": "aws_guardduty",
-        "resource_identifier": "aws_guardduty.incident_response_soc_alerting_v2_dev",
-        "severity": "info",
-        "title": "governance inspection observed incident response soc alerting not wired v2",
+        "resource_identifier": "aws_guardduty.incident_response_soc_alerting_v2_v4",
+        "severity": "low",
+        "title": "infrastructure assessment found incident response soc alerting not wired v2",
         "description": "incident response soc alerting pipeline absent v2 during change-management review"
       }
     },
@@ -1666,8 +1666,8 @@
         "finding_type": "gdpr pii retention privacy",
         "resource_type": "aws_s3_bucket",
         "resource_identifier": "aws_s3_bucket.gdpr_pii_retention_privacy_v2_dev",
-        "severity": "critical",
-        "title": "configuration review flagged gdpr pii retention privacy violation v2",
+        "severity": "medium",
+        "title": "governance inspection observed gdpr pii retention privacy violation v2",
         "description": "gdpr pii retention privacy controls not enforced v2 in the latest infrastructure scan"
       }
     },
@@ -1680,10 +1680,10 @@
       "raw_json": {
         "finding_type": "vendor third_party supply_chain sla",
         "resource_type": "aws_third_party",
-        "resource_identifier": "aws_third_party.vendor_third_party_supply_chain_sla_v2_dev",
+        "resource_identifier": "aws_third_party.vendor_third_party_supply_chain_sla_v2_staging",
         "severity": "high",
-        "title": "policy audit revealed vendor third_party supply_chain sla risk v2",
-        "description": "vendor third_party supply_chain sla not assessed v2 as identified by automated policy check"
+        "title": "configuration review flagged vendor third_party supply_chain sla risk v2",
+        "description": "vendor third_party supply_chain sla not assessed v2 during routine compliance verification"
       }
     },
     {
@@ -1695,10 +1695,10 @@
       "raw_json": {
         "finding_type": "iam public access permission",
         "resource_type": "aws_iam_policy",
-        "resource_identifier": "aws_iam_policy.access_public_permission_v2",
-        "severity": "high",
-        "title": "automated check identified access iam permission public issue detected",
-        "description": "access iam permission public needs attention on this policy during routine compliance verification"
+        "resource_identifier": "aws_iam_policy.access_public_permission_v4",
+        "severity": "medium",
+        "title": "control evaluation noted access iam permission public issue detected",
+        "description": "access iam permission public needs attention on this policy during change-management review"
       }
     },
     {
@@ -1710,10 +1710,10 @@
       "raw_json": {
         "finding_type": "encryption tls at_rest cipher",
         "resource_type": "aws_s3_bucket",
-        "resource_identifier": "aws_s3_bucket.encryption_tls_at_rest_cipher_v2",
-        "severity": "medium",
-        "title": "compliance scan detected encryption tls at_rest cipher missing",
-        "description": "encryption tls at_rest cipher should be enabled as part of the standard audit cycle"
+        "resource_identifier": "aws_s3_bucket.encryption_tls_at_rest_cipher_eu-west-1",
+        "severity": "info",
+        "title": "control evaluation noted encryption tls at_rest cipher missing",
+        "description": "encryption tls at_rest cipher should be enabled during routine compliance verification"
       }
     },
     {
@@ -1725,10 +1725,10 @@
       "raw_json": {
         "finding_type": "kms key_rotation secrets credential",
         "resource_type": "aws_kms_key",
-        "resource_identifier": "aws_kms_key.kms_key_rotation_secrets_credential_v2",
-        "severity": "medium",
-        "title": "infrastructure assessment found kms key_rotation secrets credential not rotated",
-        "description": "kms key_rotation secrets credential require rotation while validating against baseline"
+        "resource_identifier": "aws_kms_key.kms_key_rotation_secrets_credential_shared",
+        "severity": "high",
+        "title": "configuration review flagged kms key_rotation secrets credential not rotated",
+        "description": "kms key_rotation secrets credential require rotation during change-management review"
       }
     },
     {
@@ -1740,9 +1740,9 @@
       "raw_json": {
         "finding_type": "logging audit trail monitor",
         "resource_type": "aws_cloudtrail",
-        "resource_identifier": "aws_cloudtrail.logging_audit_trail_monitor_v2",
+        "resource_identifier": "aws_cloudtrail.logging_audit_trail_monitor_external",
         "severity": "medium",
-        "title": "security review reported logging audit trail monitor disabled",
+        "title": "infrastructure assessment found logging audit trail monitor disabled",
         "description": "logging audit trail monitor must be enabled during change-management review"
       }
     },
@@ -1755,10 +1755,10 @@
       "raw_json": {
         "finding_type": "network firewall ingress port",
         "resource_type": "aws_security_group",
-        "resource_identifier": "aws_security_group.network_firewall_ingress_port_v2",
-        "severity": "low",
-        "title": "control evaluation noted network firewall ingress port open",
-        "description": "network firewall ingress port should be restricted in the latest infrastructure scan"
+        "resource_identifier": "aws_security_group.network_firewall_ingress_port_v3",
+        "severity": "info",
+        "title": "compliance scan detected network firewall ingress port open",
+        "description": "network firewall ingress port should be restricted while validating against baseline"
       }
     },
     {
@@ -1770,9 +1770,9 @@
       "raw_json": {
         "finding_type": "backup restore continuity failover",
         "resource_type": "aws_rds_instance",
-        "resource_identifier": "aws_rds_instance.backup_restore_continuity_failover_v2",
-        "severity": "info",
-        "title": "governance inspection observed backup restore continuity failover missing",
+        "resource_identifier": "aws_rds_instance.backup_restore_continuity_failover_staging",
+        "severity": "medium",
+        "title": "configuration review flagged backup restore continuity failover missing",
         "description": "backup restore continuity failover configuration absent as identified by automated policy check"
       }
     },
@@ -1785,10 +1785,10 @@
       "raw_json": {
         "finding_type": "privilege admin sudo root",
         "resource_type": "aws_iam_role",
-        "resource_identifier": "aws_iam_role.privilege_admin_sudo_root_v2",
-        "severity": "critical",
+        "resource_identifier": "aws_iam_role.privilege_admin_sudo_root_staging",
+        "severity": "medium",
         "title": "configuration review flagged privilege admin sudo root granted",
-        "description": "privilege admin sudo root assignment is over-permissive during routine compliance verification"
+        "description": "privilege admin sudo root assignment is over-permissive in the latest infrastructure scan"
       }
     },
     {
@@ -1800,10 +1800,10 @@
       "raw_json": {
         "finding_type": "dependency vulnerability patch cve",
         "resource_type": "npm_package",
-        "resource_identifier": "npm_package.dependency_vulnerability_patch_cve_v2",
-        "severity": "high",
-        "title": "policy audit revealed dependency vulnerability patch cve present",
-        "description": "dependency vulnerability patch cve should be remediated as part of the standard audit cycle"
+        "resource_identifier": "npm_package.dependency_vulnerability_patch_cve_secondary",
+        "severity": "info",
+        "title": "automated check identified dependency vulnerability patch cve present",
+        "description": "dependency vulnerability patch cve should be remediated during routine compliance verification"
       }
     },
     {
@@ -1815,10 +1815,10 @@
       "raw_json": {
         "finding_type": "mfa authentication password credential",
         "resource_type": "aws_iam_user",
-        "resource_identifier": "aws_iam_user.mfa_authentication_password_credential_v2",
+        "resource_identifier": "aws_iam_user.mfa_authentication_password_credential_v4",
         "severity": "high",
-        "title": "automated check identified mfa authentication password credential weak",
-        "description": "mfa authentication password credential policy is weak while validating against baseline"
+        "title": "policy audit revealed mfa authentication password credential weak",
+        "description": "mfa authentication password credential policy is weak in the latest infrastructure scan"
       }
     },
     {
@@ -1830,11 +1830,17 @@
       "raw_json": {
         "finding_type": "baseline hardening misconfiguration config",
         "resource_type": "aws_ec2_instance",
-        "resource_identifier": "aws_ec2_instance.baseline_hardening_misconfiguration_config_v2",
-        "severity": "medium",
-        "title": "compliance scan detected baseline hardening misconfiguration config drift",
-        "description": "baseline hardening misconfiguration config detected during change-management review"
+        "resource_identifier": "aws_ec2_instance.baseline_hardening_misconfiguration_config_us-east-1",
+        "severity": "high",
+        "title": "control evaluation noted baseline hardening misconfiguration config drift",
+        "description": "baseline hardening misconfiguration config detected during routine compliance verification"
       }
     }
-  ]
+  ],
+  "generation": {
+    "source_version": "gold-1",
+    "target_count": 100,
+    "seed": 42,
+    "generator": "tests/benchmark/generate_dataset.py"
+  }
 }
