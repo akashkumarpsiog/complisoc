@@ -404,7 +404,8 @@ def get_control(control_id: int, db: Session = Depends(get_db)):
 
 @app.get("/api/v1/reports", response_model=list[ComplianceReportRead])
 def list_reports(db: Session = Depends(get_db)):
-    return db.query(ComplianceReport).order_by(ComplianceReport.id.desc()).all()
+    reports = db.query(ComplianceReport).order_by(ComplianceReport.id.desc()).all()
+    return [_serialize_compliance_report(r) for r in reports]
 
 
 @app.get("/api/v1/reports/{report_id}", response_model=ComplianceReportRead)
@@ -412,26 +413,90 @@ def get_report(report_id: int, db: Session = Depends(get_db)):
     report = db.get(ComplianceReport, report_id)
     if report is None:
         not_found("Report")
-    return report
+    return _serialize_compliance_report(report)
+
+
+def _serialize_compliance_report(report: ComplianceReport) -> ComplianceReportRead:
+    """Return a ComplianceReportRead with the integrity hash omitted.
+
+    The hash is a server-side integrity primitive. It is computed on
+    generation, re-verified on download, and exposed only through the
+    bundle's verify endpoint - never as a field on the report itself.
+    """
+    return ComplianceReportRead.model_validate(
+        {
+            "id": report.id,
+            "scan_run_id": report.scan_run_id,
+            "report_type": report.report_type,
+            "generated_by": report.generated_by,
+            "generated_at": report.generated_at,
+            "content_path": report.content_path,
+            "content_hash": None,
+        }
+    )
+
+
+def _serialize_audit_bundle(bundle: AuditBundle) -> AuditBundleRead:
+    """Return an AuditBundleRead with the integrity checksum omitted.
+
+    The checksum is a server-side integrity primitive. Operators see
+    the Valid / Tampered verdict from /verify; the raw SHA-256 stays on
+    the server. The checksum is still used internally by
+    verify_audit_bundle to recompute and compare.
+    """
+    return AuditBundleRead.model_validate(
+        {
+            "id": bundle.id,
+            "scan_run_id": bundle.scan_run_id,
+            "generated_at": bundle.generated_at,
+            "bundle_path": bundle.bundle_path,
+            "manifest_path": bundle.manifest_path,
+            "checksum": None,
+        }
+    )
+
+
+def _serialize_audit_bundle_with_checksum(bundle: AuditBundle) -> AuditBundleRead:
+    """Return an AuditBundleRead including the integrity checksum.
+
+    Only used by the dedicated verify endpoints where the hash is the
+    answer to the operator's question.
+    """
+    return AuditBundleRead.model_validate(
+        {
+            "id": bundle.id,
+            "scan_run_id": bundle.scan_run_id,
+            "generated_at": bundle.generated_at,
+            "bundle_path": bundle.bundle_path,
+            "manifest_path": bundle.manifest_path,
+            "checksum": bundle.checksum,
+        }
+    )
 
 
 @app.post("/api/v1/reports/engineering", response_model=ComplianceReportRead, status_code=201)
 def create_engineering_report(payload: ReportCreate, db: Session = Depends(get_db)):
     _ensure_scan_run(db, payload.scan_run_id)
-    return generate_compliance_report(db, scan_run_id=payload.scan_run_id, report_type="engineering")
+    return _serialize_compliance_report(
+        generate_compliance_report(db, scan_run_id=payload.scan_run_id, report_type="engineering")
+    )
 
 
 @app.post("/api/v1/reports/leadership", response_model=ComplianceReportRead, status_code=201)
 def create_leadership_report(payload: ReportCreate, db: Session = Depends(get_db)):
     _ensure_scan_run(db, payload.scan_run_id)
-    return generate_compliance_report(db, scan_run_id=payload.scan_run_id, report_type="leadership")
+    return _serialize_compliance_report(
+        generate_compliance_report(db, scan_run_id=payload.scan_run_id, report_type="leadership")
+    )
 
 
 @app.post("/api/v1/reports/scenario", response_model=ComplianceReportRead, status_code=201)
 def create_scenario_report(payload: ScenarioReportCreate, db: Session = Depends(get_db)):
     _ensure_scan_run(db, payload.scan_run_id)
     try:
-        return generate_scenario_report(db, scan_run_id=payload.scan_run_id, scenario=payload.scenario)
+        return _serialize_compliance_report(
+            generate_scenario_report(db, scan_run_id=payload.scan_run_id, scenario=payload.scenario)
+        )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
 
@@ -447,7 +512,8 @@ def download_report(report_id: int, db: Session = Depends(get_db)):
 
 @app.get("/api/v1/audit-bundles", response_model=list[AuditBundleRead])
 def list_audit_bundles(db: Session = Depends(get_db)):
-    return db.query(AuditBundle).order_by(AuditBundle.id.desc()).all()
+    bundles = db.query(AuditBundle).order_by(AuditBundle.id.desc()).all()
+    return [_serialize_audit_bundle(b) for b in bundles]
 
 
 @app.get("/api/v1/audit-bundles/{bundle_id}", response_model=AuditBundleRead)
@@ -455,13 +521,13 @@ def get_audit_bundle(bundle_id: int, db: Session = Depends(get_db)):
     bundle = db.get(AuditBundle, bundle_id)
     if bundle is None:
         not_found("Audit bundle")
-    return bundle
+    return _serialize_audit_bundle(bundle)
 
 
 @app.post("/api/v1/audit-bundles", response_model=AuditBundleRead, status_code=201)
 def create_audit_bundle(payload: ReportCreate, db: Session = Depends(get_db)):
     _ensure_scan_run(db, payload.scan_run_id)
-    return generate_audit_bundle(db, scan_run_id=payload.scan_run_id)
+    return _serialize_audit_bundle(generate_audit_bundle(db, scan_run_id=payload.scan_run_id))
 
 
 @app.get("/api/v1/audit-bundles/{bundle_id}/download")

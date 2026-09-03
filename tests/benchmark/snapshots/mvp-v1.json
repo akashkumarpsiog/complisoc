@@ -1,0 +1,167 @@
+{
+  "gold_count": 30,
+  "gold_path": "C:\\Users\\akash.kumar\\OneDrive - psiog.com\\Desktop\\sem1\\complisoc\\tests\\benchmark\\gold_standard.json",
+  "metrics": {
+    "f1": 1.0,
+    "fn": 0,
+    "fp": 0,
+    "precision": 1.0,
+    "recall": 1.0,
+    "total_gold": 30,
+    "total_predicted": 30,
+    "tp": 30
+  },
+  "predictions": {
+    "GOLD-1": {
+      "control_id": "A.5.15",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-10": {
+      "control_id": "A.8.9",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-11": {
+      "control_id": "A.5.20",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-12": {
+      "control_id": "A.7.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-13": {
+      "control_id": "A.16.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-14": {
+      "control_id": "A.18.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-15": {
+      "control_id": "A.15.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-16": {
+      "control_id": "A.5.15",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-17": {
+      "control_id": "A.8.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-18": {
+      "control_id": "A.8.2",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-19": {
+      "control_id": "A.9.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-2": {
+      "control_id": "A.8.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-20": {
+      "control_id": "A.12.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-21": {
+      "control_id": "A.13.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-22": {
+      "control_id": "A.5.18",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-23": {
+      "control_id": "A.8.8",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-24": {
+      "control_id": "A.5.17",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-25": {
+      "control_id": "A.8.9",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-26": {
+      "control_id": "A.5.20",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-27": {
+      "control_id": "A.7.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-28": {
+      "control_id": "A.16.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-29": {
+      "control_id": "A.18.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-3": {
+      "control_id": "A.8.2",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-30": {
+      "control_id": "A.15.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-4": {
+      "control_id": "A.9.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-5": {
+      "control_id": "A.12.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-6": {
+      "control_id": "A.13.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-7": {
+      "control_id": "A.5.18",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-8": {
+      "control_id": "A.8.8",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-9": {
+      "control_id": "A.5.17",
+      "final_confidence": 0.97,
+      "status": "published"
+    }
+  },
+  "version": "mvp-v1"
+}

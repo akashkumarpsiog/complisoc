@@ -83,13 +83,12 @@ function ReportActions({
 function ReportTable({ data }: { data: ComplianceReport[] }) {
   return (
     <DataTable
-      columns={["ID", "Scan Run", "Type", "Generated", "Hash", "Download"]}
+      columns={["ID", "Scan Run", "Type", "Generated", "Download"]}
       rows={data.map((report) => [
         report.id,
         report.scan_run_id,
         report.report_type,
         formatDate(report.generated_at),
-        report.content_hash || "n/a",
         <a key={`dl-${report.id}`} className="icon-button" href={api.reports.downloadUrl(report.id)}>
           Download
         </a>,

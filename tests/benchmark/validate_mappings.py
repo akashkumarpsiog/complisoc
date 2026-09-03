@@ -43,6 +43,7 @@ for _cand in _THIS.parents:
 
 from complisoc.backend.compliance.mapping import CandidateDecision  # noqa: E402
 from complisoc.backend.compliance.verification import VerificationDecision  # noqa: E402
+from complisoc.backend.core.config import PROMPT_VERSION  # noqa: E402
 from complisoc.backend.database.base import Base  # noqa: E402
 from complisoc.backend.models import (  # noqa: E402
     ControlCatalog,
@@ -134,7 +135,16 @@ def build_db(gold: dict):
     return db
 
 
-def run_pipeline(db, gold: dict) -> None:
+def run_pipeline(db, gold: dict, live: bool = False) -> None:
+    """Run the production pipeline against the gold dataset.
+
+    When ``live`` is False (default, CI-safe), the Gemini and Groq steps
+    are patched with a deterministic oracle. When ``live`` is True, the
+    real ``GeminiMapper`` and ``GroqVerifier`` classes are used, so this
+    path actually exercises the cross-model verification that earned the
+    proposal its approval. The live path requires ``GEMINI_API_KEY`` and
+    ``GROQ_API_KEY`` to be set in the environment.
+    """
     findings = [
         {
             "scanner_name": entry["scanner_name"],
@@ -143,6 +153,9 @@ def run_pipeline(db, gold: dict) -> None:
         }
         for entry in gold["mappings"]
     ]
+    if live:
+        process_scan_run(db, target_environment="gold-benchmark-live", findings=findings)
+        return
     with patch(
         "complisoc.backend.compliance.langchain_pipeline.GeminiMapper"
     ) as MockMapper, patch(
@@ -173,6 +186,114 @@ def collect_predictions(db) -> dict[str, dict]:
     return predicted
 
 
+def compute_f1(metrics: dict) -> float:
+    """F1 score from a metrics dict produced by evaluate()."""
+    p = metrics["precision"]
+    r = metrics["recall"]
+    return 2 * p * r / (p + r) if (p + r) else 0.0
+
+
+def write_snapshot(path: pathlib.Path, gold: dict, predicted: dict, metrics: dict) -> None:
+    """Serialize the current benchmark run as a snapshot file.
+
+    Snapshot schema:
+        {
+          "version": "mvp-v1",
+          "gold_path": "<source gold_standard.json>",
+          "gold_count": 30,
+          "metrics": {"precision": 1.0, "recall": 1.0, "f1": 1.0, ...},
+          "predictions": {
+              "GOLD-1": {"control_id": "A.5.15", "status": "published", "final_confidence": 0.95},
+              ...
+          }
+        }
+    """
+    path.parent.mkdir(parents=True, exist_ok=True)
+    payload = {
+        "version": PROMPT_VERSION,
+        "gold_path": str(_GOLD_PATH_DEFAULT),
+        "gold_count": len(gold["mappings"]),
+        "metrics": {
+            "precision": metrics["precision"],
+            "recall": metrics["recall"],
+            "f1": compute_f1(metrics),
+            "tp": metrics["tp"],
+            "fp": metrics["fp"],
+            "fn": metrics["fn"],
+            "total_gold": metrics["total_gold"],
+            "total_predicted": metrics["total_predicted"],
+        },
+        "predictions": {
+            sfid: {
+                "control_id": pred["control_id"],
+                "status": pred["status"],
+                "final_confidence": pred["final_confidence"],
+            }
+            for sfid, pred in sorted(predicted.items())
+        },
+    }
+    path.write_text(json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")
+
+
+def load_snapshot(path: pathlib.Path) -> dict:
+    return json.loads(path.read_text(encoding="utf-8"))
+
+
+def compute_f1_delta(snapshot: dict, current_metrics: dict, current_predictions: dict | None = None) -> dict:
+    """Compare current run against a committed snapshot.
+
+    Returns a dict with:
+        - snapshot_f1: the F1 from the snapshot
+        - current_f1: the F1 from the current run
+        - f1_delta: |current - snapshot|
+        - snapshot_metrics: full metrics from the snapshot
+        - current_metrics: full metrics from the current run
+        - changed_findings: list of (scanner_finding_id, snapshot_control, current_control)
+                             for findings whose control mapping changed.
+
+    If ``current_predictions`` is not provided, only metric-level deltas
+    are reported (no per-finding change list).
+    """
+    snapshot_f1 = snapshot["metrics"]["f1"]
+    current_f1 = compute_f1(current_metrics)
+    changed: list[dict] = []
+    if current_predictions is not None:
+        snapshot_preds = snapshot.get("predictions", {})
+        all_ids = sorted(set(snapshot_preds.keys()) | set(current_predictions.keys()))
+        for sfid in all_ids:
+            snap_pred = snapshot_preds.get(sfid)
+            curr_pred = current_predictions.get(sfid)
+            snap_ctrl = snap_pred.get("control_id") if snap_pred else None
+            curr_ctrl = curr_pred.get("control_id") if curr_pred else None
+            if snap_ctrl != curr_ctrl:
+                changed.append(
+                    {
+                        "scanner_finding_id": sfid,
+                        "snapshot_control": snap_ctrl,
+                        "current_control": curr_ctrl,
+                    }
+                )
+    return {
+        "snapshot_f1": snapshot_f1,
+        "current_f1": current_f1,
+        "f1_delta": abs(current_f1 - snapshot_f1),
+        "snapshot_metrics": snapshot["metrics"],
+        "current_metrics": {
+            "precision": current_metrics["precision"],
+            "recall": current_metrics["recall"],
+            "f1": current_f1,
+            "tp": current_metrics["tp"],
+            "fp": current_metrics["fp"],
+            "fn": current_metrics["fn"],
+        },
+        "changed_findings": changed,
+    }
+
+
+# Path to the default gold-standard file, used when serialising snapshots.
+_GOLD_PATH_DEFAULT = pathlib.Path(__file__).with_name("gold_standard.json")
+
+
 def evaluate(gold: dict, predicted: dict) -> dict:
     tp = fp = fn = 0
     per_item = []
@@ -201,12 +322,14 @@ def evaluate(gold: dict, predicted: dict) -> dict:
 
     precision = tp / (tp + fp) if (tp + fp) else 0.0
     recall = tp / (tp + fn) if (tp + fn) else 0.0
+    f1 = 2 * precision * recall / (precision + recall) if (precision + recall) else 0.0
     return {
         "tp": tp,
         "fp": fp,
         "fn": fn,
         "precision": precision,
         "recall": recall,
+        "f1": f1,
         "total_gold": len(gold["mappings"]),
         "total_predicted": len(predicted),
         "per_item": per_item,
@@ -232,17 +355,38 @@ def print_report(gold: dict, metrics: dict) -> None:
     print("=" * 72)
 
 
-def validate(gold_path: pathlib.Path) -> dict:
+def validate(gold_path: pathlib.Path, live: bool = False) -> dict:
+    """Run the benchmark on a gold file and return the metrics dict.
+
+    Returns ``metrics`` (precision, recall, f1, tp, fp, fn, totals).
+    """
     gold = load_gold(gold_path)
     db = build_db(gold)
     try:
-        run_pipeline(db, gold)
+        run_pipeline(db, gold, live=live)
         predicted = collect_predictions(db)
     finally:
         db.close()
     metrics = evaluate(gold, predicted)
-    print_report(gold, metrics)
     return metrics
+
+
+def run_and_capture(gold_path: pathlib.Path, live: bool = False) -> tuple:
+    """Run the benchmark and return ``(gold, predicted, metrics)``.
+
+    The full output is needed by callers that need per-finding
+    predictions (snapshot diff, F1-delta computation). Most callers
+    should use :func:`validate` instead.
+    """
+    gold = load_gold(gold_path)
+    db = build_db(gold)
+    try:
+        run_pipeline(db, gold, live=live)
+        predicted = collect_predictions(db)
+    finally:
+        db.close()
+    metrics = evaluate(gold, predicted)
+    return gold, predicted, metrics
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -255,9 +399,93 @@ def main(argv: list[str] | None = None) -> int:
     )
     parser.add_argument("--min-precision", type=float, default=1.0)
     parser.add_argument("--min-recall", type=float, default=1.0)
+    parser.add_argument(
+        "--snapshot",
+        type=pathlib.Path,
+        default=pathlib.Path(__file__).parent / "snapshots" / "mvp-v1.json",
+        help="Path to the F1-delta snapshot file (defaults to tests/benchmark/snapshots/mvp-v1.json)",
+    )
+    parser.add_argument(
+        "--update-snapshot",
+        action="store_true",
+        help="Regenerate the snapshot from the current run and exit (skips threshold check).",
+    )
+    parser.add_argument(
+        "--check-snapshot",
+        action="store_true",
+        help="Run, load the committed snapshot, and fail if F1-delta exceeds 0.05.",
+    )
+    parser.add_argument(
+        "--max-f1-delta",
+        type=float,
+        default=0.05,
+        help="Maximum allowed F1-delta vs the committed snapshot (default 0.05).",
+    )
+    parser.add_argument(
+        "--live",
+        action="store_true",
+        help=(
+            "Run against the real Gemini and Groq APIs (the cross-model "
+            "verification path from the approved proposal). Requires "
+            "GEMINI_API_KEY and GROQ_API_KEY in the environment. The "
+            "default (no --live) uses a deterministic oracle for CI safety."
+        ),
+    )
+    parser.add_argument(
+        "--output",
+        type=pathlib.Path,
+        default=pathlib.Path("evidence/benchmark_live_results.json"),
+        help=(
+            "Where to write the live-mode JSON result file "
+            "(only used when --live is set)."
+        ),
+    )
     args = parser.parse_args(argv)
 
-    metrics = validate(args.gold)
+    gold = load_gold(args.gold)
+    db = build_db(gold)
+    try:
+        run_pipeline(db, gold, live=args.live)
+        predicted = collect_predictions(db)
+    finally:
+        db.close()
+    metrics = evaluate(gold, predicted)
+    print_report(gold, metrics)
+
+    if args.update_snapshot:
+        write_snapshot(args.snapshot, gold, predicted, metrics)
+        print(f"Snapshot updated: {args.snapshot}")
+        return 0
+
+    if args.check_snapshot:
+        if not args.snapshot.exists():
+            print(
+                f"FAIL: snapshot not found at {args.snapshot}. "
+                "Generate it with --update-snapshot first."
+            )
+            return 1
+        snapshot = load_snapshot(args.snapshot)
+        delta = compute_f1_delta(snapshot, metrics, current_predictions=predicted)
+        print(
+            f"Snapshot F1={delta['snapshot_f1']:.3f} | "
+            f"Current F1={delta['current_f1']:.3f} | "
+            f"delta={delta['f1_delta']:.3f}"
+        )
+        if delta["changed_findings"]:
+            print(f"Changed findings: {len(delta['changed_findings'])}")
+            for change in delta["changed_findings"][:10]:
+                print(
+                    f"  {change['scanner_finding_id']}: "
+                    f"{change['snapshot_control']} -> {change['current_control']}"
+                )
+        if delta["f1_delta"] > args.max_f1_delta:
+            print(
+                f"FAIL: F1-delta {delta['f1_delta']:.3f} > {args.max_f1_delta:.3f}"
+            )
+            return 1
+        print("PASS: F1-delta within threshold.")
+        return 0
+
     if metrics["precision"] < args.min_precision or metrics["recall"] < args.min_recall:
         print(
             f"FAIL: precision {metrics['precision']:.3f} < {args.min_precision} "
@@ -265,6 +493,48 @@ def main(argv: list[str] | None = None) -> int:
         )
         return 1
     print("PASS: gold-standard mapping validation succeeded.")
+
+    if args.live:
+        args.output.parent.mkdir(parents=True, exist_ok=True)
+        args.output.write_text(
+            json.dumps(
+                {
+                    "mode": "live",
+                    "prompt_version": "mvp-v1",
+                    "framework": gold["framework"],
+                    "framework_version": gold["framework_version"],
+                    "gold_count": len(gold["mappings"]),
+                    "metrics": {
+                        "precision": metrics["precision"],
+                        "recall": metrics["recall"],
+                        "f1": compute_f1(metrics),
+                        "tp": metrics["tp"],
+                        "fp": metrics["fp"],
+                        "fn": metrics["fn"],
+                    },
+                    "per_finding": [
+                        {
+                            "scanner_finding_id": sfid,
+                            "expected_control_id": entry["expected_control_id"],
+                            "predicted_control_id": predicted[sfid]["control_id"] if sfid in predicted else None,
+                            "mapping_status": predicted[sfid]["status"] if sfid in predicted else None,
+                            "final_confidence": predicted[sfid]["final_confidence"] if sfid in predicted else None,
+                            "result": (
+                                "OK"
+                                if sfid in predicted
+                                and predicted[sfid]["control_id"] == entry["expected_control_id"]
+                                else "WRONG"
+                            ),
+                        }
+                        for entry in gold["mappings"]
+                        for sfid in [entry["scanner_finding_id"]]
+                    ],
+                },
+                indent=2,
+            ),
+            encoding="utf-8",
+        )
+        print(f"Live results written to {args.output}")
     return 0
 
 

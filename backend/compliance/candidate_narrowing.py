@@ -40,6 +40,7 @@ def narrow_candidates(
     *,
     framework: str | None = None,
     limit: int = 5,
+    commit: bool = True,
 ) -> list[CandidateControl]:
     query = db.query(ControlCatalog).filter(ControlCatalog.active_status.is_(True))
     if framework:
@@ -81,8 +82,16 @@ def narrow_candidates(
         db.add(candidate)
         candidates.append(candidate)
 
-    db.commit()
-    for candidate in candidates:
-        db.refresh(candidate)
+    if commit:
+        db.commit()
+        for candidate in candidates:
+            db.refresh(candidate)
+    else:
+        # Caller is expected to flush + commit once for the whole batch
+        # (the LCEL pipeline does this in stage_finalize). Refresh needs
+        # the rows to be flushed so their primary keys are populated.
+        db.flush()
+        for candidate in candidates:
+            db.refresh(candidate)
     return candidates
 

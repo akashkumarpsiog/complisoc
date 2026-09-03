@@ -1,0 +1,2517 @@
+{
+  "gold_count": 500,
+  "gold_path": "C:\\Users\\akash.kumar\\OneDrive - psiog.com\\Desktop\\sem1\\complisoc\\tests\\benchmark\\gold_standard.json",
+  "metrics": {
+    "f1": 1.0,
+    "fn": 0,
+    "fp": 0,
+    "precision": 1.0,
+    "recall": 1.0,
+    "total_gold": 500,
+    "total_predicted": 500,
+    "tp": 500
+  },
+  "predictions": {
+    "GOLD-1": {
+      "control_id": "A.5.15",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-10": {
+      "control_id": "A.8.9",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-11": {
+      "control_id": "A.5.20",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-12": {
+      "control_id": "A.7.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-13": {
+      "control_id": "A.16.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-14": {
+      "control_id": "A.18.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-15": {
+      "control_id": "A.15.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-16": {
+      "control_id": "A.5.15",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-17": {
+      "control_id": "A.8.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-18": {
+      "control_id": "A.8.2",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-19": {
+      "control_id": "A.9.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-2": {
+      "control_id": "A.8.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-20": {
+      "control_id": "A.12.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-21": {
+      "control_id": "A.13.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-22": {
+      "control_id": "A.5.18",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-23": {
+      "control_id": "A.8.8",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-24": {
+      "control_id": "A.5.17",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-25": {
+      "control_id": "A.8.9",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-26": {
+      "control_id": "A.5.20",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-27": {
+      "control_id": "A.7.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-28": {
+      "control_id": "A.16.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-29": {
+      "control_id": "A.18.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-3": {
+      "control_id": "A.8.2",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-30": {
+      "control_id": "A.15.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-4": {
+      "control_id": "A.9.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-5": {
+      "control_id": "A.12.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-6": {
+      "control_id": "A.13.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-7": {
+      "control_id": "A.5.18",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-8": {
+      "control_id": "A.8.8",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-9": {
+      "control_id": "A.5.17",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-100": {
+      "control_id": "A.8.9",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-101": {
+      "control_id": "A.5.20",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-102": {
+      "control_id": "A.7.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-103": {
+      "control_id": "A.16.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-104": {
+      "control_id": "A.18.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-105": {
+      "control_id": "A.15.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-106": {
+      "control_id": "A.5.15",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-107": {
+      "control_id": "A.8.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-108": {
+      "control_id": "A.8.2",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-109": {
+      "control_id": "A.9.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-110": {
+      "control_id": "A.12.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-111": {
+      "control_id": "A.13.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-112": {
+      "control_id": "A.5.18",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-113": {
+      "control_id": "A.8.8",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-114": {
+      "control_id": "A.5.17",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-115": {
+      "control_id": "A.8.9",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-116": {
+      "control_id": "A.5.20",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-117": {
+      "control_id": "A.7.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-118": {
+      "control_id": "A.16.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-119": {
+      "control_id": "A.18.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-120": {
+      "control_id": "A.15.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-121": {
+      "control_id": "A.5.15",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-122": {
+      "control_id": "A.8.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-123": {
+      "control_id": "A.8.2",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-124": {
+      "control_id": "A.9.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-125": {
+      "control_id": "A.12.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-126": {
+      "control_id": "A.13.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-127": {
+      "control_id": "A.5.18",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-128": {
+      "control_id": "A.8.8",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-129": {
+      "control_id": "A.5.17",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-130": {
+      "control_id": "A.8.9",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-131": {
+      "control_id": "A.5.20",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-132": {
+      "control_id": "A.7.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-133": {
+      "control_id": "A.16.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-134": {
+      "control_id": "A.18.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-135": {
+      "control_id": "A.15.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-136": {
+      "control_id": "A.5.15",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-137": {
+      "control_id": "A.8.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-138": {
+      "control_id": "A.8.2",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-139": {
+      "control_id": "A.9.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-140": {
+      "control_id": "A.12.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-141": {
+      "control_id": "A.13.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-142": {
+      "control_id": "A.5.18",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-143": {
+      "control_id": "A.8.8",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-144": {
+      "control_id": "A.5.17",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-145": {
+      "control_id": "A.8.9",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-146": {
+      "control_id": "A.5.20",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-147": {
+      "control_id": "A.7.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-148": {
+      "control_id": "A.16.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-149": {
+      "control_id": "A.18.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-150": {
+      "control_id": "A.15.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-151": {
+      "control_id": "A.5.15",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-152": {
+      "control_id": "A.8.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-153": {
+      "control_id": "A.8.2",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-154": {
+      "control_id": "A.9.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-155": {
+      "control_id": "A.12.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-156": {
+      "control_id": "A.13.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-157": {
+      "control_id": "A.5.18",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-158": {
+      "control_id": "A.8.8",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-159": {
+      "control_id": "A.5.17",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-160": {
+      "control_id": "A.8.9",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-161": {
+      "control_id": "A.5.20",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-162": {
+      "control_id": "A.7.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-163": {
+      "control_id": "A.16.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-164": {
+      "control_id": "A.18.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-165": {
+      "control_id": "A.15.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-166": {
+      "control_id": "A.5.15",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-167": {
+      "control_id": "A.8.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-168": {
+      "control_id": "A.8.2",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-169": {
+      "control_id": "A.9.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-170": {
+      "control_id": "A.12.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-171": {
+      "control_id": "A.13.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-172": {
+      "control_id": "A.5.18",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-173": {
+      "control_id": "A.8.8",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-174": {
+      "control_id": "A.5.17",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-175": {
+      "control_id": "A.8.9",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-176": {
+      "control_id": "A.5.20",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-177": {
+      "control_id": "A.7.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-178": {
+      "control_id": "A.16.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-179": {
+      "control_id": "A.18.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-180": {
+      "control_id": "A.15.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-181": {
+      "control_id": "A.5.15",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-182": {
+      "control_id": "A.8.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-183": {
+      "control_id": "A.8.2",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-184": {
+      "control_id": "A.9.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-185": {
+      "control_id": "A.12.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-186": {
+      "control_id": "A.13.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-187": {
+      "control_id": "A.5.18",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-188": {
+      "control_id": "A.8.8",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-189": {
+      "control_id": "A.5.17",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-190": {
+      "control_id": "A.8.9",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-191": {
+      "control_id": "A.5.20",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-192": {
+      "control_id": "A.7.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-193": {
+      "control_id": "A.16.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-194": {
+      "control_id": "A.18.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-195": {
+      "control_id": "A.15.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-196": {
+      "control_id": "A.5.15",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-197": {
+      "control_id": "A.8.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-198": {
+      "control_id": "A.8.2",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-199": {
+      "control_id": "A.9.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-200": {
+      "control_id": "A.12.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-201": {
+      "control_id": "A.13.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-202": {
+      "control_id": "A.5.18",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-203": {
+      "control_id": "A.8.8",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-204": {
+      "control_id": "A.5.17",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-205": {
+      "control_id": "A.8.9",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-206": {
+      "control_id": "A.5.20",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-207": {
+      "control_id": "A.7.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-208": {
+      "control_id": "A.16.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-209": {
+      "control_id": "A.18.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-210": {
+      "control_id": "A.15.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-211": {
+      "control_id": "A.5.15",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-212": {
+      "control_id": "A.8.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-213": {
+      "control_id": "A.8.2",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-214": {
+      "control_id": "A.9.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-215": {
+      "control_id": "A.12.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-216": {
+      "control_id": "A.13.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-217": {
+      "control_id": "A.5.18",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-218": {
+      "control_id": "A.8.8",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-219": {
+      "control_id": "A.5.17",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-220": {
+      "control_id": "A.8.9",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-221": {
+      "control_id": "A.5.20",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-222": {
+      "control_id": "A.7.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-223": {
+      "control_id": "A.16.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-224": {
+      "control_id": "A.18.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-225": {
+      "control_id": "A.15.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-226": {
+      "control_id": "A.5.15",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-227": {
+      "control_id": "A.8.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-228": {
+      "control_id": "A.8.2",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-229": {
+      "control_id": "A.9.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-230": {
+      "control_id": "A.12.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-231": {
+      "control_id": "A.13.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-232": {
+      "control_id": "A.5.18",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-233": {
+      "control_id": "A.8.8",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-234": {
+      "control_id": "A.5.17",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-235": {
+      "control_id": "A.8.9",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-236": {
+      "control_id": "A.5.20",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-237": {
+      "control_id": "A.7.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-238": {
+      "control_id": "A.16.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-239": {
+      "control_id": "A.18.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-240": {
+      "control_id": "A.15.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-241": {
+      "control_id": "A.5.15",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-242": {
+      "control_id": "A.8.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-243": {
+      "control_id": "A.8.2",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-244": {
+      "control_id": "A.9.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-245": {
+      "control_id": "A.12.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-246": {
+      "control_id": "A.13.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-247": {
+      "control_id": "A.5.18",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-248": {
+      "control_id": "A.8.8",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-249": {
+      "control_id": "A.5.17",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-250": {
+      "control_id": "A.8.9",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-251": {
+      "control_id": "A.5.20",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-252": {
+      "control_id": "A.7.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-253": {
+      "control_id": "A.16.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-254": {
+      "control_id": "A.18.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-255": {
+      "control_id": "A.15.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-256": {
+      "control_id": "A.5.15",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-257": {
+      "control_id": "A.8.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-258": {
+      "control_id": "A.8.2",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-259": {
+      "control_id": "A.9.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-260": {
+      "control_id": "A.12.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-261": {
+      "control_id": "A.13.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-262": {
+      "control_id": "A.5.18",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-263": {
+      "control_id": "A.8.8",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-264": {
+      "control_id": "A.5.17",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-265": {
+      "control_id": "A.8.9",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-266": {
+      "control_id": "A.5.20",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-267": {
+      "control_id": "A.7.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-268": {
+      "control_id": "A.16.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-269": {
+      "control_id": "A.18.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-270": {
+      "control_id": "A.15.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-271": {
+      "control_id": "A.5.15",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-272": {
+      "control_id": "A.8.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-273": {
+      "control_id": "A.8.2",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-274": {
+      "control_id": "A.9.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-275": {
+      "control_id": "A.12.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-276": {
+      "control_id": "A.13.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-277": {
+      "control_id": "A.5.18",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-278": {
+      "control_id": "A.8.8",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-279": {
+      "control_id": "A.5.17",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-280": {
+      "control_id": "A.8.9",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-281": {
+      "control_id": "A.5.20",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-282": {
+      "control_id": "A.7.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-283": {
+      "control_id": "A.16.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-284": {
+      "control_id": "A.18.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-285": {
+      "control_id": "A.15.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-286": {
+      "control_id": "A.5.15",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-287": {
+      "control_id": "A.8.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-288": {
+      "control_id": "A.8.2",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-289": {
+      "control_id": "A.9.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-290": {
+      "control_id": "A.12.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-291": {
+      "control_id": "A.13.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-292": {
+      "control_id": "A.5.18",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-293": {
+      "control_id": "A.8.8",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-294": {
+      "control_id": "A.5.17",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-295": {
+      "control_id": "A.8.9",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-296": {
+      "control_id": "A.5.20",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-297": {
+      "control_id": "A.7.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-298": {
+      "control_id": "A.16.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-299": {
+      "control_id": "A.18.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-300": {
+      "control_id": "A.15.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-301": {
+      "control_id": "A.5.15",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-302": {
+      "control_id": "A.8.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-303": {
+      "control_id": "A.8.2",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-304": {
+      "control_id": "A.9.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-305": {
+      "control_id": "A.12.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-306": {
+      "control_id": "A.13.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-307": {
+      "control_id": "A.5.18",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-308": {
+      "control_id": "A.8.8",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-309": {
+      "control_id": "A.5.17",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-31": {
+      "control_id": "A.5.15",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-310": {
+      "control_id": "A.8.9",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-311": {
+      "control_id": "A.5.20",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-312": {
+      "control_id": "A.7.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-313": {
+      "control_id": "A.16.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-314": {
+      "control_id": "A.18.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-315": {
+      "control_id": "A.15.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-316": {
+      "control_id": "A.5.15",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-317": {
+      "control_id": "A.8.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-318": {
+      "control_id": "A.8.2",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-319": {
+      "control_id": "A.9.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-32": {
+      "control_id": "A.8.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-320": {
+      "control_id": "A.12.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-321": {
+      "control_id": "A.13.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-322": {
+      "control_id": "A.5.18",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-323": {
+      "control_id": "A.8.8",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-324": {
+      "control_id": "A.5.17",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-325": {
+      "control_id": "A.8.9",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-326": {
+      "control_id": "A.5.20",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-327": {
+      "control_id": "A.7.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-328": {
+      "control_id": "A.16.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-329": {
+      "control_id": "A.18.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-33": {
+      "control_id": "A.8.2",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-330": {
+      "control_id": "A.15.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-331": {
+      "control_id": "A.5.15",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-332": {
+      "control_id": "A.8.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-333": {
+      "control_id": "A.8.2",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-334": {
+      "control_id": "A.9.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-335": {
+      "control_id": "A.12.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-336": {
+      "control_id": "A.13.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-337": {
+      "control_id": "A.5.18",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-338": {
+      "control_id": "A.8.8",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-339": {
+      "control_id": "A.5.17",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-34": {
+      "control_id": "A.9.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-340": {
+      "control_id": "A.8.9",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-341": {
+      "control_id": "A.5.20",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-342": {
+      "control_id": "A.7.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-343": {
+      "control_id": "A.16.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-344": {
+      "control_id": "A.18.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-345": {
+      "control_id": "A.15.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-346": {
+      "control_id": "A.5.15",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-347": {
+      "control_id": "A.8.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-348": {
+      "control_id": "A.8.2",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-349": {
+      "control_id": "A.9.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-35": {
+      "control_id": "A.12.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-350": {
+      "control_id": "A.12.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-351": {
+      "control_id": "A.13.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-352": {
+      "control_id": "A.5.18",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-353": {
+      "control_id": "A.8.8",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-354": {
+      "control_id": "A.5.17",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-355": {
+      "control_id": "A.8.9",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-356": {
+      "control_id": "A.5.20",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-357": {
+      "control_id": "A.7.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-358": {
+      "control_id": "A.16.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-359": {
+      "control_id": "A.18.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-36": {
+      "control_id": "A.13.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-360": {
+      "control_id": "A.15.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-361": {
+      "control_id": "A.5.15",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-362": {
+      "control_id": "A.8.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-363": {
+      "control_id": "A.8.2",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-364": {
+      "control_id": "A.9.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-365": {
+      "control_id": "A.12.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-366": {
+      "control_id": "A.13.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-367": {
+      "control_id": "A.5.18",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-368": {
+      "control_id": "A.8.8",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-369": {
+      "control_id": "A.5.17",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-37": {
+      "control_id": "A.5.18",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-370": {
+      "control_id": "A.8.9",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-371": {
+      "control_id": "A.5.20",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-372": {
+      "control_id": "A.7.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-373": {
+      "control_id": "A.16.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-374": {
+      "control_id": "A.18.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-375": {
+      "control_id": "A.15.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-376": {
+      "control_id": "A.5.15",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-377": {
+      "control_id": "A.8.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-378": {
+      "control_id": "A.8.2",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-379": {
+      "control_id": "A.9.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-38": {
+      "control_id": "A.8.8",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-380": {
+      "control_id": "A.12.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-381": {
+      "control_id": "A.13.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-382": {
+      "control_id": "A.5.18",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-383": {
+      "control_id": "A.8.8",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-384": {
+      "control_id": "A.5.17",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-385": {
+      "control_id": "A.8.9",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-386": {
+      "control_id": "A.5.20",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-387": {
+      "control_id": "A.7.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-388": {
+      "control_id": "A.16.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-389": {
+      "control_id": "A.18.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-39": {
+      "control_id": "A.5.17",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-390": {
+      "control_id": "A.15.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-391": {
+      "control_id": "A.5.15",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-392": {
+      "control_id": "A.8.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-393": {
+      "control_id": "A.8.2",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-394": {
+      "control_id": "A.9.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-395": {
+      "control_id": "A.12.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-396": {
+      "control_id": "A.13.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-397": {
+      "control_id": "A.5.18",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-398": {
+      "control_id": "A.8.8",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-399": {
+      "control_id": "A.5.17",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-40": {
+      "control_id": "A.8.9",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-400": {
+      "control_id": "A.8.9",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-401": {
+      "control_id": "A.5.20",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-402": {
+      "control_id": "A.7.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-403": {
+      "control_id": "A.16.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-404": {
+      "control_id": "A.18.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-405": {
+      "control_id": "A.15.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-406": {
+      "control_id": "A.5.15",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-407": {
+      "control_id": "A.8.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-408": {
+      "control_id": "A.8.2",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-409": {
+      "control_id": "A.9.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-41": {
+      "control_id": "A.5.20",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-410": {
+      "control_id": "A.12.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-411": {
+      "control_id": "A.13.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-412": {
+      "control_id": "A.5.18",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-413": {
+      "control_id": "A.8.8",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-414": {
+      "control_id": "A.5.17",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-415": {
+      "control_id": "A.8.9",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-416": {
+      "control_id": "A.5.20",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-417": {
+      "control_id": "A.7.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-418": {
+      "control_id": "A.16.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-419": {
+      "control_id": "A.18.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-42": {
+      "control_id": "A.7.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-420": {
+      "control_id": "A.15.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-421": {
+      "control_id": "A.5.15",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-422": {
+      "control_id": "A.8.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-423": {
+      "control_id": "A.8.2",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-424": {
+      "control_id": "A.9.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-425": {
+      "control_id": "A.12.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-426": {
+      "control_id": "A.13.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-427": {
+      "control_id": "A.5.18",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-428": {
+      "control_id": "A.8.8",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-429": {
+      "control_id": "A.5.17",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-43": {
+      "control_id": "A.16.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-430": {
+      "control_id": "A.8.9",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-431": {
+      "control_id": "A.5.20",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-432": {
+      "control_id": "A.7.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-433": {
+      "control_id": "A.16.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-434": {
+      "control_id": "A.18.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-435": {
+      "control_id": "A.15.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-436": {
+      "control_id": "A.5.15",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-437": {
+      "control_id": "A.8.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-438": {
+      "control_id": "A.8.2",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-439": {
+      "control_id": "A.9.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-44": {
+      "control_id": "A.18.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-440": {
+      "control_id": "A.12.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-441": {
+      "control_id": "A.13.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-442": {
+      "control_id": "A.5.18",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-443": {
+      "control_id": "A.8.8",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-444": {
+      "control_id": "A.5.17",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-445": {
+      "control_id": "A.8.9",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-446": {
+      "control_id": "A.5.20",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-447": {
+      "control_id": "A.7.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-448": {
+      "control_id": "A.16.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-449": {
+      "control_id": "A.18.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-45": {
+      "control_id": "A.15.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-450": {
+      "control_id": "A.15.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-451": {
+      "control_id": "A.5.15",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-452": {
+      "control_id": "A.8.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-453": {
+      "control_id": "A.8.2",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-454": {
+      "control_id": "A.9.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-455": {
+      "control_id": "A.12.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-456": {
+      "control_id": "A.13.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-457": {
+      "control_id": "A.5.18",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-458": {
+      "control_id": "A.8.8",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-459": {
+      "control_id": "A.5.17",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-46": {
+      "control_id": "A.5.15",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-460": {
+      "control_id": "A.8.9",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-461": {
+      "control_id": "A.5.20",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-462": {
+      "control_id": "A.7.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-463": {
+      "control_id": "A.16.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-464": {
+      "control_id": "A.18.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-465": {
+      "control_id": "A.15.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-466": {
+      "control_id": "A.5.15",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-467": {
+      "control_id": "A.8.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-468": {
+      "control_id": "A.8.2",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-469": {
+      "control_id": "A.9.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-47": {
+      "control_id": "A.8.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-470": {
+      "control_id": "A.12.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-471": {
+      "control_id": "A.13.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-472": {
+      "control_id": "A.5.18",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-473": {
+      "control_id": "A.8.8",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-474": {
+      "control_id": "A.5.17",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-475": {
+      "control_id": "A.8.9",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-476": {
+      "control_id": "A.5.20",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-477": {
+      "control_id": "A.7.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-478": {
+      "control_id": "A.16.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-479": {
+      "control_id": "A.18.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-48": {
+      "control_id": "A.8.2",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-480": {
+      "control_id": "A.15.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-481": {
+      "control_id": "A.5.15",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-482": {
+      "control_id": "A.8.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-483": {
+      "control_id": "A.8.2",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-484": {
+      "control_id": "A.9.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-485": {
+      "control_id": "A.12.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-486": {
+      "control_id": "A.13.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-487": {
+      "control_id": "A.5.18",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-488": {
+      "control_id": "A.8.8",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-489": {
+      "control_id": "A.5.17",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-49": {
+      "control_id": "A.9.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-490": {
+      "control_id": "A.8.9",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-491": {
+      "control_id": "A.5.20",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-492": {
+      "control_id": "A.7.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-493": {
+      "control_id": "A.16.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-494": {
+      "control_id": "A.18.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-495": {
+      "control_id": "A.15.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-496": {
+      "control_id": "A.5.15",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-497": {
+      "control_id": "A.8.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-498": {
+      "control_id": "A.8.2",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-499": {
+      "control_id": "A.9.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-50": {
+      "control_id": "A.12.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-500": {
+      "control_id": "A.12.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-51": {
+      "control_id": "A.13.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-52": {
+      "control_id": "A.5.18",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-53": {
+      "control_id": "A.8.8",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-54": {
+      "control_id": "A.5.17",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-55": {
+      "control_id": "A.8.9",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-56": {
+      "control_id": "A.5.20",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-57": {
+      "control_id": "A.7.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-58": {
+      "control_id": "A.16.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-59": {
+      "control_id": "A.18.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-60": {
+      "control_id": "A.15.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-61": {
+      "control_id": "A.5.15",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-62": {
+      "control_id": "A.8.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-63": {
+      "control_id": "A.8.2",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-64": {
+      "control_id": "A.9.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-65": {
+      "control_id": "A.12.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-66": {
+      "control_id": "A.13.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-67": {
+      "control_id": "A.5.18",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-68": {
+      "control_id": "A.8.8",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-69": {
+      "control_id": "A.5.17",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-70": {
+      "control_id": "A.8.9",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-71": {
+      "control_id": "A.5.20",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-72": {
+      "control_id": "A.7.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-73": {
+      "control_id": "A.16.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-74": {
+      "control_id": "A.18.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-75": {
+      "control_id": "A.15.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-76": {
+      "control_id": "A.5.15",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-77": {
+      "control_id": "A.8.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-78": {
+      "control_id": "A.8.2",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-79": {
+      "control_id": "A.9.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-80": {
+      "control_id": "A.12.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-81": {
+      "control_id": "A.13.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-82": {
+      "control_id": "A.5.18",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-83": {
+      "control_id": "A.8.8",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-84": {
+      "control_id": "A.5.17",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-85": {
+      "control_id": "A.8.9",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-86": {
+      "control_id": "A.5.20",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-87": {
+      "control_id": "A.7.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-88": {
+      "control_id": "A.16.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-89": {
+      "control_id": "A.18.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-90": {
+      "control_id": "A.15.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-91": {
+      "control_id": "A.5.15",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-92": {
+      "control_id": "A.8.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-93": {
+      "control_id": "A.8.2",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-94": {
+      "control_id": "A.9.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-95": {
+      "control_id": "A.12.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-96": {
+      "control_id": "A.13.1",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-97": {
+      "control_id": "A.5.18",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-98": {
+      "control_id": "A.8.8",
+      "final_confidence": 0.97,
+      "status": "published"
+    },
+    "GOLD-EXP-99": {
+      "control_id": "A.5.17",
+      "final_confidence": 0.97,
+      "status": "published"
+    }
+  },
+  "version": "mvp-v1"
+}

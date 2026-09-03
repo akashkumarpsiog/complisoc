@@ -39,6 +39,12 @@ the compliance pipeline end-to-end:
 See [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) for deployment and the
 gap-by-gap status used in the Moodle submission.
 
+## Scale Testing
+
+See [docs/SCALE_TESTING.md](docs/SCALE_TESTING.md) for the scale testing strategy,
+benchmark dataset, evaluation harness, regression detection, load testing,
+and known gaps relative to the original proposal.
+
 ## Engineering Quality
 
 See [BUG_REGISTRY.md](../BUG_REGISTRY.md) for root-cause analysis of major

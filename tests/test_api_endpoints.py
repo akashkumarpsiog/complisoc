@@ -259,7 +259,7 @@ class TestAuditBundlesAPI:
         resp = client.post("/api/v1/audit-bundles", json={"scan_run_id": scan_run_id})
         assert resp.status_code == 201
         body = resp.json()
-        assert body["checksum"]
+        assert "checksum" not in body or body["checksum"] is None
         assert body["bundle_path"]
 
     def test_download_audit_bundle_not_found(self, client):

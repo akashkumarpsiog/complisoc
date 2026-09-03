@@ -562,12 +562,11 @@ function ReportsTab({ scanRunId, reports, resource, onRefresh }: { scanRunId: nu
       <ResourceBoundary resource={{ ...resource, data: complianceReports }}>
         {(data) => (
           <DataTable
-            columns={["ID", "Type", "Generated", "Hash", "Download"]}
+            columns={["ID", "Type", "Generated", "Download"]}
             rows={data.map((report) => [
               report.id,
               report.report_type,
               formatDate(report.generated_at),
-              report.content_hash || "n/a",
               <a key={`dl-${report.id}`} className="icon-button" href={api.reports.downloadUrl(report.id)}>
                 Download
               </a>,
@@ -580,12 +579,11 @@ function ReportsTab({ scanRunId, reports, resource, onRefresh }: { scanRunId: nu
         <div className="mt-6 space-y-3">
           <h3 className="text-xs font-bold uppercase tracking-wider text-subtle">Scenario Reports</h3>
           <DataTable
-            columns={["ID", "Scenario", "Generated", "Hash", "Download"]}
+            columns={["ID", "Scenario", "Generated", "Download"]}
             rows={scenarioReports.map((report) => [
               report.id,
               report.report_type.replace("scenario:", ""),
               formatDate(report.generated_at),
-              report.content_hash || "n/a",
               <a key={`dl-${report.id}`} className="icon-button" href={api.reports.downloadUrl(report.id)}>
                 Download
               </a>,
@@ -622,11 +620,10 @@ function BundleTab({ scanRunId, bundles, resource, onRefresh }: { scanRunId: num
       <ResourceBoundary resource={{ ...resource, data: scanBundles }}>
         {(data) => (
           <DataTable
-            columns={["ID", "Generated", "Checksum", "Download"]}
+            columns={["ID", "Generated", "Download"]}
             rows={data.map((bundle) => [
               bundle.id,
               formatDate(bundle.generated_at),
-              bundle.checksum,
               <a key={`dl-${bundle.id}`} className="icon-button" href={api.auditBundles.downloadUrl(bundle.id)}>
                 Download
               </a>,

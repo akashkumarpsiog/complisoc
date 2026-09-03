@@ -182,6 +182,9 @@ class ComplianceReportRead(ORMModel):
     generated_by: str
     generated_at: datetime | None = None
     content_path: str | None = None
+    # The content hash is used internally to detect tampering of generated
+    # PDFs / JSON payloads. It is not surfaced to the UI; the download
+    # endpoint re-hashes on serve to ensure integrity.
     content_hash: str | None = None
 
 
@@ -191,7 +194,12 @@ class AuditBundleRead(ORMModel):
     generated_at: datetime | None = None
     bundle_path: str | None = None
     manifest_path: str | None = None
-    checksum: str
+    # Checksum is exposed only when explicitly requested via the verify
+    # endpoint, which already returns a per-file hash map. The list
+    # endpoint deliberately omits it so the raw SHA-256 never leaves the
+    # server. Integrity is conveyed to operators via the Valid / Tampered
+    # status from /verify-all.
+    checksum: str | None = None
 
 
 class AIMetricsRead(ORMModel):

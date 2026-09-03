@@ -215,11 +215,13 @@ def test_api_scan_run_and_reports(client):
 
     engineering = client.post("/api/v1/reports/engineering", json={"scan_run_id": scan_run_id})
     assert engineering.status_code == 201
-    assert engineering.json()["content_hash"]
+    eng_body = engineering.json()
+    assert "content_hash" not in eng_body or eng_body["content_hash"] is None
 
     bundle = client.post("/api/v1/audit-bundles", json={"scan_run_id": scan_run_id})
     assert bundle.status_code == 201
-    assert bundle.json()["checksum"]
+    bundle_body = bundle.json()
+    assert "checksum" not in bundle_body or bundle_body["checksum"] is None
 
     controls = client.get("/api/v1/controls")
     assert controls.status_code == 200

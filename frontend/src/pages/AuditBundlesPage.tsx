@@ -121,14 +121,13 @@ function BundleTable({ data, verificationResults, verifying, onRefreshVerificati
         </button>
       </div>
       <DataTable
-        columns={["ID", "Scan Run", "Generated", "Checksum", "Integrity", "Details", "Actions"]}
+        columns={["ID", "Scan Run", "Generated", "Integrity", "Details", "Actions"]}
         rows={data.map((bundle) => {
           const result = verificationResults[bundle.id];
           return [
             bundle.id,
             bundle.scan_run_id,
             formatDate(bundle.generated_at),
-            <span key={`checksum-${bundle.id}`} className="font-mono text-xs" title={bundle.checksum}>{bundle.checksum.slice(0, 16)}…</span>,
             <IntegrityStatus key={`integrity-${bundle.id}`} result={result} verifying={verifying} />,
             <VerificationDetails key={`details-${bundle.id}`} result={result} bundle={bundle} />,
             <div key={`actions-${bundle.id}`} className="flex items-center gap-2">

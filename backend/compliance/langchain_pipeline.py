@@ -110,9 +110,18 @@ def stage_ingest(state: _ChainState) -> _ChainState:
 
     for raw_finding in raw_findings:
         try:
-            normalized = normalize_raw_finding(state.db, raw_finding)
+            # ``commit=False`` batches the per-finding writes; the
+            # single transaction is flushed + committed at the end of
+            # stage_finalize. This is what makes the pipeline scale to
+            # 500+ findings without a per-finding commit penalty.
+            normalized = normalize_raw_finding(state.db, raw_finding, commit=False)
             state.normalized_findings.append(normalized)
-            candidates = narrow_candidates(state.db, normalized, framework=state.framework)
+            candidates = narrow_candidates(
+                state.db,
+                normalized,
+                framework=state.framework,
+                commit=False,
+            )
             if not candidates:
                 state.failures.append({"raw_finding_id": raw_finding.id, "error": "No candidate controls matched."})
                 continue

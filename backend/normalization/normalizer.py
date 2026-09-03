@@ -20,7 +20,12 @@ def normalize_severity(value: object) -> str:
     return severity
 
 
-def normalize_raw_finding(db: Session, raw_finding: RawFinding) -> NormalizedFinding:
+def normalize_raw_finding(
+    db: Session,
+    raw_finding: RawFinding,
+    *,
+    commit: bool = True,
+) -> NormalizedFinding:
     payload = raw_finding.raw_json or {}
     if not isinstance(payload, dict):
         raise ValueError("raw_json must be an object")
@@ -53,6 +58,13 @@ def normalize_raw_finding(db: Session, raw_finding: RawFinding) -> NormalizedFin
         metadata_json=payload,
     )
     db.add(normalized)
-    db.commit()
-    db.refresh(normalized)
+    if commit:
+        db.commit()
+        db.refresh(normalized)
+    else:
+        # Caller is expected to flush + commit once for the whole batch
+        # (the LCEL pipeline does this in stage_finalize). Flush so the
+        # primary key is populated for downstream FK references.
+        db.flush()
+        db.refresh(normalized)
     return normalized
