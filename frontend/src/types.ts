@@ -197,6 +197,8 @@ export interface DashboardTrend {
   trends: Array<{
     scan_run_id: number;
     created_at: string;
+    findings: number;
+    high_critical_findings: number;
     published: number;
     manual_review: number;
   }>;

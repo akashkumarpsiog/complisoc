@@ -3,9 +3,9 @@ import { useState } from "react";
 import { api } from "../services/api";
 import { useResource } from "../hooks/useResource";
 import { ResourceBoundary } from "../components/ResourceBoundary";
-import { BarList, DataTable, DonutChart, MetricCard, ProgressBar, Section, StatusBadge, staggerStyle } from "../components/Primitives";
+import { BarList, DataTable, DonutChart, ProgressBar, Section, StatusBadge, staggerStyle } from "../components/Primitives";
 import { ControlDrillDownDrawer, RemediationSuggestionPanel } from "../components/DashboardDetails";
-import { ComplianceScoreCard, ComplianceInsightsPanel } from "../components/ComplianceScore";
+import { ComplianceScoreCard } from "../components/ComplianceScore";
 import { formatPercent } from "../utils/format";
 
 export function OverviewPage({ onViewChange }: { onViewChange?: (viewId: ViewId) => void }) {
@@ -16,68 +16,12 @@ export function OverviewPage({ onViewChange }: { onViewChange?: (viewId: ViewId)
   const gap = useResource(api.dashboard.gap);
   const backlog = useResource(api.dashboard.backlog);
   const trends = useResource(api.dashboard.trends);
-   const cloudFindings = useResource(api.dashboard.cloudFindings);
-  const aiMetrics = useResource(api.dashboard.aiMetrics);
 
   const visibleTrends = showAllTrends ? trends.data?.trends : trends.data?.trends.slice(-5);
 
   return (
     <>
       <ComplianceScoreCard />
-      <ComplianceInsightsPanel />
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
-        <ResourceBoundary resource={coverage}>
-          {(data) => (
-            <div className="animate-slide-up" style={staggerStyle(0)}>
-              <MetricCard
-                label="Control coverage"
-                value={`${data.covered_controls}/${data.total_controls}`}
-                detail={`${Math.round((data.covered_controls / data.total_controls) * 100)}% of controls covered`}
-                accent="emerald"
-                progress={data.total_controls ? data.covered_controls / data.total_controls : 0}
-              />
-            </div>
-          )}
-        </ResourceBoundary>
-        <ResourceBoundary resource={gap}>
-          {(data) => (
-            <div className="animate-slide-up" style={staggerStyle(1)}>
-              <MetricCard label="Manual review" value={data.manual_review_mappings} detail="Mappings awaiting decision" accent="amber" />
-            </div>
-          )}
-        </ResourceBoundary>
-        <ResourceBoundary resource={gap}>
-          {(data) => <div className="animate-slide-up" style={staggerStyle(2)}><MetricCard label="Rejected" value={data.rejected_mappings} detail="Mappings not accepted" accent="rose" /></div>}
-        </ResourceBoundary>
-        <ResourceBoundary resource={backlog}>
-          {(data) => <div className="animate-slide-up" style={staggerStyle(3)}><MetricCard label="Backlog" value={data.items.length} detail="Remediation queue items" accent="brand" /></div>}
-        </ResourceBoundary>
-        <ResourceBoundary resource={cloudFindings}>
-          {(data) => (
-            <div className="animate-slide-up" style={staggerStyle(4)}>
-              <MetricCard
-                label="Cloud findings"
-                value={data.alerts + data.recommendations + data.secure_scores}
-                detail={`${data.alerts} alerts · ${data.recommendations} recommendations · ${data.secure_scores} scores`}
-                accent="slate"
-              />
-            </div>
-          )}
-        </ResourceBoundary>
-        <ResourceBoundary resource={aiMetrics}>
-          {(data) => (
-            <div className="animate-slide-up" style={staggerStyle(4)}>
-              <MetricCard
-                label="AI agreement rate"
-                value={formatPercent(data.agreement_rate)}
-                detail={`${data.published_mappings} published · ${data.manual_review_mappings} review`}
-                accent={data.agreement_rate !== null && data.agreement_rate >= 0.9 ? "emerald" : "amber"}
-                progress={data.agreement_rate ?? undefined}
-              />
-            </div>
-          )}
-        </ResourceBoundary>
-      </div>
 
       <div className="grid gap-5 xl:grid-cols-3">
         <ResourceBoundary resource={coverage}>
@@ -91,7 +35,7 @@ export function OverviewPage({ onViewChange }: { onViewChange?: (viewId: ViewId)
                 <DonutChart
                   value={data.covered_controls}
                   total={data.total_controls}
-                  label="Coverage"
+                  label="Controls with findings"
                   accent="emerald"
                   size={160}
                 />
@@ -120,17 +64,25 @@ export function OverviewPage({ onViewChange }: { onViewChange?: (viewId: ViewId)
       </div>
 
       <div className="grid gap-5 xl:grid-cols-2">
-        <Section title="Historical Trends" description="Published vs. manual-review per scan" className="xl:col-span-1" collapsible>
+        <Section title="Mapping Workflow History" description="Findings and mapping outcomes per scan" className="xl:col-span-1" collapsible>
           <ResourceBoundary resource={trends}>
             {(data) => (
               <div className="space-y-4">
-                {(visibleTrends || []).slice().reverse().map((item: { scan_run_id: number; published: number; manual_review: number; created_at: string }) => (
+                {(visibleTrends || []).slice().reverse().map((item) => (
                   <div key={item.scan_run_id} className="space-y-2 animate-slide-up" style={staggerStyle(item.scan_run_id % 5)}>
                     <div className="flex items-center justify-between text-sm">
                       <span className="font-semibold text-ink">Scan #{item.scan_run_id}</span>
                       <span className="text-xs text-subtle font-medium">{new Date(item.created_at).toLocaleDateString()}</span>
                     </div>
                     <div className="grid grid-cols-2 gap-3">
+                      <div className="rounded-lg border border-sky-200 bg-sky-50 p-3 text-center">
+                        <span className="text-lg font-bold text-sky-700 tabular-nums">{item.findings}</span>
+                        <span className="block text-xs font-medium text-sky-700/70 mt-0.5">Findings</span>
+                      </div>
+                      <div className="rounded-lg border border-rose-200 bg-rose-50 p-3 text-center">
+                        <span className="text-lg font-bold text-rose-700 tabular-nums">{item.high_critical_findings}</span>
+                        <span className="block text-xs font-medium text-rose-700/70 mt-0.5">High/Critical</span>
+                      </div>
                       <div className="rounded-lg border border-success/20 bg-success-light p-3 text-center">
                         <span className="text-lg font-bold text-success-dark tabular-nums">{item.published}</span>
                         <span className="block text-xs font-medium text-success/70 mt-0.5">Published</span>
@@ -228,20 +180,6 @@ export function OverviewPage({ onViewChange }: { onViewChange?: (viewId: ViewId)
         </ResourceBoundary>
       </Section>
 
-      <Section title="AI Evaluation" description="Mapping quality and model agreement metrics" collapsible defaultOpen={false}>
-        <ResourceBoundary resource={aiMetrics}>
-          {(data) => (
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-              <MetricCard label="Total mappings" value={data.total_mappings} detail={`${data.published_mappings} published · ${data.manual_review_mappings} review`} accent="brand" />
-              <MetricCard label="Agreement rate" value={formatPercent(data.agreement_rate)} detail="Groq vs Gemini" accent={data.agreement_rate !== null && data.agreement_rate >= 0.9 ? "emerald" : "amber"} progress={data.agreement_rate ?? undefined} />
-              <MetricCard label="Avg Gemini confidence" value={formatPercent(data.avg_gemini_confidence)} detail="Mapper output" accent="slate" />
-              <MetricCard label="Avg final confidence" value={formatPercent(data.avg_final_confidence)} detail="Post-verification" accent="emerald" />
-              <MetricCard label="Avg Groq agreement" value={formatPercent(data.avg_groq_agreement)} detail="Verifier output" accent="brand" />
-              <MetricCard label="Manual review rate" value={formatPercent(data.manual_review_rate)} detail="Below threshold or failures" accent="amber" />
-            </div>
-          )}
-        </ResourceBoundary>
-      </Section>
       <ControlDrillDownDrawer key={selectedControlId ?? "closed"} controlId={selectedControlId} onClose={() => setSelectedControlId(null)} />
     </>
   );

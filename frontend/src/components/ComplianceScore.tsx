@@ -5,12 +5,15 @@ import { ResourceBoundary } from "../components/ResourceBoundary";
 import { Section } from "../components/Primitives";
 import { TrendingUp, TrendingDown, Minus, AlertTriangle, CheckCircle2, Info } from "lucide-react";
 
-interface ComplianceScoreData {
-  score: number;
-  coverage_pct: number;
+interface ComplianceMetricsData {
+  findings_count: number;
+  high_critical_findings: number;
+  high_critical_pct: number;
   published_pct: number;
+  published_mappings: number;
+  total_mappings: number;
   avg_confidence: number;
-  gap_count: number;
+  review_queue: number;
 }
 
 interface Insight {
@@ -20,66 +23,73 @@ interface Insight {
 }
 
 export function ComplianceScoreCard() {
-  const coverage = useResource(api.dashboard.coverage);
   const aiMetrics = useResource(api.dashboard.aiMetrics);
   const gap = useResource(api.dashboard.gap);
+  const severity = useResource(api.dashboard.severity);
 
-  const scoreData = useMemo((): ComplianceScoreData | null => {
-    if (!coverage.data || !aiMetrics.data) return null;
-    const coveragePct = coverage.data.total_controls
-      ? (coverage.data.covered_controls / coverage.data.total_controls) * 100
-      : 0;
+  const metricsData = useMemo((): ComplianceMetricsData | null => {
+    if (!aiMetrics.data || !gap.data || !severity.data) return null;
     const totalMappings = aiMetrics.data.total_mappings || 0;
     const publishedPct = totalMappings
       ? (aiMetrics.data.published_mappings / totalMappings) * 100
       : 0;
-    const avgConfidence = ((aiMetrics.data.avg_final_confidence ?? 0) * 100);
-    const gapCount = (gap.data?.manual_review_mappings || 0) + (gap.data?.rejected_mappings || 0);
-    const score = Math.round((coveragePct * 0.4) + (publishedPct * 0.3) + (avgConfidence * 0.3));
-    return { score, coverage_pct: coveragePct, published_pct: publishedPct, avg_confidence: avgConfidence, gap_count: gapCount };
-  }, [coverage.data, aiMetrics.data, gap.data]);
-
-  const accent = scoreData && scoreData.score >= 70 ? "emerald" : scoreData && scoreData.score >= 40 ? "amber" : "rose";
+    const severityCounts = severity.data.severity_counts;
+    const findingsCount = Object.values(severityCounts).reduce((total, count) => total + count, 0);
+    const highCriticalFindings = (severityCounts.high || 0) + (severityCounts.critical || 0);
+    return {
+      findings_count: findingsCount,
+      high_critical_findings: highCriticalFindings,
+      high_critical_pct: findingsCount ? (highCriticalFindings / findingsCount) * 100 : 0,
+      published_pct: publishedPct,
+      published_mappings: aiMetrics.data.published_mappings,
+      total_mappings: totalMappings,
+      avg_confidence: (aiMetrics.data.avg_final_confidence ?? 0) * 100,
+      review_queue: gap.data.manual_review_mappings,
+    };
+  }, [aiMetrics.data, gap.data, severity.data]);
 
   return (
-    <Section title="Compliance Posture Score" description="Overall compliance health based on coverage, mapping quality, and confidence">
-      <ResourceBoundary resource={{ ...coverage, status: coverage.data ? "success" : coverage.status, error: coverage.error }}>
-        {() => (
-          <ResourceBoundary resource={{ ...aiMetrics, status: aiMetrics.data ? "success" : aiMetrics.status, error: aiMetrics.error }}>
-            {() => scoreData ? (
-              <div className="flex items-center gap-6">
-                <div className={`flex h-20 w-20 items-center justify-center rounded-2xl ${accent === "emerald" ? "bg-success-light" : accent === "amber" ? "bg-warning-light" : "bg-danger-light"}`}>
-                  <span className={`text-3xl font-bold ${accent === "emerald" ? "text-success-dark" : accent === "amber" ? "text-warning-dark" : "text-danger-dark"}`}>
-                    {scoreData.score}
-                  </span>
-                </div>
-                <div className="flex-1 space-y-2">
-                  <div className="grid grid-cols-3 gap-4 text-sm">
-                    <div>
-                      <div className="text-subtle font-medium">Coverage</div>
-                      <div className="font-semibold text-ink">{scoreData.coverage_pct.toFixed(0)}%</div>
-                    </div>
-                    <div>
-                      <div className="text-subtle font-medium">Published</div>
-                      <div className="font-semibold text-ink">{scoreData.published_pct.toFixed(0)}%</div>
-                    </div>
-                    <div>
-                      <div className="text-subtle font-medium">Avg Confidence</div>
-                      <div className="font-semibold text-ink">{scoreData.avg_confidence.toFixed(0)}%</div>
-                    </div>
-                  </div>
-                  <div className="text-xs text-subtle">
-                    Score = 40% coverage + 30% published + 30% confidence. Weights are configurable.
-                  </div>
-                </div>
-              </div>
-            ) : (
-              <div className="text-sm text-muted">Calculating score...</div>
+    <Section title="Compliance Metrics" description="Independent signals about findings, control mappings, and review status">
+      <ResourceBoundary resource={{ ...aiMetrics, status: aiMetrics.data ? "success" : aiMetrics.status, error: aiMetrics.error }}>
+            {() => (
+              <ResourceBoundary resource={{ ...gap, status: gap.data ? "success" : gap.status, error: gap.error }}>
+                {() => (
+                  <ResourceBoundary resource={{ ...severity, status: severity.data ? "success" : severity.status, error: severity.error }}>
+                    {() => metricsData ? (
+                      <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+                        <Metric accent="sky" label="Findings" value={metricsData.findings_count} detail="Recorded normalized findings" description="Total security findings currently recorded from scanners. Findings represent detected issues, not compliance status." />
+                        <Metric accent="emerald" label="Avg Confidence" value={`${metricsData.avg_confidence.toFixed(0)}%`} detail="Final AI mapping confidence" description="Average final confidence assigned to AI-generated control mappings after validation and verification. It indicates how strongly the mapping workflow supports the selected control, not organizational compliance." />
+                        <Metric accent="brand" label="Published Mappings" value={`${metricsData.published_pct.toFixed(0)}%`} detail={`${metricsData.published_mappings} of ${metricsData.total_mappings} mappings`} description="Percentage of generated control mappings that passed validation and verification and were published automatically." />
+                        <Metric accent="amber" label="Review Queue" value={metricsData.review_queue} detail="Mappings awaiting human review" description="Number of mappings awaiting human review because they did not meet the publication threshold or require manual validation." />
+                        <Metric accent="rose" label="High/Critical Findings" value={metricsData.high_critical_findings} detail={`${metricsData.high_critical_pct.toFixed(0)}% of recorded findings`} description="Number of currently recorded high- and critical-severity security findings. These represent the highest-priority issues requiring attention." />
+                      </div>
+                    ) : (
+                      <div className="text-sm text-muted">Loading metrics...</div>
+                    )}
+                  </ResourceBoundary>
+                )}
+              </ResourceBoundary>
             )}
-          </ResourceBoundary>
-        )}
       </ResourceBoundary>
     </Section>
+  );
+}
+
+function Metric({ accent, label, value, detail, description }: { accent: "brand" | "sky" | "emerald" | "amber" | "rose"; label: string; value: string | number; detail: string; description: string }) {
+  const styles = {
+    brand: "border-brand-200 bg-brand-50/60 text-brand-700",
+    sky: "border-sky-200 bg-sky-50/60 text-sky-700",
+    emerald: "border-emerald-200 bg-emerald-50/60 text-emerald-700",
+    amber: "border-amber-200 bg-amber-50/60 text-amber-700",
+    rose: "border-rose-200 bg-rose-50/60 text-rose-700",
+  };
+  return (
+    <div className={`rounded-lg border p-4 ${styles[accent]}`}>
+      <div className="text-sm font-medium">{label}</div>
+      <div className="mt-1 text-2xl font-semibold text-ink">{value}</div>
+      <div className="mt-1 text-xs font-medium text-muted">{detail}</div>
+      <p className="mt-3 text-xs leading-5 text-muted">{description}</p>
+    </div>
   );
 }
 

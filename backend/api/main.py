@@ -691,10 +691,13 @@ def _dashboard_trends(db: Session):
     )
     for scan_run in reversed(scan_runs):
         mappings = _mappings_for_scan_run(db, scan_run.id)
+        findings = _normalized_findings_for_scan_run(db, scan_run.id).all()
         trends.append(
             {
                 "scan_run_id": scan_run.id,
                 "created_at": scan_run.created_at,
+                "findings": len(findings),
+                "high_critical_findings": sum(1 for finding in findings if finding.severity in ("high", "critical")),
                 "published": len([mapping for mapping in mappings if mapping.mapping_status == "published"]),
                 "manual_review": len([mapping for mapping in mappings if mapping.mapping_status == "manual_review"]),
             }

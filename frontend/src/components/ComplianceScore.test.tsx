@@ -10,6 +10,7 @@ vi.mock("../services/api", () => ({
       coverage: { data: null, status: "idle", error: null, reload: vi.fn() },
       aiMetrics: { data: null, status: "idle", error: null, reload: vi.fn() },
       gap: { data: null, status: "idle", error: null, reload: vi.fn() },
+      severity: { data: null, status: "idle", error: null, reload: vi.fn() },
       trends: { data: null, status: "idle", error: null, reload: vi.fn() },
     },
   },
@@ -26,13 +27,15 @@ describe("ComplianceScoreCard", () => {
     expect(screen.getByText("Loading")).toBeInTheDocument();
   });
 
-  it("renders score when data is available", () => {
+  it("renders independent metrics when data is available", () => {
     const reload = vi.fn();
-    mockUseResource.mockReturnValueOnce({ data: { covered_controls: 80, total_controls: 100 }, status: "success", error: null, reload });
     mockUseResource.mockReturnValueOnce({ data: { total_mappings: 50, published_mappings: 40, avg_final_confidence: 0.85 }, status: "success", error: null, reload });
     mockUseResource.mockReturnValueOnce({ data: { manual_review_mappings: 5, rejected_mappings: 3 }, status: "success", error: null, reload });
+    mockUseResource.mockReturnValueOnce({ data: { severity_counts: { high: 2, critical: 1, low: 7 } }, status: "success", error: null, reload });
     render(<ComplianceScoreCard />);
-    expect(screen.getByText("Compliance Posture Score")).toBeInTheDocument();
+    expect(screen.getByText("Findings")).toBeInTheDocument();
+    expect(screen.getByText("High/Critical Findings")).toBeInTheDocument();
+    expect(screen.queryByText(/Score =/)).not.toBeInTheDocument();
   });
 });
 

@@ -324,6 +324,7 @@ class TestDashboardAPI:
         resp = client.get("/api/v1/dashboard/trends")
         assert resp.status_code == 200
         assert "trends" in resp.json()
+        assert {"findings", "high_critical_findings", "published", "manual_review"}.issubset(resp.json()["trends"][0])
 
     def test_cloud_findings(self, client, db_session):
         from complisoc.backend.models import NormalizedFinding, RawFinding, ScannerExecution, ScanRun
