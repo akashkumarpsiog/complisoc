@@ -277,11 +277,14 @@ class TestScenarioReports:
         with _mock_narrative():
             report = generate_scenario_report(db_session, scan_run_id=scan_run_id, scenario="container")
 
-        json_path = Path(report.content_path).parent
-        json_files = list(json_path.glob(f"scenario-container-scan-{scan_run_id}-*.json"))
-
-        all_control_ids = []
-        for jf in json_files:
-            data = json.loads(jf.read_text())
-            all_control_ids.extend(data["control_ids_referenced"])
-        assert len(all_control_ids) == len(set(all_control_ids)), "duplicate control IDs in scenario report"
+        report_pdf = Path(report.content_path)
+        artifact_dir = report_pdf.parent
+        if not artifact_dir.is_absolute():
+            artifact_dir = Path(__file__).resolve().parents[1] / artifact_dir
+        assert report.content_hash is not None
+        json_files = list(artifact_dir.glob(f"{report_pdf.stem}-{report.content_hash[:12]}.json"))
+        assert len(json_files) == 1, "expected exactly one JSON artifact for the generated report"
+        json_path = json_files[0]
+        data = json.loads(json_path.read_text())
+        control_ids = data["control_ids_referenced"]
+        assert len(control_ids) == len(set(control_ids)), "duplicate control IDs in scenario report"

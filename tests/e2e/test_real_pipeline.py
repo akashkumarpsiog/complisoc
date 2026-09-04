@@ -244,13 +244,19 @@ def test_e2e_real_pipeline_creates_findings_mappings_artifacts(client, tmp_path,
 
     eng = client.post("/api/v1/reports/engineering", json={"scan_run_id": scan_run_id})
     assert eng.status_code == 201
-    assert eng.json()["content_hash"]
-    assert pathlib.Path(eng.json()["content_path"]).exists(), "engineering report artifact missing"
+    assert eng.json()["content_hash"] is None, "report hashes must remain redacted from API responses"
+    report_path = pathlib.Path(eng.json()["content_path"])
+    if not report_path.is_absolute():
+        report_path = REPO_ROOT / report_path
+    assert report_path.exists(), "engineering report artifact missing"
 
     bundle = client.post("/api/v1/audit-bundles", json={"scan_run_id": scan_run_id})
     assert bundle.status_code == 201
-    assert bundle.json()["checksum"]
-    assert pathlib.Path(bundle.json()["bundle_path"]).exists(), "audit bundle artifact missing"
+    assert bundle.json()["checksum"] is None, "bundle checksums must remain redacted from API responses"
+    bundle_path = pathlib.Path(bundle.json()["bundle_path"])
+    if not bundle_path.is_absolute():
+        bundle_path = REPO_ROOT / bundle_path
+    assert bundle_path.exists(), "audit bundle artifact missing"
 
 
 @pytest.mark.skipif(

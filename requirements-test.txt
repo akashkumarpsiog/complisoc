@@ -1,0 +1,4 @@
+-r requirements.txt
+great-expectations>=1.0.0
+locust>=2.0.0
+selenium>=4.0.0

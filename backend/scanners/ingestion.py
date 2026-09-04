@@ -52,10 +52,15 @@ def ingest_findings(
         db.flush()
         executions_by_scanner[scanner_name] = execution
 
+        seen_finding_ids: set[str] = set()
         for finding in scanner_findings:
+            scanner_finding_id = finding["scanner_finding_id"]
+            if scanner_finding_id in seen_finding_ids:
+                continue
+            seen_finding_ids.add(scanner_finding_id)
             raw_finding = RawFinding(
                 scanner_execution_id=execution.id,
-                scanner_finding_id=finding["scanner_finding_id"],
+                scanner_finding_id=scanner_finding_id,
                 scanner_name=scanner_name,
                 raw_json=finding["raw_json"],
             )

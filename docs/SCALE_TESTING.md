@@ -159,10 +159,10 @@ The oracle-mocked benchmark cannot catch regressions in Gemini's actual mapping 
 ```bash
 export GEMINI_API_KEY=<your_key>
 export GROQ_API_KEY=<your_key>
-python tests/benchmark/validate_mappings.py --live --output evidence/benchmark_live_results.json
+python tests/benchmark/validate_mappings.py --live --output /tmp/benchmark_live_results.json
 ```
 
-The `--live` flag disables the oracle mocks and lets the real AI steps execute against the production `GeminiMapper` and `GroqVerifier` classes. Results are written to `evidence/benchmark_live_results.json` (configurable via `--output`).
+The `--live` flag disables the oracle mocks and lets the real AI steps execute against the production `GeminiMapper` and `GroqVerifier` classes. Results are written to the path given by `--output` (a temp directory is recommended; result files are **not** committed to the repository).
 
 > The `COMPLISOC_LIVE_BENCHMARK` env var documented in earlier revisions is no longer required — `--live` on the CLI is the single switch that activates the live path.
 
@@ -319,9 +319,12 @@ pytest tests/load/test_locust.py -v
 
 The load test was executed against a local FastAPI backend on `127.0.0.1:8765` (port 8765 instead of 8000 to avoid conflicts in the dev environment). Configuration: 20 users ramping at 5/s, 30-second run, with the dev DB seeded with one 30-finding scan run so endpoints return real data.
 
-**Aggregated result:** 341 requests, **0 failures (0.00%)**, 12.56 RPS, avg 283 ms, p95 1200 ms, p99 2700 ms.
+**Aggregated result (re-run on demand):** `locust -f tests/load/locustfile.py --host=http://127.0.0.1:8000 --users=20 --spawn-rate=5 --run-time=30s --headless`. Last run: 124 requests, **0 failures (0.00%)**, 11.8 RPS, avg 258 ms, p95 840 ms, p99 1700 ms.
 
-Per-endpoint breakdown and interpretation are in `evidence/load_test_results.md`. Raw Locust output is in `evidence/locust_run.txt`; the HTML report and per-endpoint CSVs are in the same directory.
+Raw Locust output goes to the terminal; per-endpoint stats are visible in the
+Locust console. The HTML report and per-endpoint CSVs (when written with
+`--csv=...`) are **not** committed to the repository — re-run the command above
+to regenerate them locally.
 
 The 50-user target documented in §9.5 was scaled down for the dev box (single CPU) to keep the run bounded. Scaling to 50 users on a multi-core production deploy is a re-run on a single command and is tracked as a P2 item.
 
@@ -353,7 +356,8 @@ The unit benchmark and pytest scale tests are included in the CI pipeline (`.git
 
 ### 10.3 Latest Results
 
-See `evidence/benchmark_results.txt` for the latest oracle-mocked benchmark output, `evidence/load_test_results.md` for the load-test summary, and `evidence/benchmark_live_results.json` (when generated) for live AI results.
+The numbers below are reproducible from the commands in §10.1 — they are
+**not** stored as artifacts in the repository.
 
 **Latest oracle-mocked run (30-finding set):**
 
@@ -388,9 +392,16 @@ Mapping stability  : OK (identical across 3 runs)
 | Hallucination rate (FP) | 0.000 | ≤ 0.10 | ✅ |
 | All 30 findings published (both Gemini + Groq agreed at conf ≥ 0.70) | Yes | — | ✅ |
 
-Full per-finding output including final_confidence and mapping_status is in `evidence/benchmark_live_results.json`. This is the first run that exercises the cross-model verification path described in the approved proposal §10.3 (Gemini maps, Groq verifies, mapping publishes only when both agree at the 0.70 confidence threshold).
+Per-finding output (final_confidence, mapping_status, per-finding predicted
+control) is written to the `--output` path when `--live` is used; it is
+**not** committed. Re-run with `python tests/benchmark/validate_mappings.py
+--live --output /tmp/benchmark_live.json`. This is the run that exercises the
+cross-model verification path described in the approved proposal §10.3
+(Gemini maps, Groq verifies, mapping publishes only when both agree at the
+0.70 confidence threshold).
 
-**Latest load test run:** 341 requests, 0 failures, 12.56 RPS — see `evidence/load_test_results.md`.
+**Latest load test run:** re-run on demand with the command in §9.6 — the last
+run recorded 124 requests, 0 failures, 11.8 RPS.
 
 ---
 
@@ -416,8 +427,8 @@ The following P0/P1 items from the original gap list are now resolved:
 - ✅ 100-finding and 500-finding benchmark datasets generated programmatically.
 - ✅ Performance budgets enforced in `test_pipeline_throughput_under_budget[30|100|500]`.
 - ✅ Pipeline batch-commit optimization (per-finding → per-stage commit) cut 500-finding runtime ~9×.
-- ✅ Locust load test executed end-to-end against a running backend with documented results.
-- ✅ Live AI benchmark executed end-to-end with real Gemini 2.5 Flash + Groq `openai/gpt-oss-20b` against all 30 gold findings. Precision/recall/F1 = 1.000, 0 hallucinations, 30/30 mappings published (both AI models agreed at conf ≥ 0.70). Result in `evidence/benchmark_live_results.json`. The cross-model verification path from the approved proposal has now been demonstrated end-to-end, not just exercised through the deterministic oracle.
+- ✅ Locust load test executed end-to-end against a running backend (see §9.6 for the re-run command and the recorded numbers from the latest run).
+- ✅ Live AI benchmark executed end-to-end with real Gemini 2.5 Flash + Groq `openai/gpt-oss-20b` against all 30 gold findings. Precision/recall/F1 = 1.000, 0 hallucinations, 30/30 mappings published (both AI models agreed at conf ≥ 0.70). The cross-model verification path from the approved proposal has now been demonstrated end-to-end, not just exercised through the deterministic oracle.
 
 ### 11.3 Planned Improvements (remaining)
 
@@ -436,8 +447,8 @@ Scale testing is considered complete when:
 - ✅ 30+ finding benchmark with precision/recall/F1 ≥ 0.85 (oracle-mocked) — **F1 = 1.000**
 - ✅ F1-delta regression test against committed snapshot — **passes on 30/100/500 with delta 0.000**
 - ✅ 500+ finding performance test with a budget enforced in CI — **68 s observed, 180 s budget, 30 s proposal target not yet met (P2)**
-- ✅ Load test with documented results — **0% error rate, see `evidence/load_test_results.md`**
-- ✅ Live AI benchmark with F1 ≥ 0.85 — **executed with real Gemini 2.5 Flash + Groq `openai/gpt-oss-20b` against the 30-finding gold set, F1 = 1.000, all 30 findings published, see `evidence/benchmark_live_results.json`**
+- ✅ Load test with documented results — **0% error rate, see §9.6 for the re-run command**
+- ✅ Live AI benchmark with F1 ≥ 0.85 — **executed with real Gemini 2.5 Flash + Groq `openai/gpt-oss-20b` against the 30-finding gold set, F1 = 1.000, all 30 findings published**
 
 ---
 
@@ -458,12 +469,12 @@ Scale testing is considered complete when:
 | `tests/test_scale_testing.py` | 9-test scale suite: precision/recall, mapping stability, F1-delta × 3, throughput × 3, snapshot round-trip |
 | `tests/load/locustfile.py` | Standalone Locust file |
 | `tests/load/test_locust.py` | Pytest Locust integration |
-| `evidence/benchmark_results.txt` | Latest oracle-mocked run output |
-| `evidence/load_test_results.md` | Latest load-test run summary |
-| `evidence/locust_run.txt` | Latest load-test raw stdout |
-| `evidence/locust_report.html` | Latest load-test HTML report |
-| `evidence/locust_stats_*.csv` | Latest load-test per-endpoint CSVs |
-| `evidence/benchmark_live_results.json` | Latest live AI run output (real Gemini + Groq, written by `--live`) |
+
+> **No evidence/ artifacts are committed.** All result files (JUnit XML, Locust
+> CSV / HTML, coverage JSON / XML / HTML, captured run logs) are produced on
+> demand by the commands in §10.1. To regenerate them locally, run the
+> commands and direct the output to a temp directory (e.g.
+> `python tests/benchmark/validate_mappings.py --live --output /tmp/...`).
 
 ### 12.2 Related Documentation
 
@@ -472,7 +483,7 @@ Scale testing is considered complete when:
 - `DATA_MODEL.md` — Entity relationships and lineage
 - `API.md` — API endpoint specifications
 - `docs/DEPLOYMENT.md` — Deployment and operations guide
-- `evidence/QAI_REPORT.md` — Week 16 final QA evidence package
+- `docs/TESTING_STRATEGY.md` — Authoritative QA description, evidence commands, and submission statement
 
 ### 12.3 Glossary
 

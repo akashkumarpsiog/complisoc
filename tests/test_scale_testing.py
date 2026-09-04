@@ -18,6 +18,7 @@ documented benchmark.
 from __future__ import annotations
 
 import json
+import os
 import pathlib
 import sys
 import time
@@ -182,16 +183,36 @@ def test_scale_f1_delta_against_committed_snapshot(
 # ---------------------------------------------------------------------------
 # 4. End-to-end throughput at 30, 100, and 500 findings.
 #
-# The proposal §10.2 commits to "<30s for 500-1000 findings end-to-end".
-# On developer hardware the 30-finding benchmark runs in ~25s today;
-# 100 in ~30s; 500 in ~70s. We assert soft thresholds that document the
-# current state and fail if performance regresses by >50% from the
-# committed baseline.
+# Proposal §10.2 commits to "<30s for 500-1000 findings end-to-end".
+# Measured on the developer box that produced these numbers (Windows,
+# Python 3.12, in-memory SQLite, no AI calls — oracle-only):
+#
+#     30  ->  ~25s
+#     100 ->  ~30s
+#     500 ->  ~70s
+#
+# We assert the following per-size soft budgets. These are 1.7x the
+# observed dev-box runtime so a real CI machine (5-10x faster) easily
+# fits the proposal's <30s target for the 500-finding case, while a
+# regression in the pipeline is still caught. The hard floor is "under
+# the proposal's <30s ceiling for the 500-finding case" — if the dev
+# box can no longer achieve that, the bottleneck must be investigated
+# before claiming the proposal target.
 # ---------------------------------------------------------------------------
 _PERF_BASELINE_SECONDS = {
-    30: 60.0,   # 30 findings must complete in < 60s
-    100: 90.0,  # 100 findings must complete in < 90s
-    500: 180.0, # 500 findings must complete in < 180s
+    30: 45.0,   # 30 findings must complete in < 45s
+    100: 60.0,  # 100 findings must complete in < 60s
+    500: 120.0, # 500 findings must complete in < 120s (under 2x proposal ceiling)
+}
+
+# Proposal §10.2 hard ceiling for 500-1000 findings: 30s on a real CI
+# machine. We log this as a "target" rather than gate it on the dev
+# box, but the test will assert it via a separate "target" run when
+# the env var PERF_TIGHT=1 is set.
+_PROPOSAL_CEILING_SECONDS = {
+    30: 15.0,   # 30 findings target: < 15s
+    100: 20.0,  # 100 findings target: < 20s
+    500: 30.0,  # 500 findings target: < 30s (proposal §10.2 ceiling)
 }
 
 
@@ -219,10 +240,10 @@ def _time_pipeline(gold_path: pathlib.Path) -> float:
 def test_scale_throughput_at_size(gold_path, expected_count):
     """End-to-end pipeline throughput at the committed batch sizes.
 
-    Thresholds are deliberately generous (3x the current observed
-    runtime) so the test is a regression guard, not a micro-benchmark.
-    A real CI machine will be 5-10x faster than the dev box that
-    produced these numbers.
+    Regression-guard budget: 1.7x the observed dev-box runtime. A real
+    CI machine will be 5-10x faster than the dev box that produced
+    these numbers, so it should easily pass the proposal's <30s target
+    for the 500-finding case.
     """
     if not gold_path.exists():
         pytest.skip(f"missing dataset: {gold_path}")
@@ -232,8 +253,40 @@ def test_scale_throughput_at_size(gold_path, expected_count):
     assert elapsed < threshold, (
         f"Pipeline took {elapsed:.1f}s for {expected_count} findings "
         f"(threshold {threshold:.1f}s). "
+        f"Proposal §10.2 target: {_PROPOSAL_CEILING_SECONDS[expected_count]:.0f}s. "
         f"If the regression is real, profile narrow_candidates / "
         f"normalizer and re-baseline."
+    )
+
+
+@pytest.mark.benchmark
+@pytest.mark.skipif(
+    not os.environ.get("PERF_TIGHT"),
+    reason="Proposal ceiling gate is only enforced when PERF_TIGHT=1 is set "
+    "(suitable for fast CI hardware; dev boxes skip it).",
+)
+@pytest.mark.parametrize(
+    "gold_path,expected_count",
+    [
+        (_GOLD_30, 30),
+        (_GOLD_100, 100),
+        (_GOLD_500, 500),
+    ],
+)
+def test_scale_throughput_meets_proposal_ceiling(gold_path, expected_count):
+    """Strict proposal §10.2 ceiling: <30s for 500 findings, linear below.
+
+    Skipped on dev boxes; enable with ``PERF_TIGHT=1`` on CI runners
+    that should be capable of meeting the proposal target.
+    """
+    if not gold_path.exists():
+        pytest.skip(f"missing dataset: {gold_path}")
+
+    elapsed = _time_pipeline(gold_path)
+    ceiling = _PROPOSAL_CEILING_SECONDS[expected_count]
+    assert elapsed < ceiling, (
+        f"Pipeline took {elapsed:.1f}s for {expected_count} findings; "
+        f"proposal §10.2 ceiling is {ceiling:.0f}s."
     )
 
 

@@ -29,6 +29,7 @@ from complisoc.backend.models import (
     ScannerExecution,
 )
 from complisoc.backend.scanners import runners
+from complisoc.backend.scanners.ingestion import ingest_findings
 from complisoc.backend.api.schemas import ScanRequest
 
 
@@ -236,6 +237,30 @@ class TestDefenderIntegration:
 
 
 class TestScanRunDBLineage:
+    def test_duplicate_scanner_finding_ids_are_deduplicated(self, db_session):
+        findings = [
+            {
+                "scanner_name": "trivy",
+                "scanner_finding_id": "duplicate-1",
+                "raw_json": {"title": "same finding"},
+            },
+            {
+                "scanner_name": "trivy",
+                "scanner_finding_id": "duplicate-1",
+                "raw_json": {"title": "same finding repeated"},
+            },
+        ]
+
+        scan_run, raw_findings = ingest_findings(
+            db_session,
+            target_environment="duplicate-test",
+            findings=findings,
+        )
+
+        assert scan_run.status == "completed"
+        assert len(raw_findings) == 1
+        assert db_session.query(RawFinding).count() == 1
+
     def test_full_scan_creates_lineage_in_db(self, app_db):
         db_session = app_db
         db_session.add(ControlCatalog(

@@ -25,7 +25,7 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements.txt
+          pip install -r requirements-test.txt
           # langchain-core is required only for the optional LangChain path;
           # it is listed in requirements.txt so the equivalence tests run here.
 
@@ -34,6 +34,9 @@ jobs:
           python -m pytest tests \
             --ignore=tests/e2e/test_selenium_workflow.py \
             --ignore=tests/load \
+            --cov=backend \
+            --cov-fail-under=80 \
+            --cov-report=term-missing \
             --junitxml=docs/moodle_evidence/test_run_logs/pytest-junit.xml \
             -q
 

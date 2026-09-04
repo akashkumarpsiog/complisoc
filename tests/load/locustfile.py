@@ -10,7 +10,11 @@ import os
 
 try:
     from locust import HttpUser, between, task
+except ImportError:
+    HttpUser = None  # type: ignore[assignment]
 
+
+if HttpUser is not None:
     class ComplisocUser(HttpUser):
         wait_time = between(0.5, 2)
         host = os.getenv("BACKEND_URL", "http://127.0.0.1:8000")
@@ -38,6 +42,3 @@ try:
         @task(1)
         def severity_distribution(self):
             self.client.get("/api/v1/dashboard/severity-distribution")
-
-except (ImportError, RecursionError, Exception):
-    pass
