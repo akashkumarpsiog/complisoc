@@ -548,8 +548,8 @@ class TestAIMetricsAPI:
             "complisoc.backend.compliance.langchain_pipeline.GroqVerifier"
         ) as MockVerifier:
             MockMapper.return_value.map_batch.side_effect = lambda items: {
-                _finding_fingerprint(items[0][0]): [CandidateDecision(control_id=items[0][1][0].control_catalog.control_id, maps=True, confidence=0.95, rationale="oracle")],
-                _finding_fingerprint(items[1][0]): [CandidateDecision(control_id=items[1][1][0].control_catalog.control_id, maps=True, confidence=0.95, rationale="oracle")],
+                _finding_fingerprint(finding): [CandidateDecision(control_id=candidates[0].control_catalog.control_id, maps=True, confidence=0.95, rationale="oracle")]
+                for finding, candidates in items
             }
             MockVerifier.return_value.verify_batch.return_value = {
                 1: VerificationDecision(result="agree", agreement_value=1.0, explanation="oracle"),
@@ -557,13 +557,14 @@ class TestAIMetricsAPI:
             }
             client.post(
                 "/api/v1/scan-runs",
-                json={"target_environment": "metrics-test", "findings": [make_finding("MET-1"), make_finding("MET-2")]},
+                json={"target_environment": "metrics-test", "findings": [make_finding("MET-1"), make_finding("MET-2"), make_finding("MET-3")]},
             )
         resp = client.get("/api/v1/dashboard/ai-metrics")
         assert resp.status_code == 200
         body = resp.json()
-        assert body["total_mappings"] == 2
+        assert body["total_mappings"] == 3
         assert body["agreement_rate"] == 0.5
+        assert body["avg_groq_agreement"] == 0.5
 
 
 class TestAuditBundleVerifyAPI:

@@ -5,7 +5,7 @@ export interface ResourceState<T> {
   data: T | null;
   status: Status;
   error: string | null;
-  reload: () => Promise<void>;
+  reload: (quiet?: boolean) => Promise<void>;
   setData: (value: T | null) => void;
 }
 
@@ -15,17 +15,21 @@ export function useResource<T>(load: () => Promise<T>, deps: unknown[] = []): Re
   const [error, setError] = useState<string | null>(null);
   const loadingRef = useRef(false);
 
-  const reload = useCallback(async () => {
+  const reload = useCallback(async (quiet = false) => {
     if (loadingRef.current) return;
     loadingRef.current = true;
-    setStatus("loading");
-    setError(null);
+    if (!quiet) {
+      setStatus("loading");
+      setError(null);
+    }
     try {
       setData(await load());
       setStatus("success");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Request failed.");
-      setStatus("error");
+      if (!quiet) {
+        setError(err instanceof Error ? err.message : "Request failed.");
+        setStatus("error");
+      }
     } finally {
       loadingRef.current = false;
     }

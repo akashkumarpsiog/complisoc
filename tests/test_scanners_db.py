@@ -265,7 +265,9 @@ class TestScanRunDBLineage:
             findings=findings,
         )
 
-        assert scan_run.status == "completed"
+        # Scanner ingestion is only the first phase; mapping and verification
+        # still need to run before the scan is complete.
+        assert scan_run.status == "running"
         assert len(raw_findings) == 1
         assert db_session.query(RawFinding).count() == 1
 
@@ -328,6 +330,7 @@ class TestScanRunDBLineage:
                 db=app_db,
             )
         app_db.commit()
+        assert scan_run.status == "completed"
         raw_findings = (
             app_db.query(RawFinding)
             .join(ScannerExecution, RawFinding.scanner_execution_id == ScannerExecution.id)

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ChevronLeft, Loader2 } from "lucide-react";
+import { ChevronLeft, Loader2, RefreshCw } from "lucide-react";
 import { api } from "../services/api";
 import { useResource } from "../hooks/useResource";
 import type { AuditBundle, BulkReviewDecision, ComplianceReport, ControlMapping, NormalizedFinding, ReviewQueueItem, ScanRun, ScanRunSummary, ScannerExecution, VerificationRecord } from "../types";
@@ -28,25 +28,39 @@ export function ScanDetailPage({ scanRunId, onBack }: { scanRunId: number; onBac
   const reviewResource = useResource(() => api.reviewQueue.list({ scan_run_id: scanRunId }, true), [scanRunId]);
   const reportsResource = useResource(api.reports.list);
   const bundlesResource = useResource(api.auditBundles.list);
-  const sawRunningScan = useRef(false);
+  const previousScanStatus = useRef<string | undefined>(undefined);
 
   useEffect(() => {
     if (scanRunResource.data?.status !== "running") return;
-    sawRunningScan.current = true;
-    const timer = window.setInterval(() => void scanRunResource.reload(), 3000);
+    const timer = window.setInterval(() => void scanRunResource.reload(true), 5000);
     return () => window.clearInterval(timer);
   }, [scanRunResource.data?.status, scanRunResource.reload]);
 
   useEffect(() => {
-    if (!sawRunningScan.current || scanRunResource.data?.status === "running" || !scanRunResource.data) return;
-    sawRunningScan.current = false;
+    const currentStatus = scanRunResource.data?.status;
+    const previousStatus = previousScanStatus.current;
+    previousScanStatus.current = currentStatus;
+    if (previousStatus !== "running" || currentStatus === "running" || !scanRunResource.data) return;
+    setCompletionNotice(true);
     void Promise.all([
-      summaryResource.reload(),
-      findingsResource.reload(),
-      mappingsResource.reload(),
-      reviewResource.reload(),
+      summaryResource.reload(true),
+      findingsResource.reload(true),
+      mappingsResource.reload(true),
+      reviewResource.reload(true),
     ]);
   }, [scanRunResource.data?.status, scanRunResource.data, summaryResource.reload, findingsResource.reload, mappingsResource.reload, reviewResource.reload]);
+
+  const [completionNotice, setCompletionNotice] = useState(false);
+
+  async function refreshScan() {
+    await Promise.all([
+      scanRunResource.reload(true),
+      summaryResource.reload(true),
+      findingsResource.reload(true),
+      mappingsResource.reload(true),
+      reviewResource.reload(true),
+    ]);
+  }
 
   const scanFindings = useMemo(() => findingsResource.data || [], [findingsResource.data]);
   const scanMappings = useMemo(() => mappingsResource.data || [], [mappingsResource.data]);

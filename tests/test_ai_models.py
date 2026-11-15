@@ -228,6 +228,23 @@ class TestGeminiMapper:
             with pytest.raises(ValueError):
                 mapper.map_batch([(finding, [candidate])])
 
+    def test_map_batch_reports_original_error_when_all_chunks_fail(self, db_session):
+        from complisoc.backend.compliance.mapping import GeminiMapper
+
+        finding = _make_finding(db_session)
+        candidate = _make_candidate(db_session, finding)
+
+        with patch("complisoc.backend.compliance.mapping.GEMINI_API_KEY", "fake"), patch(
+            "complisoc.backend.compliance.mapping.genai"
+        ):
+            mapper = GeminiMapper()
+            mapper.clear_cache()
+            mapper._map_one_chunk = MagicMock(side_effect=RuntimeError("provider quota exhausted"))
+            # More than one chunk exercises the parallel chunk error handler.
+            items = [(finding, [candidate])] * 26
+            with pytest.raises(RuntimeError, match="provider quota exhausted"):
+                mapper.map_batch(items)
+
 
 class TestGroqVerifier:
     def test_init_raises_without_api_key(self):
@@ -274,7 +291,7 @@ class TestGroqVerifier:
         decision = result[1]
         assert decision.result == "agree"
         assert decision.agreement_value == 1.0
-        assert mock_client.chat.completions.create.call_args.kwargs["max_completion_tokens"] == 1024
+        assert mock_client.chat.completions.create.call_args.kwargs["max_completion_tokens"] == 4096
 
     def test_verify_batch_splits_only_when_groq_request_exceeds_tpm_limit(self, db_session):
         from complisoc.backend.compliance.verification import GroqVerifier, PendingVerification
@@ -374,8 +391,36 @@ class TestGroqVerifier:
         ), patch("complisoc.backend.core.retry.time.sleep"):
             verifier = GroqVerifier()
             item = PendingVerification(ref=1, finding=finding, control=control, confidence=0.95, rationale="test")
-            with pytest.raises(ValueError, match="no usable results"):
+            with pytest.raises(RuntimeError, match="Groq verification failed for all"):
                 verifier.verify_batch([item])
+
+    def test_verify_batch_retries_only_missing_refs_in_smaller_batches(self, db_session):
+        from complisoc.backend.compliance.verification import GroqVerifier, PendingVerification
+
+        first_finding = _make_finding(db_session, title="first finding")
+        second_finding = _make_finding(db_session, title="second finding")
+        control = db_session.query(ControlCatalog).first()
+        partial = json.dumps({"results": [{"ref": 1, "result": "agree", "explanation": "ok"}]})
+        retried = json.dumps({"results": [{"ref": 2, "result": "disagree", "explanation": "no"}]})
+        mock_client = MagicMock()
+        mock_client.chat.completions.create.side_effect = [
+            MagicMock(choices=[MagicMock(message=MagicMock(content=partial, finish_reason="stop"))]),
+            MagicMock(choices=[MagicMock(message=MagicMock(content=retried, finish_reason="stop"))]),
+        ]
+        with patch("complisoc.backend.compliance.verification.GROQ_API_KEY", "fake"), patch(
+            "complisoc.backend.compliance.verification.Groq", return_value=mock_client
+        ):
+            verifier = GroqVerifier(max_batch_size=2)
+            items = [
+                PendingVerification(ref=1, finding=first_finding, control=control, confidence=0.9, rationale="first"),
+                PendingVerification(ref=2, finding=second_finding, control=control, confidence=0.9, rationale="second"),
+            ]
+            result = verifier.verify_batch(items)
+
+        assert set(result) == {1, 2}
+        assert result[1].result == "agree"
+        assert result[2].result == "disagree"
+        assert mock_client.chat.completions.create.call_count == 2
 
     def test_verify_batch_skips_invalid_results(self, db_session):
         from complisoc.backend.compliance.verification import GroqVerifier, PendingVerification
@@ -394,7 +439,7 @@ class TestGroqVerifier:
         ), patch("complisoc.backend.core.retry.time.sleep"):
             verifier = GroqVerifier()
             item = PendingVerification(ref=1, finding=finding, control=control, confidence=0.95, rationale="test")
-            with pytest.raises(ValueError, match="no usable results"):
+            with pytest.raises(RuntimeError, match="Groq verification failed for all"):
                 verifier.verify_batch([item])
 
     def test_verify_one_valid(self, db_session):

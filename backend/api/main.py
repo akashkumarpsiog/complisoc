@@ -958,13 +958,14 @@ def _dashboard_ai_metrics(db: Session) -> dict[str, Any]:
     rejected = [m for m in mappings if m.mapping_status == "rejected"]
     published_confidences = [m.final_confidence for m in published if m.final_confidence is not None]
     gemini_confidences = [m.gemini_confidence for m in mappings if m.gemini_confidence is not None]
-    groq_agreements = [m.groq_agreement_value for m in mappings if m.groq_agreement_value is not None]
-    verified_records = (
-        db.query(VerificationRecord)
-        .filter(VerificationRecord.result == "agree")
-        .count()
-    )
-    total_verified = db.query(VerificationRecord).count()
+    verified_mappings = [
+        m for m in mappings
+        if m.verification_status in {"agree", "disagree"}
+        and m.groq_agreement_value is not None
+    ]
+    groq_agreements = [m.groq_agreement_value for m in verified_mappings]
+    verified_records = sum(1 for m in verified_mappings if m.verification_status == "agree")
+    total_verified = len(verified_mappings)
     manual_review_rate = len(manual_review) / total if total else 0.0
 
     # Output quality metrics: track when AI decisions are overridden

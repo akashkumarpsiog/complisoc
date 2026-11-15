@@ -395,18 +395,16 @@ def stage_finalize(state: _ChainState) -> _ChainState:
 
         if state.groq_unavailable or state.groq_failed:
             mapping.verification_status = "failed"
-            mapping.final_confidence = calculate_final_confidence(mapping.gemini_confidence or 0.0, 0.0)
-            mapping.groq_agreement_value = 0.0
-            # A missing/failed verification is not a positive verdict. Keep it
-            # in manual review even when Gemini alone has high confidence.
+            mapping.final_confidence = None
+            mapping.groq_agreement_value = None
             mapping.mapping_status = "manual_review"
             state.db.add(
                 VerificationRecord(
                     control_mapping_id=mapping.id,
                     verification_model="groq",
                     prompt_version=PROMPT_VERSION,
-                    result="disagree",
-                    agreement_value=0.0,
+                    result="failed",
+                    agreement_value=None,
                     explanation=f"Verification unavailable: {state.groq_error or 'Groq API failed or unavailable.'}",
                 )
             )
@@ -420,16 +418,16 @@ def stage_finalize(state: _ChainState) -> _ChainState:
 
         if verdict is None:
             mapping.verification_status = "failed"
-            mapping.final_confidence = calculate_final_confidence(mapping.gemini_confidence or 0.0, 0.0)
-            mapping.groq_agreement_value = 0.0
+            mapping.final_confidence = None
+            mapping.groq_agreement_value = None
             mapping.mapping_status = "manual_review"
             state.db.add(
                 VerificationRecord(
                     control_mapping_id=mapping.id,
                     verification_model="groq",
                     prompt_version=PROMPT_VERSION,
-                    result="disagree",
-                    agreement_value=0.0,
+                    result="failed",
+                    agreement_value=None,
                     explanation="No result returned for this mapping in the batch response.",
                 )
             )
@@ -465,12 +463,18 @@ def stage_finalize(state: _ChainState) -> _ChainState:
             )
 
     state.db.add_all(state.review_items)
+    has_failed_verification = any(
+        mapping.verification_status == "failed" for mapping in state.mappings
+    )
     if state.gemini_unavailable or state.gemini_failed:
         state.scan_run.ai_status = "failed"
-    elif state.groq_unavailable or state.groq_failed:
+    elif state.groq_unavailable or state.groq_failed or has_failed_verification:
         state.scan_run.ai_status = "partial"
     else:
         state.scan_run.ai_status = "ok"
+    if state.scan_run.status != "failed":
+        state.scan_run.status = "completed"
+        state.scan_run.completed_at = datetime.utcnow()
     state.db.commit()
     for mapping in state.mappings:
         state.db.refresh(mapping)

@@ -177,7 +177,7 @@ def _run_with_timeout(fn, timeout: float):
 
 
 class GroqVerifier:
-    def __init__(self, timeout: float = 30.0, max_batch_size: int = 25) -> None:
+    def __init__(self, timeout: float = 30.0, max_batch_size: int = 10) -> None:
         if not GROQ_API_KEY:
             raise RuntimeError("GROQ_API_KEY is not configured; cannot perform AI verification.")
         self._client = Groq(api_key=GROQ_API_KEY)
@@ -233,7 +233,7 @@ class GroqVerifier:
                     # GPT-OSS and Qwen spend completion tokens on reasoning. A low
                     # budget leaves none for the schema-constrained answer and
                     # yields Groq's json_validate_failed error.
-                    request.update({"reasoning_effort": "low", "max_completion_tokens": 1024})
+                    request.update({"reasoning_effort": "low", "max_completion_tokens": 4096})
                 response = self._client.chat.completions.create(**request)
                 return model, response
             except Exception as exc:
@@ -265,7 +265,19 @@ class GroqVerifier:
                 )
 
             model_used, response = _run_with_timeout(_call, self._timeout)
-            data = extract_json(response.choices[0].message.content)
+            choice = response.choices[0]
+            usage = getattr(response, "usage", None)
+            content = choice.message.content
+            logger.info(
+                "Groq verification batch response: expected_refs=%d finish_reason=%s "
+                "prompt_tokens=%s completion_tokens=%s",
+                len(expected_refs),
+                getattr(choice, "finish_reason", None),
+                getattr(usage, "prompt_tokens", None),
+                getattr(usage, "completion_tokens", None),
+            )
+            logger.debug("Groq verification raw response content: %s", content[:4000])
+            data = extract_json(content)
             out: dict[int, VerificationDecision] = {}
             for entry in data.get("results", []):
                 ref = entry.get("ref")
@@ -290,6 +302,13 @@ class GroqVerifier:
                 )
             if not out:
                 raise ValueError("Groq batch response contained no usable results.")
+            missing_refs = expected_refs - set(out)
+            if missing_refs:
+                logger.warning(
+                    "Groq omitted refs from batch response: expected=%s returned=%s missing=%s",
+                    sorted(expected_refs), sorted(out), sorted(missing_refs),
+                )
+            logger.info("Groq verification batch parsed: expected_refs=%d returned_refs=%d", len(expected_refs), len(out))
             return out
 
         result = call_with_retry(
@@ -323,12 +342,9 @@ class GroqVerifier:
                 logger.warning("Groq batch exceeded its TPM limit; retrying as %d smaller batches", 2)
                 return verify_chunk(chunk[:midpoint]) | verify_chunk(chunk[midpoint:])
 
-        if len(chunks) == 1:
-            return verify_chunk(chunks[0])
-
         # Run chunks in parallel. One failing chunk must not take down the
         # whole run: partial verdicts are returned and missing refs are handled
-        # by the caller's ``verdict is None`` path.
+        # by a single retry of only those refs in smaller batches.
         merged: dict[int, VerificationDecision] = {}
         last_error: Exception | None = None
         failed_chunks = 0
@@ -345,7 +361,24 @@ class GroqVerifier:
                     logger.warning("Groq verification chunk failed: %s", exc)
                     last_error = exc
                     failed_chunks += 1
-        if failed_chunks == len(chunks):
+        verified_refs = set(merged)
+        missing_items = [item for item in items if item.ref not in verified_refs]
+        if missing_items:
+            retry_size = max(1, min(5, self._max_batch_size // 2))
+            logger.warning(
+                "Retrying %d missing Groq verdicts once in batches of at most %d",
+                len(missing_items), retry_size,
+            )
+            for i in range(0, len(missing_items), retry_size):
+                retry_chunk = missing_items[i:i + retry_size]
+                try:
+                    merged.update(verify_chunk(retry_chunk))
+                except Exception as exc:
+                    logger.warning(
+                        "Groq retry failed for refs %s: %s",
+                        [item.ref for item in retry_chunk], exc,
+                    )
+        if not merged and failed_chunks == len(chunks):
             raise RuntimeError(f"Groq verification failed for all {len(chunks)} chunks: {last_error}") from last_error
         return merged
 

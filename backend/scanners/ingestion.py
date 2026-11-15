@@ -121,7 +121,11 @@ def ingest_findings(
         db.add(execution)
         executions_by_scanner[scanner_name] = execution
 
-    scan_run.status = "failed" if scanner_failures and not raw_findings else "completed"
+    # Scanner collection is only one phase of the run. Keep successful or
+    # partially successful runs active until normalization, mapping, and
+    # verification have reached stage_finalize.
+    if scanner_failures and not raw_findings:
+        scan_run.status = "failed"
     db.commit()
     db.refresh(scan_run)
     for raw_finding in raw_findings:

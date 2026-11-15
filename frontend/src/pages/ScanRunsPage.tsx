@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
-import { Archive, ArrowRight, CheckCircle2, Play, RotateCcw } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { Archive, ArrowRight, CheckCircle2, Play, RefreshCw, RotateCcw } from "lucide-react";
 import { api } from "../services/api";
 import { useResource } from "../hooks/useResource";
 import type { ScanRun } from "../types";
@@ -14,15 +14,27 @@ export function ScanRunsPage({ onSelectScan }: { onSelectScan: (id: number) => v
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [createdScan, setCreatedScan] = useState<ScanRun | null>(null);
   const [scanCreatorOpen, setScanCreatorOpen] = useState(false);
+  const [completedScanId, setCompletedScanId] = useState<number | null>(null);
+  const previousStatuses = useRef(new Map<number, string>());
 
   useEffect(() => {
-    if (!scanRuns.data?.some((scanRun) => scanRun.status === "running")) return;
-    const timer = window.setInterval(() => void scanRuns.reload(), 3000);
+    if (showArchived || !scanRuns.data?.some((scanRun) => scanRun.status === "running")) return;
+    const timer = window.setInterval(() => void scanRuns.reload(true), 5000);
     return () => window.clearInterval(timer);
-  }, [scanRuns.data, scanRuns.reload]);
+  }, [showArchived, scanRuns.data, scanRuns.reload]);
+
+  useEffect(() => {
+    for (const scanRun of scanRuns.data ?? []) {
+      if (previousStatuses.current.get(scanRun.id) === "running" && scanRun.status !== "running") {
+        setCompletedScanId(scanRun.id);
+      }
+      previousStatuses.current.set(scanRun.id, scanRun.status);
+    }
+  }, [scanRuns.data]);
 
   async function handleCreated(scanRun: ScanRun) {
-    await scanRuns.reload();
+    scanRuns.setData((current) => [scanRun, ...(current ?? []).filter((item) => item.id !== scanRun.id)]);
+    previousStatuses.current.set(scanRun.id, scanRun.status);
     setCreatedScan(scanRun);
   }
 
@@ -33,6 +45,10 @@ export function ScanRunsPage({ onSelectScan }: { onSelectScan: (id: number) => v
         description={showArchived ? "Archived scan history only. Restore a scan to return it to active views." : "Active scans only. Archived scans remain available for audit."}
         actions={
           <div className="flex items-center gap-2">
+            <button className="secondary-button" onClick={() => void scanRuns.reload(true)}>
+              <RefreshCw className="h-4 w-4" aria-hidden />
+              Refresh
+            </button>
             <button className="secondary-button" onClick={() => setShowArchived((value) => !value)}>
               {showArchived ? "Show active" : "Show archived"}
             </button>
@@ -43,13 +59,15 @@ export function ScanRunsPage({ onSelectScan }: { onSelectScan: (id: number) => v
           </div>
         }
       >
-        {createdScan && (
-          <div className="mb-4 flex items-center justify-between gap-3 rounded-xl border border-success/20 bg-success-light px-4 py-3 text-sm font-medium text-success-dark">
+        {(createdScan || completedScanId !== null) && (
+          <div className={`mb-4 flex items-center justify-between gap-3 rounded-xl border px-4 py-3 text-sm ${completedScanId !== null ? "border-success/20 bg-success-light text-success-dark" : "border-line bg-panel text-muted"}`}>
             <span className="inline-flex items-center gap-2">
               <CheckCircle2 className="h-4 w-4" aria-hidden />
-              Scan #{createdScan.id} was created. Open it from the table below.
+              {completedScanId !== null
+                ? `Scan #${completedScanId} is finished. Its results are ready.`
+                : `Scan #${createdScan?.id} started. We’ll let you know here when it finishes.`}
             </span>
-            <button className="text-xs font-semibold underline" onClick={() => setCreatedScan(null)}>Dismiss</button>
+            <button className="text-xs font-semibold underline" onClick={() => { setCreatedScan(null); setCompletedScanId(null); }}>Dismiss</button>
           </div>
         )}
         <div className="mb-4 flex flex-wrap items-center gap-2">

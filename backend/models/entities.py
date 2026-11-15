@@ -211,7 +211,7 @@ class VerificationRecord(Base):
     __tablename__ = "verification_records"
     __table_args__ = (
         CheckConstraint(
-            "result IN ('agree','disagree')",
+            "result IN ('agree','disagree','failed')",
             name="ck_verification_result",
         ),
     )

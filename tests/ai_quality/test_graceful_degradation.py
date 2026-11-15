@@ -140,6 +140,8 @@ class TestGracefulDegradation:
         monkeypatch.setattr(langchain_pipeline, "GroqVerifier", unavailable)
         result = _run(ai_quality_db, ai_quality_finding(), mocked_ai_services, "degradation-no-groq")
         assert result["mappings"][0].gemini_confidence == 0.95
+        assert result["mappings"][0].groq_agreement_value is None
+        assert result["mappings"][0].final_confidence is None
         assert result["mappings"][0].mapping_status == "manual_review"
         assert result["review_items"][0].review_reason_code == "AI_VERIFIER_FAILURE"
 
@@ -147,8 +149,8 @@ class TestGracefulDegradation:
         mocked_ai_services.verifier.verify_batch.side_effect = TimeoutError("provider timeout")
         result = _run(ai_quality_db, ai_quality_finding(), mocked_ai_services, "degradation-groq-timeout")
         assert result["mappings"][0].gemini_confidence == 0.95
-        assert result["mappings"][0].groq_agreement_value == 0.0
-        assert result["mappings"][0].final_confidence == 0.57
+        assert result["mappings"][0].groq_agreement_value is None
+        assert result["mappings"][0].final_confidence is None
         assert result["mappings"][0].mapping_status == "manual_review"
         assert result["mappings"][0].verification_status == "failed"
         assert result["review_items"][0].review_reason_code == "AI_VERIFIER_FAILURE"
@@ -192,7 +194,13 @@ class TestPartialResults:
         mocked_ai_services.verifier.verify_batch.return_value = {}
         result = _run(ai_quality_db, ai_quality_finding(), mocked_ai_services, "degradation-no-verdict")
         assert result["mappings"][0].verification_status == "failed"
+        assert result["mappings"][0].groq_agreement_value is None
+        assert result["mappings"][0].final_confidence is None
         assert result["mappings"][0].mapping_status == "manual_review"
+        assert result["scan_run"].ai_status == "partial"
+        record = result["mappings"][0].verification_records[0]
+        assert record.result == "failed"
+        assert record.agreement_value is None
 
     def test_missing_verifier_result_creates_review_item(
         self, ai_quality_db, ai_quality_finding, mocked_ai_services

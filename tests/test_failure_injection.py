@@ -166,7 +166,8 @@ class TestGroqUnavailable:
             assert len(result["mappings"]) == 1
             mapping = result["mappings"][0]
             assert mapping.mapping_status == "manual_review"
-            assert mapping.groq_agreement_value == 0.0
+            assert mapping.groq_agreement_value is None
+            assert mapping.final_confidence is None
             assert mapping.verification_status == "failed"
             assert len(result["review_items"]) == 1
             assert result["review_items"][0].review_reason_code == "AI_VERIFIER_FAILURE"

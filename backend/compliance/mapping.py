@@ -1,5 +1,6 @@
 import hashlib
 import json
+import logging
 import pathlib
 import re
 from concurrent.futures import ThreadPoolExecutor, Future
@@ -13,6 +14,8 @@ from complisoc.backend.core.json_extract import extract_json
 from complisoc.backend.core.retry import call_with_retry
 from complisoc.backend.models import CandidateControl, ControlCatalog, NormalizedFinding
 
+
+logger = logging.getLogger(__name__)
 
 DELAY_RE = re.compile(r"(\d+(?:\.\d+)?)\s*s", re.IGNORECASE)
 
@@ -381,7 +384,7 @@ class GeminiMapper:
                     merged.update(future.result())
                 except Exception as exc:
                     # Log the real failure instead of swallowing it silently.
-                    log.warning("Gemini mapping chunk failed: %s", exc)
+                    logger.warning("Gemini mapping chunk failed: %s", exc)
                     last_error = exc
                     failed_chunks += 1
         if failed_chunks == len(chunk_payloads):
