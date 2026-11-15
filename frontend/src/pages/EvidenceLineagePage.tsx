@@ -47,9 +47,9 @@ export function EvidenceLineagePage({ onViewChange }: { onViewChange?: (viewId: 
       title="Evidence Lineage"
       description="Choose a scan, then a finding, to trace its full compliance evidence chain"
       actions={
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="grid w-full min-w-0 gap-2 sm:grid-cols-2 lg:w-[min(54vw,900px)] lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]">
           <select
-            className="control"
+            className="control min-w-0 truncate"
             value={scanRunId}
             onChange={(e) => handleScanRunChange(e.target.value)}
             disabled={scanRuns.status === "loading"}
@@ -62,7 +62,7 @@ export function EvidenceLineagePage({ onViewChange }: { onViewChange?: (viewId: 
             ))}
           </select>
           <select
-            className="control"
+            className="control min-w-0 truncate"
             value={findingId}
             onChange={(e) => setFindingId(e.target.value)}
             disabled={!scanRunId || findings.status === "loading"}
@@ -79,7 +79,7 @@ export function EvidenceLineagePage({ onViewChange }: { onViewChange?: (viewId: 
               <option disabled>…and {findingsList.length - 100} more (refine search)</option>
             )}
           </select>
-          <button className="icon-button" disabled={!findingId} onClick={handleView}>
+          <button className="icon-button w-full sm:col-span-2 lg:col-span-1 lg:w-auto" disabled={!findingId} onClick={handleView}>
             View lineage
           </button>
         </div>
@@ -111,24 +111,24 @@ function LineageView({ data }: { data: FindingLineage }) {
       </div>
       {data.scan_run ? (
         <div className="rounded-xl border border-line bg-white p-5 shadow-sm">
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
-            <div>
+          <div className="grid min-w-0 gap-4 sm:grid-cols-2 xl:grid-cols-[repeat(5,minmax(0,1fr))]">
+            <div className="min-w-0">
               <div className="text-xs font-bold uppercase tracking-wider text-subtle">Scan run ID</div>
               <div className="mt-1 text-sm font-semibold text-ink">#{data.scan_run.id}</div>
             </div>
-            <div>
+            <div className="min-w-0">
               <div className="text-xs font-bold uppercase tracking-wider text-subtle">Environment</div>
-              <div className="mt-1 text-sm text-ink">{data.scan_run.target_environment}</div>
+              <div className="mt-1 break-all text-sm text-ink" title={data.scan_run.target_environment ?? undefined}>{data.scan_run.target_environment}</div>
             </div>
-            <div>
+            <div className="min-w-0">
               <div className="text-xs font-bold uppercase tracking-wider text-subtle">Status</div>
               <div className="mt-1"><StatusBadge value={data.scan_run.status} /></div>
             </div>
-            <div>
+            <div className="min-w-0">
               <div className="text-xs font-bold uppercase tracking-wider text-subtle">AI mapping</div>
               <div className="mt-1"><StatusBadge value={data.scan_run.ai_status ?? "pending"} /></div>
             </div>
-            <div>
+            <div className="min-w-0">
               <div className="text-xs font-bold uppercase tracking-wider text-subtle">Created</div>
               <div className="mt-1 text-sm text-ink">{formatDate(data.scan_run.created_at)}</div>
             </div>
@@ -144,20 +144,20 @@ function LineageView({ data }: { data: FindingLineage }) {
       </div>
       {data.raw_finding ? (
         <div className="rounded-xl border border-line bg-white p-5 shadow-sm">
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            <div>
+          <div className="grid min-w-0 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            <div className="min-w-0">
               <div className="text-xs font-bold uppercase tracking-wider text-subtle">Raw finding ID</div>
               <div className="mt-1 text-sm font-semibold text-ink">#{data.raw_finding.id}</div>
             </div>
-            <div>
+            <div className="min-w-0">
               <div className="text-xs font-bold uppercase tracking-wider text-subtle">Scanner finding ID</div>
-              <div className="mt-1 text-sm font-mono text-ink">{data.raw_finding.scanner_finding_id}</div>
+              <div className="mt-1 break-all text-sm font-mono text-ink">{data.raw_finding.scanner_finding_id}</div>
             </div>
-            <div>
+            <div className="min-w-0">
               <div className="text-xs font-bold uppercase tracking-wider text-subtle">Scanner</div>
               <div className="mt-1 text-sm text-ink">{data.raw_finding.scanner_name}</div>
             </div>
-            <div>
+            <div className="min-w-0">
               <div className="text-xs font-bold uppercase tracking-wider text-subtle">Created</div>
               <div className="mt-1 text-sm text-ink">{formatDate(data.raw_finding.created_at)}</div>
             </div>
@@ -180,12 +180,12 @@ function LineageView({ data }: { data: FindingLineage }) {
         Normalized Finding
       </div>
       <div className="rounded-xl border border-line bg-white p-5 shadow-sm">
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          <div>
+        <div className="grid min-w-0 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          <div className="min-w-0">
             <div className="text-xs font-bold uppercase tracking-wider text-subtle">Finding ID</div>
             <div className="mt-1 text-sm font-semibold text-ink">#{data.normalized_finding.id}</div>
           </div>
-          <div>
+          <div className="min-w-0">
             <div className="text-xs font-bold uppercase tracking-wider text-subtle">Scanner</div>
             <div className="mt-1 text-sm text-ink">{data.normalized_finding.scanner_name}</div>
           </div>
@@ -195,17 +195,17 @@ function LineageView({ data }: { data: FindingLineage }) {
           </div>
           <div>
             <div className="text-xs font-bold uppercase tracking-wider text-subtle">Resource</div>
-            <div className="mt-1 text-sm font-mono text-ink">{data.normalized_finding.resource_identifier}</div>
+            <div className="mt-1 break-all text-sm font-mono text-ink">{data.normalized_finding.resource_identifier}</div>
           </div>
         </div>
         <div className="mt-4 grid gap-3 sm:grid-cols-2">
-          <div>
+          <div className="min-w-0">
             <div className="text-xs font-bold uppercase tracking-wider text-subtle">Title</div>
-            <div className="mt-1 text-sm text-ink">{data.normalized_finding.title}</div>
+            <div className="mt-1 break-words text-sm text-ink">{data.normalized_finding.title}</div>
           </div>
-          <div>
+          <div className="min-w-0">
             <div className="text-xs font-bold uppercase tracking-wider text-subtle">Description</div>
-            <div className="mt-1 text-sm text-muted">{data.normalized_finding.description || "n/a"}</div>
+            <div className="mt-1 break-words text-sm text-muted">{data.normalized_finding.description || "n/a"}</div>
           </div>
         </div>
       </div>
