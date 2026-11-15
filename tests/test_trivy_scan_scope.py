@@ -21,7 +21,7 @@ def test_trivy_reports_terraform_misconfiguration_when_misconfig_scanner_is_enab
         encoding="utf-8",
     )
 
-    def fake_trivy(command, **_kwargs):
+    def fake_trivy(command, *_args, **_kwargs):
         scanners = command[command.index("--scanners") + 1] if "--scanners" in command else "vuln,secret"
         misconfigs = []
         if "misconfig" in scanners.split(","):
@@ -35,7 +35,7 @@ def test_trivy_reports_terraform_misconfiguration_when_misconfig_scanner_is_enab
             }]
         return type("Proc", (), {"returncode": 0, "stdout": json.dumps({"Results": [{"Target": str(terraform), "Type": "terraform", "Misconfigurations": misconfigs}]}), "stderr": ""})()
 
-    with patch("complisoc.backend.scanners.runners.subprocess.run", side_effect=fake_trivy) as run:
+    with patch("complisoc.backend.scanners.runners._run_command", side_effect=fake_trivy) as run:
         findings, error = TrivyScanner().run(str(tmp_path))
 
     command = run.call_args.args[0]

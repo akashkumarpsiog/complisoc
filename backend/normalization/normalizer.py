@@ -30,6 +30,11 @@ def normalize_raw_finding(
     if not isinstance(payload, dict):
         raise ValueError("raw_json must be an object")
 
+    if payload.get("description") is not None and not isinstance(payload["description"], str):
+        raise ValueError("description must be a string")
+    if payload.get("title") is not None and not isinstance(payload["title"], str):
+        raise ValueError("title must be a string")
+
     finding_type = payload.get("finding_type") or payload.get("type") or payload.get("category") or payload.get("check_id")
     resource_type = payload.get("resource_type") or payload.get("resourceType") or payload.get("asset_type") or "unknown"
     resource_identifier = (
@@ -39,6 +44,8 @@ def normalize_raw_finding(
         or payload.get("file")
         or payload.get("id")
     )
+    if not isinstance(resource_identifier, (str, int)) or isinstance(resource_identifier, bool):
+        raise ValueError("resource_identifier must be a string or integer")
     title = payload.get("title") or payload.get("name") or payload.get("message") or payload.get("check_name") or payload.get("description")
     description = payload.get("description") or payload.get("message") or payload.get("short_description") or payload.get("check_name") or title
 

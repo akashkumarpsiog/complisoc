@@ -12,14 +12,20 @@ from __future__ import annotations
 
 import hashlib
 import json
+import logging
 import os
 import shutil
 import subprocess
 import sys
 import tempfile
+import time
 from abc import ABC, abstractmethod
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
+from threading import Event
 from typing import Any
+
+log = logging.getLogger("complisoc.timing")
 
 from complisoc.backend.core.retry import call_with_retry
 
@@ -29,6 +35,25 @@ try:
     _HAS_REQUESTS = True
 except ImportError:
     _HAS_REQUESTS = False
+
+
+def timed(name: str):
+    def deco(fn):
+        def wrapper(*a, **kw):
+            t = time.perf_counter()
+            try:
+                return fn(*a, **kw)
+            finally:
+                log.warning("STAGE %s took %.1fs", name, time.perf_counter() - t)
+        return wrapper
+    return deco
+
+
+DEFAULT_SCAN_TIMEOUT_SECONDS = 60
+
+
+class ScanCancelled(Exception):
+    """Raised when a user cancellation stops an external scanner process."""
 
 
 def _fid(prefix: str, payload: dict[str, Any]) -> str:
@@ -60,6 +85,33 @@ def _module_available(name: str) -> bool:
     import importlib.util
 
     return importlib.util.find_spec(name) is not None
+
+
+def _run_command(command: list[str], timeout: int, cancel_event: Event | None) -> subprocess.CompletedProcess[str]:
+    """Run a command with timeout and cancellation support."""
+    process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+    deadline = time.monotonic() + timeout
+    while True:
+        if cancel_event is not None and cancel_event.is_set():
+            process.terminate()
+            try:
+                stdout, stderr = process.communicate(timeout=5)
+            except subprocess.TimeoutExpired:
+                process.kill()
+                stdout, stderr = process.communicate()
+            raise ScanCancelled("Scan cancelled by user.")
+
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            process.kill()
+            stdout, stderr = process.communicate()
+            raise subprocess.TimeoutExpired(command, timeout, output=stdout, stderr=stderr)
+
+        try:
+            stdout, stderr = process.communicate(timeout=min(0.5, remaining))
+            return subprocess.CompletedProcess(command, process.returncode, stdout, stderr)
+        except subprocess.TimeoutExpired:
+            continue
 
 
 class BaseScanner(ABC):
@@ -99,7 +151,7 @@ class BaseScanner(ABC):
         }
 
     @abstractmethod
-    def run(self, target: str, timeout: int = 300) -> tuple[list[dict[str, Any]], str | None]:
+    def run(self, target: str, timeout: int = 300, scan_mode: str = "full", cancel_event: Event | None = None) -> tuple[list[dict[str, Any]], str | None]:
         ...
 
 
@@ -109,25 +161,31 @@ class TrivyScanner(BaseScanner):
     description = "Scans local repositories, filesystem paths, containers, and IaC for vulnerabilities and misconfigurations."
     required_inputs = ["Target path, for example . or C:/repo"]
 
-    def run(self, target: str, timeout: int = 300) -> tuple[list[dict[str, Any]], str | None]:
+    def run(self, target: str, timeout: int = 300, scan_mode: str = "full", cancel_event: Event | None = None) -> tuple[list[dict[str, Any]], str | None]:
+        if scan_mode == "config-only":
+            cmd = [
+                "trivy",
+                "config",
+                "--skip-check-update",
+                "--skip-version-check",
+                "--format",
+                "json",
+                target,
+            ]
+        else:
+            cmd = [
+                "trivy",
+                "fs",
+                "--scanners",
+                "misconfig,vuln",
+                "--severity",
+                "LOW,MEDIUM,HIGH,CRITICAL",
+                "--format",
+                "json",
+                target,
+            ]
         try:
-            proc = subprocess.run(
-                [
-                    "trivy",
-                    "fs",
-                    "--scanners",
-                    "misconfig,vuln",
-                    "--severity",
-                    "LOW,MEDIUM,HIGH,CRITICAL",
-                    "--format",
-                    "json",
-                    target,
-                ],
-                capture_output=True,
-                text=True,
-                timeout=timeout,
-                check=False,
-            )
+            proc = _run_command(cmd, timeout, cancel_event)
         except (subprocess.SubprocessError, OSError) as exc:
             return [], f"trivy execution failed: {exc}"
 
@@ -216,16 +274,10 @@ class CheckovScanner(BaseScanner):
             parts.extend(["--output-file-path", output_dir, "--quiet"])
         return parts
 
-    def run(self, target: str, timeout: int = 300) -> tuple[list[dict[str, Any]], str | None]:
+    def run(self, target: str, timeout: int = 300, scan_mode: str = "full", cancel_event: Event | None = None) -> tuple[list[dict[str, Any]], str | None]:
         try:
             with tempfile.TemporaryDirectory(prefix="complisoc-checkov-") as output_dir:
-                proc = subprocess.run(
-                    self._command(target, output_dir),
-                    capture_output=True,
-                    text=True,
-                    timeout=timeout,
-                    check=False,
-                )
+                proc = _run_command(self._command(target, output_dir), timeout, cancel_event)
                 reports = list(Path(output_dir).rglob("*.json"))
                 report_text = reports[0].read_text(encoding="utf-8") if reports else proc.stdout
         except (subprocess.SubprocessError, OSError) as exc:
@@ -270,7 +322,7 @@ class SonarQubeScanner(BaseScanner):
             missing.append("requests library")
         return missing
 
-    def run(self, target: str, timeout: int = 300) -> tuple[list[dict[str, Any]], str | None]:
+    def run(self, target: str, timeout: int = 300, scan_mode: str = "full", cancel_event: Event | None = None) -> tuple[list[dict[str, Any]], str | None]:
         missing = [env for env in ["SONAR_HOST_URL", "SONAR_TOKEN"] if not os.environ.get(env)]
         if missing:
             return [], f"sonarqube requires {', '.join(missing)}"
@@ -284,6 +336,20 @@ class SonarQubeScanner(BaseScanner):
         session.auth = auth
         session.headers["Accept"] = "application/json"
 
+        # Fast-fail pre-check: if the host is unreachable, don't burn the full
+        # per-page read timeout on every page. Connect timeout is 5s so a
+        # stopped/stopped-and-restarted EC2 instance fails in seconds, not 120.
+        try:
+            status = session.get(f"{host}/api/system/status", timeout=(5.0, 5.0))
+            if status.status_code != 200:
+                return [], f"sonarqube pre-check failed: HTTP {status.status_code}"
+        except _requests.ConnectTimeout:
+            return [], f"sonarqube host unreachable ({host}): connection timed out after 5s"
+        except _requests.ConnectionError as exc:
+            return [], f"sonarqube host unreachable ({host}): {exc}"
+        except _requests.RequestException as exc:
+            return [], f"sonarqube pre-check failed: {exc}"
+
         findings: list[dict[str, Any]] = []
         page = 1
         while True:
@@ -296,7 +362,7 @@ class SonarQubeScanner(BaseScanner):
                         "ps": 100,
                         "p": page,
                     },
-                    timeout=timeout,
+                    timeout=(5.0, float(timeout)),
                 )
             except _requests.RequestException as exc:
                 return findings, f"sonarqube request failed: {exc}"
@@ -398,6 +464,12 @@ class DefenderScanner(BaseScanner):
                 resp = session.get(url, params=params, timeout=timeout)
                 resp.raise_for_status()
                 return resp, version, None
+            except _requests.Timeout:
+                # Network timeout is not version-specific; don't try other versions.
+                return None, None, f"request timed out after {timeout}s"
+            except _requests.ConnectionError as exc:
+                # Connection errors are not version-specific.
+                return None, None, f"connection error: {exc}"
             except Exception as exc:  # noqa: BLE001 - surface the final failure
                 last_error = str(exc)
                 # Auth/permission problems are version-independent; stop early.
@@ -513,7 +585,7 @@ class DefenderScanner(BaseScanner):
                 break
         return findings, None
 
-    def run(self, target: str, timeout: int = 300) -> tuple[list[dict[str, Any]], str | None]:
+    def run(self, target: str, timeout: int = 300, scan_mode: str = "full", cancel_event: Event | None = None) -> tuple[list[dict[str, Any]], str | None]:
         missing = [env for env in ["AZURE_TENANT_ID", "AZURE_CLIENT_ID", "AZURE_CLIENT_SECRET", "AZURE_SUBSCRIPTION_ID"] if not os.environ.get(env)]
         if missing:
             return [], f"defender requires {', '.join(missing)}"
@@ -550,8 +622,7 @@ SCANNER_RUNNERS: dict[str, BaseScanner] = {
 
 SCAN_PROFILE_SCANNERS: dict[str, list[str]] = {
     "local": ["checkov", "trivy", "sonarqube"],
-    "aws": ["checkov", "trivy", "sonarqube"],
-    "azure": ["defender", "checkov", "trivy", "sonarqube"],
+    "azure": ["defender"],
     "git": ["checkov", "trivy", "sonarqube"],
 }
 
@@ -587,23 +658,74 @@ def resolve_scanners(scanners: list[str] | None, scan_profile: str | None) -> li
 
     An explicit ``scanners`` list wins over the convenience ``scan_profile`` so
     callers (e.g. the UI "cloud-only" toggle) can request exactly the sources
-    they want. When neither is supplied, all configured runners are used.
+    they want. When neither is supplied, the "local" profile is used.
     """
+    if scan_profile is None:
+        scan_profile = "local"
     profile_scanners = scanners_for_profile(scan_profile)
-    return scanners or profile_scanners or list(SCANNER_RUNNERS.keys())
+    if profile_scanners is None:
+        raise ValueError(f"Unsupported scan profile: {scan_profile}")
+    if scanners:
+        return scanners
+    if scan_profile == "azure" and not SCANNER_RUNNERS["defender"].is_available():
+        return list(SCAN_PROFILE_SCANNERS["local"])
+    return list(profile_scanners)
 
 
+def _run_one_scanner(
+    name: str,
+    runner: BaseScanner,
+    target: str,
+    timeout: int,
+    scan_mode: str,
+    cancel_event: Event | None,
+) -> tuple[str, list[dict[str, Any]], str | None, bool]:
+    """Run a single scanner and return (name, findings, error, cancelled).
+
+    ``cancelled`` is True when the scanner did not run because cancellation was
+    requested, or when it raised ``ScanCancelled`` (which also sets the shared
+    cancel_event so peer scanners stop).
+    """
+    try:
+        if cancel_event is not None and cancel_event.is_set():
+            return name, [], "Scan cancelled before scanner started.", True
+        scanned, error = timed(f"scanner:{name}")(runner.run)(
+            target, timeout=timeout, scan_mode=scan_mode, cancel_event=cancel_event
+        )
+        return name, scanned, error, False
+    except ScanCancelled as exc:
+        # Signal cancellation to peer scanners still waiting to start.
+        if cancel_event is not None:
+            cancel_event.set()
+        return name, [], str(exc), True
+    except Exception as exc:  # Defensive: one scanner must not abort the whole run.
+        return name, [], f"{name} failed: {exc}", False
+
+
+@timed("run_scanners")
 def run_scanners(
     target: str,
     scanners: list[str] | None = None,
     scan_profile: str | None = None,
     timeout: int = 300,
+    scan_mode: str = "full",
+    cancel_event: Event | None = None,
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
-    target = _resolve_target(target)
     selected = resolve_scanners(scanners, scan_profile)
+    if any(SCANNER_RUNNERS.get(name) and SCANNER_RUNNERS[name].kind == "local" for name in selected):
+        target = _resolve_target(target)
     findings: list[dict[str, Any]] = []
     failures: list[dict[str, Any]] = []
+
+    # Resolve and pre-check each scanner (availability, cancellation) before
+    # submitting the actual runner calls to the thread pool so scanners execute
+    # in parallel since they are independent subprocesses / HTTP calls.
+    to_run: list[tuple[str, BaseScanner]] = []
     for name in selected:
+        # Check for cancellation before starting each scanner
+        if cancel_event is not None and cancel_event.is_set():
+            failures.append({"scanner_name": name, "error_message": "Scan cancelled before scanner started."})
+            continue
         runner = SCANNER_RUNNERS.get(name)
         if runner is None:
             failures.append({"scanner_name": name, "error_message": f"Unknown scanner: {name}"})
@@ -613,13 +735,21 @@ def run_scanners(
                 {"scanner_name": name, "error_message": f"{name} is not available (not installed or not configured)"}
             )
             continue
-        try:
-            scanned, error = runner.run(target, timeout=timeout)
-        except Exception as exc:  # Defensive: one scanner must not abort the whole run.
-            failures.append({"scanner_name": name, "error_message": f"{name} failed: {exc}"})
-            continue
-        if error:
-            failures.append({"scanner_name": name, "error_message": error})
-        else:
-            findings.extend(scanned)
+        to_run.append((name, runner))
+
+    if to_run:
+        workers = min(len(to_run), 4)
+        with ThreadPoolExecutor(max_workers=workers) as pool:
+            futures = [
+                pool.submit(_run_one_scanner, name, runner, target, timeout, scan_mode, cancel_event)
+                for name, runner in to_run
+            ]
+            for fut in futures:
+                name, scanned, error, cancelled = fut.result()
+                if cancelled:
+                    failures.append({"scanner_name": name, "error_message": error or "Scan cancelled."})
+                elif error:
+                    failures.append({"scanner_name": name, "error_message": error})
+                else:
+                    findings.extend(scanned)
     return findings, failures

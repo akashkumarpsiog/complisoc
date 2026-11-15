@@ -15,6 +15,7 @@ from sqlalchemy.pool import StaticPool
 
 from complisoc.backend.core.json_extract import extract_json
 from complisoc.backend.database.base import Base
+from complisoc.backend.compliance.mapping import _finding_fingerprint
 from complisoc.backend.models import (
     CandidateControl,
     ControlCatalog,
@@ -102,6 +103,7 @@ class TestGeminiMapper:
         ) as mock_genai:
             mock_genai.Client.return_value.models.generate_content.return_value.text = '{"results": []}'
             mapper = GeminiMapper()
+            mapper.clear_cache()
             result = mapper.map_batch([])
             assert result == {}
             assert mock_genai.Client.call_args.kwargs == {"api_key": "fake"}
@@ -117,7 +119,7 @@ class TestGeminiMapper:
         response_text = json.dumps({
             "results": [
                 {
-                    "finding_id": finding.id,
+                    "finding_id": _finding_fingerprint(finding),
                     "candidates": [
                         {"control_id": control.control_id, "maps": True, "confidence": 0.95, "rationale": "strong match"}
                     ]
@@ -130,10 +132,11 @@ class TestGeminiMapper:
         ) as mock_genai:
             mock_genai.Client.return_value.models.generate_content.return_value.text = response_text
             mapper = GeminiMapper()
+            mapper.clear_cache()
             result = mapper.map_batch([(finding, [candidate])])
 
-        assert finding.id in result
-        decisions = result[finding.id]
+        assert _finding_fingerprint(finding) in result
+        decisions = result[_finding_fingerprint(finding)]
         assert len(decisions) == 1
         assert decisions[0].maps is True
         assert decisions[0].confidence == pytest.approx(0.95)
@@ -156,6 +159,7 @@ class TestGeminiMapper:
         ) as mock_genai, patch("complisoc.backend.core.retry.time.sleep"):
             mock_genai.Client.return_value.models.generate_content.return_value.text = response_text
             mapper = GeminiMapper()
+            mapper.clear_cache()
             with pytest.raises(ValueError, match="no usable results"):
                 mapper.map_batch([(finding, [candidate])])
 
@@ -169,7 +173,7 @@ class TestGeminiMapper:
         response_text = json.dumps({
             "results": [
                 {
-                    "finding_id": finding.id,
+                    "finding_id": _finding_fingerprint(finding),
                     "candidates": [
                         {"control_id": control.control_id, "maps": False, "confidence": 5.0, "rationale": "weak"}
                     ]
@@ -182,9 +186,10 @@ class TestGeminiMapper:
         ) as mock_genai:
             mock_genai.Client.return_value.models.generate_content.return_value.text = response_text
             mapper = GeminiMapper()
+            mapper.clear_cache()
             result = mapper.map_batch([(finding, [candidate])])
 
-        decision = result[finding.id][0]
+        decision = result[_finding_fingerprint(finding)][0]
         assert decision.confidence <= 0.99
 
     def test_map_one_with_valid_response(self, db_session):
@@ -200,6 +205,7 @@ class TestGeminiMapper:
         ) as mock_genai:
             mock_genai.Client.return_value.models.generate_content.return_value.text = response_text
             mapper = GeminiMapper()
+            mapper.clear_cache()
             decision = mapper.map_one(finding, control)
 
         assert decision.maps is True
@@ -218,6 +224,7 @@ class TestGeminiMapper:
         ) as mock_genai, patch("complisoc.backend.core.retry.time.sleep"):
             mock_genai.Client.return_value.models.generate_content.return_value.text = response_text
             mapper = GeminiMapper()
+            mapper.clear_cache()
             with pytest.raises(ValueError):
                 mapper.map_batch([(finding, [candidate])])
 
@@ -240,7 +247,7 @@ class TestGroqVerifier:
             result = verifier.verify_batch([])
             assert result == {}
             assert mock_groq.call_args.kwargs == {"api_key": "fake"}
-            assert verifier._timeout == 60.0
+            assert verifier._timeout == 30.0
 
     def test_verify_batch_with_valid_response(self, db_session):
         from complisoc.backend.compliance.verification import GroqVerifier, PendingVerification
@@ -267,7 +274,7 @@ class TestGroqVerifier:
         decision = result[1]
         assert decision.result == "agree"
         assert decision.agreement_value == 1.0
-        assert mock_client.chat.completions.create.call_args.kwargs["max_completion_tokens"] == 512
+        assert mock_client.chat.completions.create.call_args.kwargs["max_completion_tokens"] == 1024
 
     def test_verify_batch_splits_only_when_groq_request_exceeds_tpm_limit(self, db_session):
         from complisoc.backend.compliance.verification import GroqVerifier, PendingVerification

@@ -22,7 +22,7 @@ from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
 from complisoc.backend.api.main import process_scan_run
-from complisoc.backend.compliance.mapping import CandidateDecision
+from complisoc.backend.compliance.mapping import CandidateDecision, _finding_fingerprint
 from complisoc.backend.compliance.verification import VerificationDecision
 from complisoc.backend.database.base import Base
 from complisoc.backend.models import (
@@ -93,7 +93,7 @@ def seed_controls(db):
 def _oracle_mapper(items):
     out = {}
     for finding, candidates in items:
-        out[finding.id] = [
+        out[_finding_fingerprint(finding)] = [
             CandidateDecision(
                 control_id=candidate.control_catalog.control_id,
                 maps=(rank == 0),

@@ -105,6 +105,12 @@ or
 Failed
 ```
 
+Scan execution status and AI mapping status are tracked independently. `status`
+describes whether the scanner run completed; `ai_status` is nullable while AI
+processing is pending and is `ok`, `partial`, or `failed` when processing has
+finished. An AI provider outage does not change a successfully completed scan
+to `failed`.
+
 Invariants:
 
 * Root entity of the platform

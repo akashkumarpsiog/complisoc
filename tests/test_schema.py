@@ -41,6 +41,7 @@ def test_scan_runs_schema():
         "id",
         "target_environment",
         "status",
+        "ai_status",
         "started_at",
         "completed_at",
         "created_at",

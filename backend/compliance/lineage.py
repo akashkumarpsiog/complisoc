@@ -18,6 +18,7 @@ from complisoc.backend.models import (
     ControlMapping,
     NormalizedFinding,
     RawFinding,
+    ReviewQueueItem,
     ScanRun,
     ScannerExecution,
     VerificationRecord,
@@ -51,6 +52,12 @@ def get_finding_lineage(db: Session, normalized_finding_id: int) -> dict[str, An
             .filter(VerificationRecord.control_mapping_id == mapping.id)
             .all()
         )
+        review_item = (
+            db.query(ReviewQueueItem)
+            .filter(ReviewQueueItem.control_mapping_id == mapping.id)
+            .order_by(ReviewQueueItem.id.desc())
+            .first()
+        )
         mapping_payloads.append({
             "mapping_id": mapping.id,
             "control_catalog_id": control.id if control else None,
@@ -58,6 +65,7 @@ def get_finding_lineage(db: Session, normalized_finding_id: int) -> dict[str, An
             "framework_name": control.framework_name if control else None,
             "control_title": control.title if control else None,
             "mapping_status": mapping.mapping_status,
+            "review_reason_code": review_item.review_reason_code if review_item else None,
             "gemini_confidence": mapping.gemini_confidence,
             "final_confidence": mapping.final_confidence,
             "verification_status": mapping.verification_status,
@@ -82,6 +90,7 @@ def get_finding_lineage(db: Session, normalized_finding_id: int) -> dict[str, An
             "id": scan_run.id if scan_run else None,
             "target_environment": scan_run.target_environment if scan_run else None,
             "status": scan_run.status if scan_run else None,
+            "ai_status": scan_run.ai_status if scan_run else None,
             "started_at": scan_run.started_at.isoformat() if scan_run and scan_run.started_at else None,
             "completed_at": scan_run.completed_at.isoformat() if scan_run and scan_run.completed_at else None,
             "created_at": scan_run.created_at.isoformat() if scan_run and scan_run.created_at else None,

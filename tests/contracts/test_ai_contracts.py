@@ -18,7 +18,7 @@ class TestGeminiResponseSchema:
         response = {
             "results": [
                 {
-                    "finding_id": 1,
+                    "finding_id": "70e814a9bc",
                     "candidates": [
                         {
                             "control_id": "A.5.15",

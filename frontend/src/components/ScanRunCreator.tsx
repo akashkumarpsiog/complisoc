@@ -59,6 +59,7 @@ function LiveScanForm({
   const [scanners, setScanners] = useState<ScannerInfo[]>([]);
   const [targetType, setTargetType] = useState<TargetType>("local");
   const [target, setTarget] = useState(".");
+  const [scanMode, setScanMode] = useState<"full" | "config-only">("config-only");
   const [framework, setFramework] = useState("");
   const [message, setMessage] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -118,6 +119,7 @@ function LiveScanForm({
       const result = await api.scans.run({
         target,
         scan_profile: targetType,
+        scan_mode: scanMode,
         framework: framework.trim() || undefined,
       }, controller.signal);
       await onCreated(result);
@@ -173,6 +175,16 @@ function LiveScanForm({
         <label className="text-sm font-semibold text-ink block">
           {targetLabel}
           <input className="control mt-1.5" disabled={submitting} value={target} onChange={(event) => setTarget(event.target.value)} placeholder={targetPlaceholder} />
+        </label>
+      )}
+
+      {!isCloud && (
+        <label className="text-sm font-semibold text-ink block">
+          Scan mode
+          <select className="control mt-1.5" disabled={submitting} value={scanMode} onChange={(event) => setScanMode(event.target.value as "full" | "config-only")}>
+            <option value="config-only">Config only (faster, skips vulnerability database scan)</option>
+            <option value="full">Full (includes vulnerability scan)</option>
+          </select>
         </label>
       )}
 

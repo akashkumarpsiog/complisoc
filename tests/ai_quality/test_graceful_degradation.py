@@ -2,10 +2,12 @@
 from __future__ import annotations
 
 import json
+import time
+from types import SimpleNamespace
 
 from complisoc.backend.compliance import langchain_pipeline, mapping as mapping_module
 from complisoc.backend.compliance import verification as verification_module
-from complisoc.backend.compliance.mapping import CandidateDecision
+from complisoc.backend.compliance.mapping import CandidateDecision, _finding_fingerprint
 from complisoc.backend.compliance.workflow import process_scan_run
 
 
@@ -14,6 +16,44 @@ def _run(db, finding, mocked_ai_services, target="ai-quality-degradation"):
 
 
 class TestGracefulDegradation:
+    def test_daily_quota_error_fails_mapping_stage_fast_with_auditable_reason(
+        self, ai_quality_db, ai_quality_finding, mocked_ai_services, monkeypatch, tmp_path
+    ):
+        class DailyQuotaError(Exception):
+            details = [{
+                "@type": "type.googleapis.com/google.rpc.RetryInfo",
+                "retryDelay": "77945s",
+            }]
+
+            def __str__(self):
+                return "429 RESOURCE_EXHAUSTED: quota exceeded; retryDelay=77945s"
+
+        client = SimpleNamespace(
+            models=SimpleNamespace(
+                generate_content=lambda **_: (_ for _ in ()).throw(DailyQuotaError())
+            )
+        )
+        monkeypatch.setattr(mapping_module, "GEMINI_API_KEY", "offline-test-key")
+        monkeypatch.setattr(mapping_module.genai, "Client", lambda **_: client)
+        mapper = mapping_module.GeminiMapper(cache_path=tmp_path / "mapping-cache.json")
+        monkeypatch.setattr(langchain_pipeline, "GeminiMapper", lambda: mapper)
+
+        started = time.perf_counter()
+        result = _run(
+            ai_quality_db,
+            ai_quality_finding(),
+            mocked_ai_services,
+            "degradation-daily-quota",
+        )
+        elapsed = time.perf_counter() - started
+
+        assert elapsed < 2.0
+        assert result["mappings"][0].mapping_status == "manual_review"
+        assert "RESOURCE_EXHAUSTED" in result["mappings"][0].rationale
+        assert "quota" in result["mappings"][0].rationale.lower()
+        assert result["scan_run"].status == "completed"
+        assert result["scan_run"].ai_status == "failed"
+
     def test_available_providers_publish_through_full_pipeline(
         self, ai_quality_db, ai_quality_finding, mocked_ai_services
     ):
@@ -31,6 +71,8 @@ class TestGracefulDegradation:
         result = _run(ai_quality_db, ai_quality_finding(), mocked_ai_services, "degradation-no-gemini")
         assert result["mappings"][0].mapping_status == "manual_review"
         assert result["review_items"][0].review_reason_code == "AI_MAPPER_FAILURE"
+        assert result["scan_run"].status == "completed"
+        assert result["scan_run"].ai_status == "failed"
 
     def test_gemini_timeout_does_not_persist_success(
         self, ai_quality_db, ai_quality_finding, mocked_ai_services
@@ -59,7 +101,7 @@ class TestGracefulDegradation:
         def partial(items):
             finding, candidates = items[0]
             return {
-                finding.id: [
+                _finding_fingerprint(finding): [
                     CandidateDecision(
                         control_id=candidates[0].control_catalog.control_id,
                         maps=True,
@@ -104,8 +146,14 @@ class TestGracefulDegradation:
     def test_groq_timeout_forces_manual_review(self, ai_quality_db, ai_quality_finding, mocked_ai_services):
         mocked_ai_services.verifier.verify_batch.side_effect = TimeoutError("provider timeout")
         result = _run(ai_quality_db, ai_quality_finding(), mocked_ai_services, "degradation-groq-timeout")
+        assert result["mappings"][0].gemini_confidence == 0.95
+        assert result["mappings"][0].groq_agreement_value == 0.0
+        assert result["mappings"][0].final_confidence == 0.57
         assert result["mappings"][0].mapping_status == "manual_review"
         assert result["mappings"][0].verification_status == "failed"
+        assert result["review_items"][0].review_reason_code == "AI_VERIFIER_FAILURE"
+        assert result["scan_run"].status == "completed"
+        assert result["scan_run"].ai_status == "partial"
 
     def test_groq_malformed_json_forces_manual_review(
         self, ai_quality_db, ai_quality_finding, provider_response_clients, monkeypatch

@@ -7,6 +7,7 @@ from __future__ import annotations
 import os
 import sys
 import json
+import re
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import MagicMock
@@ -21,11 +22,13 @@ from sqlalchemy.pool import StaticPool
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
 
 from tests.ai_quality.generators.test_data_generator import TestDataGenerator
+from complisoc.backend.core.json_extract import extract_json
+from complisoc.backend.api import main as api_main
 from complisoc.backend.api.main import app
 from complisoc.backend.compliance import langchain_pipeline
 from complisoc.backend.compliance import mapping as mapping_module
 from complisoc.backend.compliance import verification as verification_module
-from complisoc.backend.compliance.mapping import CandidateDecision
+from complisoc.backend.compliance.mapping import CandidateDecision, _finding_fingerprint
 from complisoc.backend.compliance.verification import VerificationDecision
 from complisoc.backend.database.base import Base
 from complisoc.backend.database.session import get_db
@@ -74,6 +77,9 @@ def ai_quality_db():
 
 @pytest.fixture
 def ai_quality_client(ai_quality_db):
+    previous_bind = api_main.SessionLocal.kw.get("bind")
+    api_main.SessionLocal.configure(bind=ai_quality_db.get_bind())
+
     def override_get_db():
         yield ai_quality_db
 
@@ -82,6 +88,7 @@ def ai_quality_client(ai_quality_db):
         yield TestClient(app)
     finally:
         app.dependency_overrides.pop(get_db, None)
+        api_main.SessionLocal.configure(bind=previous_bind)
 
 
 @pytest.fixture
@@ -119,7 +126,7 @@ def mocked_ai_services(monkeypatch):
 
     def map_batch(items):
         return {
-            finding.id: [
+            _finding_fingerprint(finding): [
                 CandidateDecision(
                     control_id=candidates[0].control_catalog.control_id,
                     maps=state["maps"],
@@ -182,7 +189,26 @@ def provider_response_clients(monkeypatch):
         ),
     }
 
-    gemini_call = MagicMock(side_effect=lambda **_: SimpleNamespace(text=state["gemini"]))
+    def gemini_response(**kwargs):
+        text = state["gemini"]
+        prompt = kwargs.get("contents", "")
+        fingerprints = re.findall(r"FINDING fingerprint=([0-9a-f]+)", prompt)
+        if fingerprints:
+            try:
+                payload = extract_json(text)
+            except (TypeError, json.JSONDecodeError):
+                return SimpleNamespace(text=text)
+            template_results = payload.get("results", [])
+            if len(fingerprints) > len(template_results):
+                template = template_results[0] if template_results else {}
+                payload["results"] = [dict(template) for _ in fingerprints]
+            for item, fingerprint in zip(payload.get("results", []), fingerprints):
+                item["finding_id"] = fingerprint
+            rewritten = json.dumps(payload)
+            text = f"```json\n{rewritten}\n```" if text.lstrip().startswith("```") else rewritten
+        return SimpleNamespace(text=text)
+
+    gemini_call = MagicMock(side_effect=gemini_response)
     groq_call = MagicMock(
         side_effect=lambda **_: SimpleNamespace(
             choices=[
@@ -204,6 +230,7 @@ def provider_response_clients(monkeypatch):
     monkeypatch.setattr(verification_module, "Groq", lambda **_: groq_client)
 
     mapper = mapping_module.GeminiMapper()
+    mapper.clear_cache()
     verifier = verification_module.GroqVerifier()
 
     def install_pipeline_clients():

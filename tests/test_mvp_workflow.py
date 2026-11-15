@@ -10,7 +10,7 @@ from sqlalchemy.pool import StaticPool
 
 from complisoc.backend.api.main import app
 from complisoc.backend.compliance.confidence import calculate_final_confidence, publication_status
-from complisoc.backend.compliance.mapping import CandidateDecision
+from complisoc.backend.compliance.mapping import CandidateDecision, _finding_fingerprint
 from complisoc.backend.compliance.verification import VerificationDecision
 from complisoc.backend.compliance.workflow import process_scan_run
 from complisoc.backend.database.base import Base
@@ -131,8 +131,8 @@ def test_process_scan_run_creates_full_lineage(db_session):
         "complisoc.backend.compliance.langchain_pipeline.GroqVerifier"
     ) as MockVerifier:
         MockMapper.return_value.map_batch.side_effect = lambda items: {
-            items[0][0].id: [CandidateDecision(control_id=items[0][1][0].control_catalog.control_id, maps=True, confidence=0.95, rationale="High signal")],
-            items[1][0].id: [CandidateDecision(control_id=items[1][1][0].control_catalog.control_id, maps=True, confidence=0.40, rationale="Low signal")],
+            _finding_fingerprint(items[0][0]): [CandidateDecision(control_id=items[0][1][0].control_catalog.control_id, maps=True, confidence=0.95, rationale="High signal")],
+            _finding_fingerprint(items[1][0]): [CandidateDecision(control_id=items[1][1][0].control_catalog.control_id, maps=True, confidence=0.40, rationale="Low signal")],
         }
         MockVerifier.return_value.verify_batch.return_value = {
             1: VerificationDecision(result="agree", agreement_value=1.0, explanation="Correct", model="groq", prompt_version="mvp-v1"),
@@ -164,12 +164,12 @@ def test_process_scan_run_creates_full_lineage(db_session):
     assert manual_review.groq_agreement_value == pytest.approx(0.0)
 
 
-def test_gemini_rejected_candidate_skips_groq_verification(db_session):
+def test_gemini_rejected_candidate_skips_groq_verification(db_session, client):
     with patch("complisoc.backend.compliance.langchain_pipeline.GeminiMapper") as MockMapper, patch(
         "complisoc.backend.compliance.langchain_pipeline.GroqVerifier"
     ) as MockVerifier:
         MockMapper.return_value.map_batch.side_effect = lambda items: {
-            items[0][0].id: [
+            _finding_fingerprint(items[0][0]): [
                 CandidateDecision(
                     control_id=items[0][1][0].control_catalog.control_id,
                     maps=False,
@@ -178,17 +178,34 @@ def test_gemini_rejected_candidate_skips_groq_verification(db_session):
                 )
             ]
         }
+        MockVerifier.return_value.verify_batch.return_value = {
+            1: VerificationDecision(result="disagree", agreement_value=0.0, explanation="Not mapped")
+        }
 
         process_scan_run(db_session, target_environment="aws-iac", findings=[high_signal_finding()])
 
     mapping = db_session.query(ControlMapping).one()
-    # Groq verifier should NOT be called when Gemini rejects the mapping
+    # Gemini-rejected candidates are queued for human review without Groq.
     assert MockVerifier.return_value.verify_batch.call_count == 0
     assert mapping.verification_status is None
     assert mapping.groq_agreement_value is None
     assert mapping.mapping_status == "manual_review"
     assert mapping.gemini_confidence == pytest.approx(0.1)
-    assert mapping.final_confidence == pytest.approx(0.1)
+    assert mapping.final_confidence is None
+    review_item = db_session.query(ReviewQueueItem).one()
+    assert review_item.review_reason_code == "GEMINI_REJECTED"
+    response = client.post(
+        f"/api/v1/review-queue/{review_item.id}/approve",
+        json={"reviewer_id": "tester"},
+    )
+    assert response.status_code == 409
+    bulk_response = client.post(
+        "/api/v1/review-queue/bulk-decide",
+        json={"item_ids": [review_item.id], "action": "approve", "reviewer_id": "tester"},
+    )
+    assert bulk_response.status_code == 409
+    db_session.refresh(mapping)
+    assert mapping.mapping_status == "manual_review"
 
 
 def test_api_scan_run_and_reports(client):
@@ -196,7 +213,7 @@ def test_api_scan_run_and_reports(client):
         "complisoc.backend.compliance.langchain_pipeline.GroqVerifier"
     ) as MockVerifier:
         MockMapper.return_value.map_batch.side_effect = lambda items: {
-            items[0][0].id: [CandidateDecision(control_id=items[0][1][0].control_catalog.control_id, maps=True, confidence=0.95, rationale="High signal")]
+            _finding_fingerprint(items[0][0]): [CandidateDecision(control_id=items[0][1][0].control_catalog.control_id, maps=True, confidence=0.95, rationale="High signal")]
         }
         MockVerifier.return_value.verify_batch.return_value = {
             1: VerificationDecision(result="agree", agreement_value=1.0, explanation="Correct"),
@@ -269,8 +286,8 @@ def test_leadership_report_uses_published_posture_only(client):
         "complisoc.backend.compliance.langchain_pipeline.GroqVerifier"
     ) as MockVerifier:
         MockMapper.return_value.map_batch.side_effect = lambda items: {
-            items[0][0].id: [CandidateDecision(control_id=items[0][1][0].control_catalog.control_id, maps=True, confidence=0.95, rationale="High signal")],
-            items[1][0].id: [CandidateDecision(control_id=items[1][1][0].control_catalog.control_id, maps=True, confidence=0.40, rationale="Low signal")],
+            _finding_fingerprint(items[0][0]): [CandidateDecision(control_id=items[0][1][0].control_catalog.control_id, maps=True, confidence=0.95, rationale="High signal")],
+            _finding_fingerprint(items[1][0]): [CandidateDecision(control_id=items[1][1][0].control_catalog.control_id, maps=True, confidence=0.40, rationale="Low signal")],
         }
         MockVerifier.return_value.verify_batch.return_value = {
             1: VerificationDecision(result="agree", agreement_value=1.0, explanation="Correct"),
@@ -297,7 +314,7 @@ def test_audit_bundle_contains_lineage_checksums(client):
         "complisoc.backend.compliance.langchain_pipeline.GroqVerifier"
     ) as MockVerifier:
         MockMapper.return_value.map_batch.side_effect = lambda items: {
-            items[0][0].id: [CandidateDecision(control_id=items[0][1][0].control_catalog.control_id, maps=True, confidence=0.95, rationale="High signal")]
+            _finding_fingerprint(items[0][0]): [CandidateDecision(control_id=items[0][1][0].control_catalog.control_id, maps=True, confidence=0.95, rationale="High signal")]
         }
         MockVerifier.return_value.verify_batch.return_value = {
             1: VerificationDecision(result="agree", agreement_value=1.0, explanation="Correct"),
@@ -326,7 +343,7 @@ def test_audit_bundle_generates_manifest_and_verify_endpoint(client):
         "complisoc.backend.compliance.langchain_pipeline.GroqVerifier"
     ) as MockVerifier:
         MockMapper.return_value.map_batch.side_effect = lambda items: {
-            items[0][0].id: [CandidateDecision(control_id=items[0][1][0].control_catalog.control_id, maps=True, confidence=0.95, rationale="oracle")]
+            _finding_fingerprint(items[0][0]): [CandidateDecision(control_id=items[0][1][0].control_catalog.control_id, maps=True, confidence=0.95, rationale="oracle")]
         }
         MockVerifier.return_value.verify_batch.return_value = {
             1: VerificationDecision(result="agree", agreement_value=1.0, explanation="oracle")

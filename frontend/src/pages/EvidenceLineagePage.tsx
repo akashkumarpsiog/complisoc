@@ -111,7 +111,7 @@ function LineageView({ data }: { data: FindingLineage }) {
       </div>
       {data.scan_run ? (
         <div className="rounded-xl border border-line bg-white p-5 shadow-sm">
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
             <div>
               <div className="text-xs font-bold uppercase tracking-wider text-subtle">Scan run ID</div>
               <div className="mt-1 text-sm font-semibold text-ink">#{data.scan_run.id}</div>
@@ -123,6 +123,10 @@ function LineageView({ data }: { data: FindingLineage }) {
             <div>
               <div className="text-xs font-bold uppercase tracking-wider text-subtle">Status</div>
               <div className="mt-1"><StatusBadge value={data.scan_run.status} /></div>
+            </div>
+            <div>
+              <div className="text-xs font-bold uppercase tracking-wider text-subtle">AI mapping</div>
+              <div className="mt-1"><StatusBadge value={data.scan_run.ai_status ?? "pending"} /></div>
             </div>
             <div>
               <div className="text-xs font-bold uppercase tracking-wider text-subtle">Created</div>
@@ -264,6 +268,11 @@ function LineageView({ data }: { data: FindingLineage }) {
 
                   <div>
                     <div className="text-xs font-bold uppercase tracking-wider text-subtle mb-2">Verification records</div>
+                    {mapping.review_reason_code === "GEMINI_REJECTED" && (
+                      <p className="my-2 text-sm text-warning-dark">
+                        Gemini rejected the candidate. Groq verification was skipped; this mapping remains in manual review and cannot be published until it is remapped and verified.
+                      </p>
+                    )}
                     {mapping.verification_records.length === 0 ? (
                       <p className="text-sm text-muted">No verification records.</p>
                     ) : (

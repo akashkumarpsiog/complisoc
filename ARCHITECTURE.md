@@ -290,7 +290,13 @@ or
 Manual Review
 ```
 
-Workflow stages must not be bypassed.
+If Gemini rejects every candidate for a finding, that mapping goes directly to
+manual review and Groq is skipped for that finding. It has no final confidence
+and is not eligible for publication. A reviewer cannot publish it directly;
+it must be remapped and pass verification first. All Gemini-accepted mappings
+continue through Groq verification and confidence calculation.
+
+Workflow stages must not be bypassed for mappings eligible for publication.
 
 ---
 
@@ -549,11 +555,13 @@ The following rules are mandatory:
 3. Normalization is deterministic.
 4. Candidate narrowing occurs before AI mapping.
 5. Validation occurs before publication.
-6. Verification occurs before publication.
-7. Confidence threshold is enforced.
-8. Published mappings require lineage.
-9. Reports use validated mappings only.
-10. Dashboards consume processed data only.
+6. Gemini-accepted mappings are verified before publication.
+7. Gemini-rejected mappings have no final confidence, remain in manual review,
+   and cannot be published through review approval.
+8. Confidence threshold is enforced.
+9. Published mappings require lineage.
+10. Reports use validated mappings only.
+11. Dashboards consume processed data only.
 
 Violation of these rules is considered an architectural defect.
 

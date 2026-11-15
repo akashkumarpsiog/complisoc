@@ -134,6 +134,7 @@ class TestLineageReturnsFullChain:
             assert lineage["scan_run"] is not None
             assert lineage["scan_run"]["id"] == data["scan"].id
             assert lineage["scan_run"]["target_environment"] == "test"
+            assert "ai_status" in lineage["scan_run"]
         finally:
             db.close()
             engine.dispose()

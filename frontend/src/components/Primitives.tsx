@@ -157,7 +157,7 @@ export function StatusBadge({ value, className }: { value?: string | null; class
   const tone =
     normalized.includes("published") || normalized.includes("completed") || normalized.includes("agree")
       ? "border-success/20 bg-success-light text-success-dark"
-      : normalized.includes("manual") || normalized.includes("pending")
+      : normalized.includes("manual") || normalized.includes("pending") || normalized.includes("partial")
         ? "border-warning/20 bg-warning-light text-warning-dark"
         : normalized.includes("failed") || normalized.includes("rejected") || normalized.includes("disagree")
           ? "border-danger/20 bg-danger-light text-danger-dark"

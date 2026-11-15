@@ -28,9 +28,10 @@ class ScannerInfo(BaseModel):
 
 class ScanRequest(BaseModel):
     target: str = Field(min_length=1, max_length=512)
-    scan_profile: str | None = Field(default=None, max_length=64)
+    scan_profile: str | None = Field(default=None, pattern="^(local|git|azure)$")
     scanners: list[str] | None = None
     framework: str | None = None
+    scan_mode: str = Field(default="full", pattern="^(full|config-only)$")
 
 
 class ScanRunCreate(BaseModel):
@@ -78,6 +79,7 @@ class ScanRunRead(ORMModel):
     id: int
     target_environment: str
     status: str
+    ai_status: str | None = None
     started_at: datetime | None = None
     completed_at: datetime | None = None
     created_at: datetime | None = None

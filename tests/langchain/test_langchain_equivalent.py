@@ -28,7 +28,7 @@ from complisoc.backend.compliance.langchain_pipeline import (  # noqa: E402
     is_langchain_available,
     run_pipeline,
 )
-from complisoc.backend.compliance.mapping import CandidateDecision  # noqa: E402
+from complisoc.backend.compliance.mapping import CandidateDecision, _finding_fingerprint  # noqa: E402
 from complisoc.backend.compliance.verification import VerificationDecision  # noqa: E402
 from complisoc.backend.database.base import Base  # noqa: E402
 from complisoc.backend.models import (  # noqa: E402
@@ -130,7 +130,7 @@ def _sample_findings():
 def _oracle_mapper(items):
     out = {}
     for finding, candidates in items:
-        out[finding.id] = [
+        out[_finding_fingerprint(finding)] = [
             CandidateDecision(
                 control_id=candidate.control_catalog.control_id,
                 maps=(rank == 0),

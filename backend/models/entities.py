@@ -24,11 +24,18 @@ class ScanRun(Base):
             "status IN ('created','running','completed','failed')",
             name="ck_scanrun_status",
         ),
+        CheckConstraint(
+            "ai_status IS NULL OR ai_status IN ('ok','partial','failed')",
+            name="ck_scanrun_ai_status",
+        ),
     )
 
     id = Column(Integer, primary_key=True, index=True)
     target_environment = Column(String(128), nullable=False)
     status = Column(String(50), nullable=False, default="created")
+    # AI enrichment is independent from scanner evidence collection: a scan
+    # may complete successfully while mapping is partial or awaiting review.
+    ai_status = Column(String(16), nullable=True)
     started_at = Column(DateTime, default=datetime.utcnow)
     completed_at = Column(DateTime, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)

@@ -1,8 +1,9 @@
 from datetime import datetime, timedelta
 from pathlib import Path
+from threading import Event, Lock
 from typing import Any
 
-from fastapi import Depends, FastAPI, HTTPException
+from fastapi import BackgroundTasks, Depends, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from groq import Groq
@@ -12,7 +13,7 @@ from sqlalchemy.orm import Session, joinedload
 from complisoc.backend.core.config import GROQ_API_KEY, GROQ_MODEL
 from complisoc.backend.core.json_extract import extract_json
 
-from complisoc.backend.database.session import get_db
+from complisoc.backend.database.session import SessionLocal, get_db
 
 from complisoc.backend.api.schemas import (
     AIMetricsRead,
@@ -63,6 +64,8 @@ def _run_compliance_pipeline(
     scanner_failures: list[dict] | None = None,
     framework: str | None = None,
     selected_scanners: list[str] | None = None,
+    cancel_event: Event | None = None,
+    scan_run_id: int | None = None,
 ) -> dict:
     """Run the compliance pipeline.
 
@@ -70,6 +73,9 @@ def _run_compliance_pipeline(
     ``complisoc.backend.compliance.langchain_pipeline.run_pipeline`` (exposed
     here as ``process_scan_run`` via the workflow module). It returns the same
     dict shape the rest of the API relies on.
+
+    When ``scan_run_id`` is provided (background task), the pre-existing scan
+    run row is reused instead of creating a duplicate.
     """
     return run_pipeline(
         db,
@@ -78,6 +84,8 @@ def _run_compliance_pipeline(
         scanner_failures=scanner_failures,
         framework=framework,
         selected_scanners=selected_scanners,
+        cancel_event=cancel_event,
+        scan_run_id=scan_run_id,
     )
 
 app.add_middleware(
@@ -87,6 +95,109 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# In-process registry of per-scan-run cancellation events. The background scan
+# task reads/sets the same event so a cancel request (see POST /scans/{id}/cancel)
+# has a real handle to signal the running pipeline.
+_scan_cancel_events: dict[int, Event] = {}
+_scan_cancel_lock = Lock()
+
+
+def _scan_cancel_event(scan_run_id: int) -> Event:
+    with _scan_cancel_lock:
+        event = _scan_cancel_events.get(scan_run_id)
+        if event is None:
+            event = Event()
+            _scan_cancel_events[scan_run_id] = event
+        return event
+
+
+def _clear_scan_cancel_event(scan_run_id: int) -> None:
+    with _scan_cancel_lock:
+        _scan_cancel_events.pop(scan_run_id, None)
+
+
+@app.on_event("startup")
+def _reap_stale_running_scans() -> None:
+    """Mark scans left in ``running`` state after a server restart as ``failed``.
+
+    The cancel-event registry is process-local and does not survive a restart,
+    so any scan that was mid-flight when the server went down can never complete.
+    Sweep those rows on startup so the dashboard and clients don't wait forever.
+    """
+    db = SessionLocal()
+    try:
+        stale = db.query(ScanRun).filter(ScanRun.status == "running").all()
+        for scan_run in stale:
+            scan_run.status = "failed"
+            scan_run.completed_at = datetime.utcnow()
+        if stale:
+            db.commit()
+    finally:
+        db.close()
+
+
+def _execute_scan(
+    scan_run_id: int,
+    target: str,
+    scanners: list[str] | None,
+    scan_profile: str | None,
+    scan_mode: str,
+    framework: str | None,
+    cancel_event: Event,
+    db: Session | None = None,
+) -> None:
+    """Run the full scan pipeline in the background.
+
+    When ``db`` is omitted (production route), a fresh ``SessionLocal`` is opened
+    because the request-scoped session is closed once the HTTP response is sent.
+    Tests may pass their own session so the background task writes to the same
+    in-memory database the assertions read from.
+    """
+    own_session = db is None
+    if own_session:
+        db = SessionLocal()
+    try:
+        scan_run = db.get(ScanRun, scan_run_id)
+        if scan_run is None:
+            return
+        findings, scanner_failures = run_scanners(
+            target,
+            scanners=scanners,
+            scan_profile=scan_profile,
+            scan_mode=scan_mode,
+            timeout=120,
+            cancel_event=cancel_event,
+        )
+        selected = resolve_scanners(scanners, scan_profile)
+        result = _run_compliance_pipeline(
+            db,
+            target_environment=target,
+            findings=findings,
+            scanner_failures=scanner_failures,
+            framework=framework,
+            selected_scanners=selected,
+            cancel_event=cancel_event,
+            scan_run_id=scan_run_id,
+        )
+        scan_run = db.get(ScanRun, scan_run_id)
+        scan_run.completed_at = datetime.utcnow()
+        if cancel_event.is_set():
+            scan_run.status = "failed"
+        elif scan_run.status != "failed":
+            scan_run.status = "completed"
+        db.commit()
+    except Exception:  # Defensive: never leave a run stuck in "running".
+        scan_run = db.get(ScanRun, scan_run_id)
+        if scan_run is not None:
+            scan_run.status = "failed"
+            scan_run.ai_status = "failed"
+            scan_run.completed_at = datetime.utcnow()
+            db.commit()
+    finally:
+        if own_session:
+            db.close()
+            _clear_scan_cancel_event(scan_run_id)
 
 
 def not_found(resource: str):
@@ -123,23 +234,53 @@ def list_available_scanners():
     return [ScannerInfo(**item) for item in list_scanners()]
 
 
-@app.post("/api/v1/scans", response_model=ScanRunRead, status_code=201)
-def run_scan(payload: ScanRequest, db: Session = Depends(get_db)):
-    findings, scanner_failures = run_scanners(
+@app.post("/api/v1/scans", response_model=ScanRunRead, status_code=202)
+def run_scan(
+    payload: ScanRequest,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db),
+):
+    # Persist a placeholder scan run immediately so the client gets a stable
+    # handle to poll, then run the full pipeline (scanners + AI mapping +
+    # verification) in a background task with a fresh DB session. The HTTP
+    # request no longer holds open through the slow AI stages.
+    scan_run = ScanRun(target_environment=payload.target, status="running")
+    db.add(scan_run)
+    db.commit()
+    db.refresh(scan_run)
+
+    cancel_event = _scan_cancel_event(scan_run.id)
+    background_tasks.add_task(
+        _execute_scan,
+        scan_run.id,
         payload.target,
-        scanners=payload.scanners,
-        scan_profile=payload.scan_profile,
+        payload.scanners,
+        payload.scan_profile,
+        payload.scan_mode,
+        payload.framework,
+        cancel_event,
     )
-    selected = resolve_scanners(payload.scanners, payload.scan_profile)
-    result = _run_compliance_pipeline(
-        db,
-        target_environment=payload.target,
-        findings=findings,
-        scanner_failures=scanner_failures,
-        framework=payload.framework,
-        selected_scanners=selected,
-    )
-    return result["scan_run"]
+    return scan_run
+
+
+@app.post("/api/v1/scans/{scan_run_id}/cancel", status_code=204)
+def cancel_scan(scan_run_id: int):
+    """Request cancellation of a running scan.
+
+    Sets the scan's cancellation event so every pipeline stage (scanners,
+    Gemini mapping, Groq verification) stops as soon as it next checks it.
+    """
+    event = _scan_cancel_events.get(scan_run_id)
+    if event is None:
+        raise HTTPException(
+            status_code=404,
+            detail={
+                "code": "SCAN_NOT_FOUND",
+                "message": "Scan run is not running or does not exist.",
+            },
+        )
+    event.set()
+    return None
 
 
 @app.get("/api/v1/scan-runs", response_model=list[ScanRunRead])
@@ -337,6 +478,22 @@ def reject_review_item(item_id: int, payload: ReviewDecision, db: Session = Depe
 
 @app.post("/api/v1/review-queue/bulk-decide", response_model=list[ReviewQueueItemRead])
 def bulk_decide_review_items(payload: BulkReviewDecision, db: Session = Depends(get_db)):
+    if payload.action == "approve":
+        rejected_mapping = (
+            db.query(ReviewQueueItem)
+            .filter(ReviewQueueItem.id.in_(payload.item_ids))
+            .filter(ReviewQueueItem.status == "pending")
+            .filter(ReviewQueueItem.review_reason_code == "GEMINI_REJECTED")
+            .first()
+        )
+        if rejected_mapping is not None:
+            raise HTTPException(
+                status_code=409,
+                detail={
+                    "code": "GEMINI_REJECTED_MAPPING",
+                    "message": "A Gemini-rejected mapping cannot be published. Remap and verify it first.",
+                },
+            )
     results = []
     for item_id in payload.item_ids:
         item = db.get(ReviewQueueItem, item_id)
@@ -553,7 +710,16 @@ def verify_all_audit_bundles(db: Session = Depends(get_db)):
 
 
 def _dashboard_control_coverage(db: Session) -> dict[str, int]:
-    mappings = db.query(ControlMapping).filter(ControlMapping.mapping_status == "published").all()
+    mappings = (
+        db.query(ControlMapping)
+        .join(ControlMapping.normalized_finding)
+        .join(NormalizedFinding.raw_finding)
+        .join(RawFinding.scanner_execution)
+        .join(ScannerExecution.scan_run)
+        .filter(ControlMapping.mapping_status == "published")
+        .filter(ScanRun.status == "completed")
+        .all()
+    )
     covered = {mapping.control_catalog_id for mapping in mappings}
     total = db.query(ControlCatalog).filter(ControlCatalog.active_status.is_(True)).count()
     return {"covered_controls": len(covered), "total_controls": total}
@@ -566,7 +732,14 @@ def dashboard_control_coverage(db: Session = Depends(get_db)):
 
 def _dashboard_severity_distribution(db: Session) -> dict[str, dict[str, int]]:
     counts: dict[str, int] = {}
-    for finding in db.query(NormalizedFinding).all():
+    for finding in (
+        db.query(NormalizedFinding)
+        .join(NormalizedFinding.raw_finding)
+        .join(RawFinding.scanner_execution)
+        .join(ScannerExecution.scan_run)
+        .filter(ScanRun.status == "completed")
+        .all()
+    ):
         counts[finding.severity] = counts.get(finding.severity, 0) + 1
     return {"severity_counts": counts}
 
@@ -578,9 +751,17 @@ def dashboard_severity_distribution(db: Session = Depends(get_db)):
 
 def _dashboard_gap_summary(db: Session) -> dict[str, int | list[dict[str, object]]]:
     failed_controls: list[dict[str, object]] = []
+    completed_scan_filter = (
+        db.query(ControlMapping)
+        .join(ControlMapping.normalized_finding)
+        .join(NormalizedFinding.raw_finding)
+        .join(RawFinding.scanner_execution)
+        .join(ScannerExecution.scan_run)
+        .filter(ScanRun.status == "completed")
+    )
     for status in ("manual_review", "rejected"):
         rows = (
-            db.query(
+            completed_scan_filter.with_entities(
                 ControlMapping.control_catalog_id,
                 ControlCatalog.control_id,
                 ControlCatalog.title,
@@ -603,8 +784,8 @@ def _dashboard_gap_summary(db: Session) -> dict[str, int | list[dict[str, object
             )
 
     return {
-        "manual_review_mappings": db.query(ControlMapping).filter(ControlMapping.mapping_status == "manual_review").count(),
-        "rejected_mappings": db.query(ControlMapping).filter(ControlMapping.mapping_status == "rejected").count(),
+        "manual_review_mappings": completed_scan_filter.filter(ControlMapping.mapping_status == "manual_review").count(),
+        "rejected_mappings": completed_scan_filter.filter(ControlMapping.mapping_status == "rejected").count(),
         "failed_controls": sorted(
             failed_controls,
             key=lambda item: (item["status"], str(item["control_id"])),
@@ -619,7 +800,15 @@ def dashboard_gap_summary(db: Session = Depends(get_db)):
 
 def _dashboard_remediation_backlog(db: Session):
     severity_order = {"critical": 0, "high": 1, "medium": 2, "low": 3, "info": 4}
-    query = db.query(ControlMapping).filter(ControlMapping.mapping_status.in_(["manual_review", "rejected"]))
+    query = (
+        db.query(ControlMapping)
+        .join(ControlMapping.normalized_finding)
+        .join(NormalizedFinding.raw_finding)
+        .join(RawFinding.scanner_execution)
+        .join(ScannerExecution.scan_run)
+        .filter(ControlMapping.mapping_status.in_(["manual_review", "rejected"]))
+        .filter(ScanRun.status == "completed")
+    )
     total = query.count()
     mappings = (
         query.order_by(ControlMapping.id.desc())
@@ -645,9 +834,14 @@ def dashboard_control_drill_down(control_catalog_id: int, db: Session = Depends(
         not_found("Control")
     mappings = (
         db.query(ControlMapping)
+        .join(ControlMapping.normalized_finding)
+        .join(NormalizedFinding.raw_finding)
+        .join(RawFinding.scanner_execution)
+        .join(ScannerExecution.scan_run)
         .filter(
             ControlMapping.control_catalog_id == control_catalog_id,
             ControlMapping.mapping_status.in_(["manual_review", "rejected"]),
+            ScanRun.status == "completed",
         )
         .order_by(ControlMapping.id.desc())
         .all()
@@ -685,6 +879,7 @@ def _dashboard_trends(db: Session):
     scan_runs = (
         db.query(ScanRun)
         .filter(ScanRun.archived_at.is_(None))
+        .filter(ScanRun.status == "completed")
         .order_by(ScanRun.created_at.desc())
         .limit(10)
         .all()
@@ -711,25 +906,29 @@ def dashboard_trends(db: Session = Depends(get_db)):
 
 
 def _dashboard_cloud_findings(db: Session) -> dict[str, int]:
-    alerts = (
+    completed_findings = (
         db.query(NormalizedFinding)
-        .filter(
+        .join(NormalizedFinding.raw_finding)
+        .join(RawFinding.scanner_execution)
+        .join(ScannerExecution.scan_run)
+        .filter(ScanRun.status == "completed")
+    )
+    alerts = (
+        completed_findings.filter(
             NormalizedFinding.scanner_name == "defender",
             func.json_extract(NormalizedFinding.metadata_json, "$.defender_source") == "alerts",
         )
         .count()
     )
     recommendations = (
-        db.query(NormalizedFinding)
-        .filter(
+        completed_findings.filter(
             NormalizedFinding.scanner_name == "defender",
             func.json_extract(NormalizedFinding.metadata_json, "$.defender_source") == "assessments",
         )
         .count()
     )
     secure_scores = (
-        db.query(NormalizedFinding)
-        .filter(
+        completed_findings.filter(
             NormalizedFinding.scanner_name == "defender",
             func.json_extract(NormalizedFinding.metadata_json, "$.defender_source") == "secureScores",
         )
@@ -744,7 +943,15 @@ def dashboard_cloud_findings(db: Session = Depends(get_db)):
 
 
 def _dashboard_ai_metrics(db: Session) -> dict[str, Any]:
-    mappings = db.query(ControlMapping).all()
+    mappings = (
+        db.query(ControlMapping)
+        .join(ControlMapping.normalized_finding)
+        .join(NormalizedFinding.raw_finding)
+        .join(RawFinding.scanner_execution)
+        .join(ScannerExecution.scan_run)
+        .filter(ScanRun.status == "completed")
+        .all()
+    )
     total = len(mappings)
     published = [m for m in mappings if m.mapping_status == "published"]
     manual_review = [m for m in mappings if m.mapping_status == "manual_review"]
@@ -816,6 +1023,14 @@ def _decide_review_item(db: Session, item_id: int, item_status: str, mapping_sta
     mapping = db.get(ControlMapping, item.control_mapping_id)
     if mapping is None:
         not_found("Mapping")
+    if mapping_status == "published" and item.review_reason_code == "GEMINI_REJECTED":
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "code": "GEMINI_REJECTED_MAPPING",
+                "message": "A Gemini-rejected mapping cannot be published. Remap and verify it first.",
+            },
+        )
     item.status = item_status
     item.reviewer_id = payload.reviewer_id
     item.comments = payload.comments

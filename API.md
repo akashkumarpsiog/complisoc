@@ -56,6 +56,11 @@ AuditBundle
 | GET    | /scan-runs/{id}         | Get scan run    |
 | GET    | /scan-runs/{id}/summary | Scan summary    |
 
+`POST /scans` returns `202 Accepted` with the created `ScanRun` in `running`
+status. Poll `GET /scan-runs/{id}` for scanner completion. The `status` field
+tracks evidence collection; `ai_status` independently reports `ok`, `partial`,
+or `failed` after AI enrichment finishes.
+
 ---
 
 # Findings

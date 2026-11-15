@@ -87,11 +87,12 @@ async function request<T>(
   path: string,
   options: RequestInit = {},
   query?: Record<string, QueryValue>,
+  useCache = true,
 ): Promise<T> {
   const url = buildUrl(path, query);
   const isRead = !options.method || options.method === "GET";
 
-  if (isRead) {
+  if (isRead && useCache) {
     const cached = getCached<T>(url);
     if (cached !== null) return cached;
   }
@@ -141,14 +142,14 @@ export const api = {
       request<ScanDiff>(`/scan-runs/${scanRunId}/drift`, {}, compareTo ? { compare_to: String(compareTo) } : undefined),
   },
   scanRuns: {
-    list: (archivedOnly = false) => request<ScanRun[]>("/scan-runs", {}, { archived_only: archivedOnly ? "true" : undefined }),
+    list: (archivedOnly = false, fresh = false) => request<ScanRun[]>("/scan-runs", {}, { archived_only: archivedOnly ? "true" : undefined }, !fresh),
     create: (payload: {
       target_environment: string;
       findings: RawFindingInput[];
       scanner_failures?: ScannerFailureInput[];
     }) => request<ScanRun>("/scan-runs", { method: "POST", body: JSON.stringify(payload) }),
-    summary: (id: number) => request<ScanRunSummary>(`/scan-runs/${id}/summary`),
-    get: (id: number) => request<ScanRun>(`/scan-runs/${id}`),
+    summary: (id: number, fresh = false) => request<ScanRunSummary>(`/scan-runs/${id}/summary`, {}, undefined, !fresh),
+    get: (id: number, fresh = false) => request<ScanRun>(`/scan-runs/${id}`, {}, undefined, !fresh),
     archive: (id: number) => request<ScanRun>(`/scan-runs/${id}/archive`, { method: "POST" }),
     restore: (id: number) => request<ScanRun>(`/scan-runs/${id}/restore`, { method: "POST" }),
     bulkArchive: (scanRunIds: number[]) =>
@@ -165,19 +166,19 @@ export const api = {
       request<ScanRun>("/scans", { method: "POST", body: JSON.stringify(payload), signal }),
   },
   findings: {
-    list: (query?: Record<string, QueryValue>) => request<NormalizedFinding[]>("/findings", {}, query),
+    list: (query?: Record<string, QueryValue>, fresh = false) => request<NormalizedFinding[]>("/findings", {}, query, !fresh),
     mappings: (id: number) => request<ControlMapping[]>(`/findings/${id}/mappings`),
     lineage: (id: number) => request<FindingLineage>(`/findings/${id}/lineage`),
   },
   mappings: {
-    list: (query?: Record<string, QueryValue>) => request<ControlMapping[]>("/mappings", {}, query),
+    list: (query?: Record<string, QueryValue>, fresh = false) => request<ControlMapping[]>("/mappings", {}, query, !fresh),
     verification: (id: number) => request<VerificationRecord[]>(`/mappings/${id}/verification`),
   },
   controls: {
     list: (framework?: string) => request<Control[]>("/controls", {}, { framework }),
   },
   reviewQueue: {
-    list: (query?: Record<string, QueryValue>) => request<ReviewQueueItem[]>("/review-queue", {}, query),
+    list: (query?: Record<string, QueryValue>, fresh = false) => request<ReviewQueueItem[]>("/review-queue", {}, query, !fresh),
     approve: (id: number, comments?: string) =>
       request<ReviewQueueItem>(`/review-queue/${id}/approve`, {
         method: "POST",

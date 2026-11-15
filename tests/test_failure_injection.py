@@ -23,7 +23,7 @@ from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
 from complisoc.backend.compliance.langchain_pipeline import run_pipeline
-from complisoc.backend.compliance.mapping import CandidateDecision
+from complisoc.backend.compliance.mapping import CandidateDecision, _finding_fingerprint
 from complisoc.backend.compliance.verification import VerificationDecision
 from complisoc.backend.database.base import Base
 from complisoc.backend.models import (
@@ -93,7 +93,7 @@ def _finding():
 
 def _oracle_mapper(items):
     return {
-        items[0][0].id: [
+        _finding_fingerprint(items[0][0]): [
             CandidateDecision(
                 control_id=items[0][1][0].control_catalog.control_id,
                 maps=True,
@@ -145,7 +145,7 @@ class TestGroqUnavailable:
         try:
             def low_confidence_mapper(items):
                 return {
-                    items[0][0].id: [
+                    _finding_fingerprint(items[0][0]): [
                         CandidateDecision(
                             control_id=items[0][1][0].control_catalog.control_id,
                             maps=True,

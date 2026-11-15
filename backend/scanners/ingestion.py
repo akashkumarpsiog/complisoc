@@ -1,4 +1,5 @@
 from collections import defaultdict
+from datetime import datetime
 
 from sqlalchemy.orm import Session
 
@@ -12,10 +13,20 @@ def ingest_findings(
     findings: list[dict],
     scanner_failures: list[dict] | None = None,
     selected_scanners: list[str] | None = None,
+    scan_run_id: int | None = None,
 ) -> tuple[ScanRun, list[RawFinding]]:
-    scan_run = ScanRun(target_environment=target_environment, status="running")
-    db.add(scan_run)
-    db.flush()
+    if scan_run_id is not None:
+        scan_run = db.get(ScanRun, scan_run_id)
+        if scan_run is None:
+            raise ValueError(f"Scan run {scan_run_id} does not exist")
+        scan_run.status = "running"
+        scan_run.completed_at = None
+        db.add(scan_run)
+        db.flush()
+    else:
+        scan_run = ScanRun(target_environment=target_environment, status="running")
+        db.add(scan_run)
+        db.flush()
 
     executions_by_scanner: dict[str, ScannerExecution] = {}
     grouped: dict[str, list[dict]] = defaultdict(list)
@@ -34,6 +45,7 @@ def ingest_findings(
             scan_run_id=scan_run.id,
             scanner_name="unknown",
             status="failed",
+            completed_at=datetime.utcnow(),
             error_message=str(exc),
         )
         db.add(execution)
@@ -47,6 +59,7 @@ def ingest_findings(
             scan_run_id=scan_run.id,
             scanner_name=scanner_name,
             status="completed",
+            completed_at=datetime.utcnow(),
         )
         db.add(execution)
         db.flush()
@@ -75,6 +88,7 @@ def ingest_findings(
             scan_run_id=scan_run.id,
             scanner_name=scanner_name,
             status="failed",
+            completed_at=datetime.utcnow(),
             error_message=str(failure.get("error_message") or "Scanner execution failed"),
         )
         db.add(execution)
@@ -85,6 +99,7 @@ def ingest_findings(
             scan_run_id=scan_run.id,
             scanner_name="manual",
             status="completed",
+            completed_at=datetime.utcnow(),
             error_message=None,
         )
         db.add(execution)
@@ -100,6 +115,7 @@ def ingest_findings(
             scan_run_id=scan_run.id,
             scanner_name=scanner_name,
             status="completed",
+            completed_at=datetime.utcnow(),
             error_message="Scanner ran but produced no findings.",
         )
         db.add(execution)

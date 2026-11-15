@@ -6,19 +6,21 @@ through the full pipeline: run_scanners → process_scan_run → DB assertions.
 
 from __future__ import annotations
 
-import asyncio
 import json
 import os
+from pathlib import Path
+from threading import Event
 from unittest.mock import MagicMock, patch
 
 import pytest
+from fastapi import BackgroundTasks
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
 from complisoc.backend.api.main import run_scan
 from complisoc.backend.api import main as api_main
-from complisoc.backend.compliance.mapping import CandidateDecision
+from complisoc.backend.compliance.mapping import CandidateDecision, _finding_fingerprint
 from complisoc.backend.compliance.verification import VerificationDecision
 from complisoc.backend.database.base import Base
 from complisoc.backend.database.session import get_db
@@ -116,7 +118,12 @@ class TestCheckovIntegration:
                 ]
             }
         }
-        with patch.object(runners, "_run_command", return_value=_fake_run(stdout=json.dumps(report))):
+        def fake_checkov_run(argv, timeout, cancel_event=None):
+            output_dir = Path(argv[argv.index("--output-file-path") + 1])
+            (output_dir / "results_json.json").write_text(json.dumps(report), encoding="utf-8")
+            return _fake_run(stdout="")
+
+        with patch.object(runners, "_run_command", side_effect=fake_checkov_run):
             findings, failures = runners.CheckovScanner().run(".")
         assert len(findings) == 1
         assert findings[0]["raw_json"]["finding_type"] == "CKV_AWS_1"
@@ -297,7 +304,7 @@ class TestScanRunDBLineage:
             "complisoc.backend.compliance.langchain_pipeline.GroqVerifier"
         ) as MockVerifier:
             MockMapper.return_value.map_batch.side_effect = lambda items: {
-                items[0][0].id: [
+                _finding_fingerprint(items[0][0]): [
                     CandidateDecision(
                         control_id=items[0][1][0].control_catalog.control_id,
                         maps=True,
@@ -309,13 +316,25 @@ class TestScanRunDBLineage:
             MockVerifier.return_value.verify_batch.return_value = {
                 1: VerificationDecision(result="agree", agreement_value=1.0, explanation="Correct")
             }
-            scan_run = asyncio.run(run_scan(ScanRequest(target="."), _ConnectedRequest(), app_db))
+            scan_run = run_scan(ScanRequest(target="."), BackgroundTasks(), app_db)
+            api_main._execute_scan(
+                scan_run.id,
+                ".",
+                None,
+                None,
+                "full",
+                None,
+                Event(),
+                db=app_db,
+            )
         app_db.commit()
-        raw_findings = app_db.query(RawFinding).filter(RawFinding.scanner_execution_id == scan_run.id).all()
+        raw_findings = (
+            app_db.query(RawFinding)
+            .join(ScannerExecution, RawFinding.scanner_execution_id == ScannerExecution.id)
+            .filter(ScannerExecution.scan_run_id == scan_run.id)
+            .all()
+        )
         assert len(raw_findings) == 1
         assert raw_findings[0].scanner_name == "trivy"
-
-
-class _ConnectedRequest:
-    async def is_disconnected(self):
-        return False
+        execution = app_db.query(ScannerExecution).filter_by(scan_run_id=scan_run.id, scanner_name="trivy").one()
+        assert execution.completed_at is not None

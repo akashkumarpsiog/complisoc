@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { ChevronLeft, Loader2 } from "lucide-react";
 import { api } from "../services/api";
 import { useResource } from "../hooks/useResource";
@@ -21,13 +21,32 @@ type TabId = (typeof TABS)[number]["id"];
 
 export function ScanDetailPage({ scanRunId, onBack }: { scanRunId: number; onBack: () => void }) {
   const [activeTab, setActiveTab] = useState<TabId>("summary");
-  const summaryResource = useResource(() => api.scanRuns.summary(scanRunId));
-  const scanRunResource = useResource(() => api.scanRuns.get(scanRunId));
-  const findingsResource = useResource(() => api.findings.list({ scan_run_id: scanRunId }));
-  const mappingsResource = useResource(() => api.mappings.list({ scan_run_id: scanRunId }));
-  const reviewResource = useResource(() => api.reviewQueue.list({ scan_run_id: scanRunId }), [scanRunId]);
+  const summaryResource = useResource(() => api.scanRuns.summary(scanRunId, true));
+  const scanRunResource = useResource(() => api.scanRuns.get(scanRunId, true));
+  const findingsResource = useResource(() => api.findings.list({ scan_run_id: scanRunId }, true));
+  const mappingsResource = useResource(() => api.mappings.list({ scan_run_id: scanRunId }, true));
+  const reviewResource = useResource(() => api.reviewQueue.list({ scan_run_id: scanRunId }, true), [scanRunId]);
   const reportsResource = useResource(api.reports.list);
   const bundlesResource = useResource(api.auditBundles.list);
+  const sawRunningScan = useRef(false);
+
+  useEffect(() => {
+    if (scanRunResource.data?.status !== "running") return;
+    sawRunningScan.current = true;
+    const timer = window.setInterval(() => void scanRunResource.reload(), 3000);
+    return () => window.clearInterval(timer);
+  }, [scanRunResource.data?.status, scanRunResource.reload]);
+
+  useEffect(() => {
+    if (!sawRunningScan.current || scanRunResource.data?.status === "running" || !scanRunResource.data) return;
+    sawRunningScan.current = false;
+    void Promise.all([
+      summaryResource.reload(),
+      findingsResource.reload(),
+      mappingsResource.reload(),
+      reviewResource.reload(),
+    ]);
+  }, [scanRunResource.data?.status, scanRunResource.data, summaryResource.reload, findingsResource.reload, mappingsResource.reload, reviewResource.reload]);
 
   const scanFindings = useMemo(() => findingsResource.data || [], [findingsResource.data]);
   const scanMappings = useMemo(() => mappingsResource.data || [], [mappingsResource.data]);
@@ -122,6 +141,10 @@ function SummaryTab({ summary, scanRun }: { summary: ScanRunSummary | undefined 
 
   return (
     <Section title="Scan Summary">
+      <div className="mb-4 flex items-center gap-2 text-sm">
+        <span className="font-semibold text-ink">AI mapping status:</span>
+        <StatusBadge value={scanRun?.ai_status ?? (scanRun?.status === "running" ? "pending" : "unknown")} />
+      </div>
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <MetricCard label="Raw findings" value={summary.raw_findings} />
         <MetricCard label="Normalized" value={summary.normalized_findings} />

@@ -23,18 +23,34 @@ The chain reuses the shared deterministic and AI building blocks
 from __future__ import annotations
 
 import logging
+import time
 from dataclasses import dataclass, field
+from datetime import datetime
 from typing import Any
+
+log = logging.getLogger("complisoc.timing")
 
 from sqlalchemy.orm import Session
 
 from complisoc.backend.compliance.candidate_narrowing import narrow_candidates
 from complisoc.backend.compliance.confidence import calculate_final_confidence, publication_status
-from complisoc.backend.compliance.mapping import CandidateDecision, GeminiMapper
+from complisoc.backend.compliance.mapping import CandidateDecision, GeminiMapper, _finding_fingerprint
 from complisoc.backend.compliance.verification import GroqVerifier, PendingVerification
 from complisoc.backend.core.config import PROMPT_VERSION
 
 logger = logging.getLogger(__name__)
+
+
+def timed(name: str):
+    def deco(fn):
+        def wrapper(*a, **kw):
+            t = time.perf_counter()
+            try:
+                return fn(*a, **kw)
+            finally:
+                log.warning("STAGE %s took %.1fs", name, time.perf_counter() - t)
+        return wrapper
+    return deco
 from complisoc.backend.models import (
     ControlMapping,
     NormalizedFinding,
@@ -58,6 +74,8 @@ class _ChainState:
     scanner_failures: list[dict] | None = None
     framework: str | None = None
     selected_scanners: list[str] | None = None
+    cancel_event: Event | None = None
+    scan_run_id: int | None = None
 
     scan_run: Any = None
     raw_findings: list = field(default_factory=list)
@@ -69,6 +87,8 @@ class _ChainState:
     candidates_by_finding: dict = field(default_factory=dict)
     batch_input: list = field(default_factory=list)
     batch_decisions: dict = field(default_factory=dict)
+    finding_ids_by_fingerprint: dict[str, list[int]] = field(default_factory=dict)
+    batch_decisions_by_finding_id: dict[int, list[CandidateDecision]] = field(default_factory=dict)
 
     pending_verifications: list = field(default_factory=list)
     ref_to_mapping: dict = field(default_factory=dict)
@@ -97,6 +117,7 @@ def _add_review_item(review_items: list[ReviewQueueItem], mapping: ControlMappin
 # ---------------------------------------------------------------------------
 # Stage 1: ingest findings + normalize + deterministic candidate narrowing
 # ---------------------------------------------------------------------------
+@timed("stage_ingest")
 def stage_ingest(state: _ChainState) -> _ChainState:
     scan_run, raw_findings = ingest_findings(
         state.db,
@@ -104,9 +125,17 @@ def stage_ingest(state: _ChainState) -> _ChainState:
         findings=state.findings,
         scanner_failures=state.scanner_failures,
         selected_scanners=state.selected_scanners,
+        scan_run_id=state.scan_run_id,
     )
     state.scan_run = scan_run
     state.raw_findings = raw_findings
+
+    if state.cancel_event is not None and state.cancel_event.is_set():
+        state.scan_run.status = "failed"
+        state.scan_run.completed_at = datetime.utcnow()
+        state.db.commit()
+        state.failures.append({"scanner_name": "scan", "error": "Scan cancelled by user."})
+        return state
 
     for raw_finding in raw_findings:
         try:
@@ -132,6 +161,8 @@ def stage_ingest(state: _ChainState) -> _ChainState:
             ]
             if top_candidates:
                 state.batch_input.append((normalized, top_candidates))
+                fingerprint = _finding_fingerprint(normalized)
+                state.finding_ids_by_fingerprint.setdefault(fingerprint, []).append(normalized.id)
         except Exception as exc:
             state.db.rollback()
             state.failures.append({"raw_finding_id": raw_finding.id, "error": str(exc)})
@@ -141,6 +172,7 @@ def stage_ingest(state: _ChainState) -> _ChainState:
 # ---------------------------------------------------------------------------
 # Stage 2: Gemini mapping (AI) — same GeminiMapper used by the direct path
 # ---------------------------------------------------------------------------
+@timed("stage_map")
 def stage_map(state: _ChainState) -> _ChainState:
     try:
         mapper = GeminiMapper()
@@ -156,6 +188,11 @@ def stage_map(state: _ChainState) -> _ChainState:
     if mapper is not None and state.batch_input:
         try:
             state.batch_decisions = mapper.map_batch(state.batch_input)
+            for fingerprint, finding_ids in state.finding_ids_by_fingerprint.items():
+                decisions = state.batch_decisions.get(fingerprint)
+                if decisions is not None:
+                    for finding_id in finding_ids:
+                        state.batch_decisions_by_finding_id[finding_id] = decisions
         except Exception as exc:
             state.gemini_error = str(exc)
             state.gemini_failed = True
@@ -166,6 +203,7 @@ def stage_map(state: _ChainState) -> _ChainState:
 # ---------------------------------------------------------------------------
 # Stage 3: build ControlMapping rows from mapping decisions
 # ---------------------------------------------------------------------------
+@timed("stage_build_mappings")
 def stage_build_mappings(state: _ChainState) -> _ChainState:
     findings_by_id = {finding.id: finding for finding in state.normalized_findings}
     ref = 0
@@ -210,7 +248,7 @@ def stage_build_mappings(state: _ChainState) -> _ChainState:
             )
             continue
 
-        decisions = state.batch_decisions.get(finding_id)
+        decisions = state.batch_decisions_by_finding_id.get(finding.id)
         if not decisions:
             mapping = ControlMapping(
                 normalized_finding_id=finding.id,
@@ -254,12 +292,6 @@ def stage_build_mappings(state: _ChainState) -> _ChainState:
             rationale = "Gemini indicated this finding does not map to any evaluated candidate."
             if best_guess:
                 rationale = f"Gemini rejected top candidate: {best_guess.rationale}"
-
-            # A Gemini rejection is a mapping-quality signal, not a Groq
-            # outage. Still send the deterministic top candidate to the
-            # independent verifier so every evaluated finding has an auditable
-            # Groq verdict. Its low Gemini confidence keeps the result in
-            # manual review even if Groq independently agrees.
             mapping = ControlMapping(
                 normalized_finding_id=finding.id,
                 candidate_control_id=top_candidate.id,
@@ -269,24 +301,19 @@ def stage_build_mappings(state: _ChainState) -> _ChainState:
                 prompt_version=PROMPT_VERSION,
                 rationale=rationale,
                 gemini_confidence=confidence,
-                verification_status="pending",
+                verification_status=None,
                 final_confidence=None,
                 groq_agreement_value=None,
-                mapping_status="validated",
+                mapping_status="manual_review",
             )
             state.db.add(mapping)
             state.db.flush()
             state.mappings.append(mapping)
-            ref += 1
-            state.ref_to_mapping[ref] = mapping
-            state.pending_verifications.append(
-                PendingVerification(
-                    ref=ref,
-                    finding=finding,
-                    control=top_control,
-                    confidence=confidence or 0.0,
-                    rationale=rationale,
-                )
+            _add_review_item(
+                state.review_items,
+                mapping,
+                "GEMINI_REJECTED",
+                rationale,
             )
             continue
 
@@ -330,6 +357,7 @@ def stage_build_mappings(state: _ChainState) -> _ChainState:
 # ---------------------------------------------------------------------------
 # Stage 4: Groq gap analysis (AI) — same GroqVerifier used by direct path
 # ---------------------------------------------------------------------------
+@timed("stage_verify")
 def stage_verify(state: _ChainState) -> _ChainState:
     try:
         verifier = GroqVerifier()
@@ -357,6 +385,7 @@ def stage_verify(state: _ChainState) -> _ChainState:
 # ---------------------------------------------------------------------------
 # Stage 5: finalize confidence + VerificationRecord rows + review items
 # ---------------------------------------------------------------------------
+@timed("stage_finalize")
 def stage_finalize(state: _ChainState) -> _ChainState:
     verdicts = state.verdicts
 
@@ -366,9 +395,11 @@ def stage_finalize(state: _ChainState) -> _ChainState:
 
         if state.groq_unavailable or state.groq_failed:
             mapping.verification_status = "failed"
-            mapping.final_confidence = mapping.gemini_confidence
+            mapping.final_confidence = calculate_final_confidence(mapping.gemini_confidence or 0.0, 0.0)
             mapping.groq_agreement_value = 0.0
-            mapping.mapping_status = publication_status(mapping.gemini_confidence or 0.0)
+            # A missing/failed verification is not a positive verdict. Keep it
+            # in manual review even when Gemini alone has high confidence.
+            mapping.mapping_status = "manual_review"
             state.db.add(
                 VerificationRecord(
                     control_mapping_id=mapping.id,
@@ -379,20 +410,19 @@ def stage_finalize(state: _ChainState) -> _ChainState:
                     explanation=f"Verification unavailable: {state.groq_error or 'Groq API failed or unavailable.'}",
                 )
             )
-            if mapping.mapping_status == "manual_review":
-                _add_review_item(
-                    state.review_items,
-                    mapping,
-                    "AI_VERIFIER_FAILURE",
-                    state.groq_error or "Groq API failed or unavailable.",
-                )
+            _add_review_item(
+                state.review_items,
+                mapping,
+                "AI_VERIFIER_FAILURE",
+                state.groq_error or "Groq API failed or unavailable.",
+            )
             continue
 
         if verdict is None:
             mapping.verification_status = "failed"
-            mapping.final_confidence = mapping.gemini_confidence
+            mapping.final_confidence = calculate_final_confidence(mapping.gemini_confidence or 0.0, 0.0)
             mapping.groq_agreement_value = 0.0
-            mapping.mapping_status = publication_status(mapping.gemini_confidence or 0.0)
+            mapping.mapping_status = "manual_review"
             state.db.add(
                 VerificationRecord(
                     control_mapping_id=mapping.id,
@@ -403,13 +433,12 @@ def stage_finalize(state: _ChainState) -> _ChainState:
                     explanation="No result returned for this mapping in the batch response.",
                 )
             )
-            if mapping.mapping_status == "manual_review":
-                _add_review_item(
-                    state.review_items,
-                    mapping,
-                    "AI_VERIFIER_FAILURE",
-                    "No result returned for this mapping in the batch response.",
-                )
+            _add_review_item(
+                state.review_items,
+                mapping,
+                "AI_VERIFIER_FAILURE",
+                "No result returned for this mapping in the batch response.",
+            )
             continue
 
         final_confidence = calculate_final_confidence(mapping.gemini_confidence or 0.0, verdict.agreement_value)
@@ -436,6 +465,12 @@ def stage_finalize(state: _ChainState) -> _ChainState:
             )
 
     state.db.add_all(state.review_items)
+    if state.gemini_unavailable or state.gemini_failed:
+        state.scan_run.ai_status = "failed"
+    elif state.groq_unavailable or state.groq_failed:
+        state.scan_run.ai_status = "partial"
+    else:
+        state.scan_run.ai_status = "ok"
     state.db.commit()
     for mapping in state.mappings:
         state.db.refresh(mapping)
@@ -464,6 +499,8 @@ def run_pipeline(
     scanner_failures: list[dict] | None = None,
     framework: str | None = None,
     selected_scanners: list[str] | None = None,
+    cancel_event: Event | None = None,
+    scan_run_id: int | None = None,
 ) -> dict:
     """Run the compliance pipeline through the LangChain/LCEL path.
 
@@ -477,6 +514,8 @@ def run_pipeline(
         scanner_failures=scanner_failures,
         framework=framework,
         selected_scanners=selected_scanners,
+        cancel_event=cancel_event,
+        scan_run_id=scan_run_id,
     )
     chain = _build_chain()
     final: _ChainState = chain.invoke(state)

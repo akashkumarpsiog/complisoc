@@ -14,6 +14,7 @@ export interface ScanRun {
   id: number;
   target_environment: string;
   status: string;
+  ai_status?: "ok" | "partial" | "failed" | null;
   started_at?: string | null;
   completed_at?: string | null;
   created_at?: string | null;
@@ -218,6 +219,7 @@ export interface ScannerInfo {
 export interface ScanRequest {
   target: string;
   scan_profile?: string;
+  scan_mode?: "full" | "config-only";
   framework?: string;
 }
 
@@ -302,6 +304,7 @@ export interface FindingLineage {
     id: number | null;
     target_environment: string | null;
     status: string | null;
+    ai_status: string | null;
     started_at: string | null;
     completed_at: string | null;
     created_at: string | null;
@@ -332,6 +335,7 @@ export interface FindingLineage {
     framework_name: string | null;
     control_title: string | null;
     mapping_status: string;
+    review_reason_code: string | null;
     gemini_confidence: number | null;
     final_confidence: number | null;
     verification_status: string | null;

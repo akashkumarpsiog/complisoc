@@ -15,7 +15,7 @@ def test_checkov_second_run_has_no_self_referential_parse_errors(tmp_path):
     terraform.write_text('resource "aws_s3_bucket" "public" { bucket = "regression-public-bucket" }\n', encoding="utf-8")
     reports = []
 
-    def fake_checkov(command, **_kwargs):
+    def fake_checkov(command, *_args, **_kwargs):
         output_dir = Path(command[command.index("--output-file-path") + 1])
         assert not output_dir.is_relative_to(tmp_path), "Checkov output must never be placed in the scanned directory"
         parsing_errors = ["checkov-report.json"] if (tmp_path / "checkov-report.json").exists() else []
@@ -31,7 +31,7 @@ def test_checkov_second_run_has_no_self_referential_parse_errors(tmp_path):
         (output_dir / "results.json").write_text(json.dumps(report), encoding="utf-8")
         return type("Proc", (), {"returncode": 1, "stdout": "Checkov banner that is not JSON", "stderr": ""})()
 
-    with patch("complisoc.backend.scanners.runners.subprocess.run", side_effect=fake_checkov) as run:
+    with patch("complisoc.backend.scanners.runners._run_command", side_effect=fake_checkov) as run:
         first_findings, first_error = CheckovScanner().run(str(tmp_path))
         second_findings, second_error = CheckovScanner().run(str(tmp_path))
 

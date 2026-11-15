@@ -43,7 +43,7 @@ for _cand in _THIS.parents:
             sys.path.insert(0, str(_cand))
         break
 
-from complisoc.backend.compliance.mapping import CandidateDecision  # noqa: E402
+from complisoc.backend.compliance.mapping import CandidateDecision, _finding_fingerprint  # noqa: E402
 from complisoc.backend.compliance.verification import VerificationDecision  # noqa: E402
 from complisoc.backend.core.config import PROMPT_VERSION  # noqa: E402
 from complisoc.backend.database.base import Base  # noqa: E402
@@ -79,7 +79,7 @@ def _oracle_mapper_side_effect(items):
                     rationale="oracle: accept top deterministic candidate" if rank == 0 else "oracle: reject lower-ranked candidate",
                 )
             )
-        out[finding.id] = decisions
+        out[_finding_fingerprint(finding)] = decisions
     return out
 
 
@@ -461,8 +461,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--snapshot",
         type=pathlib.Path,
-        default=pathlib.Path(__file__).parent / "snapshots" / "mvp-v1.json",
-        help="Path to the F1-delta snapshot file (defaults to tests/benchmark/snapshots/mvp-v1.json)",
+        default=pathlib.Path(__file__).parent / "snapshots" / f"{PROMPT_VERSION}.json",
+        help="Path to the F1-delta snapshot file",
     )
     parser.add_argument(
         "--update-snapshot",
@@ -586,7 +586,7 @@ def main(argv: list[str] | None = None) -> int:
             json.dumps(
                 {
                     "mode": "live",
-                    "prompt_version": "mvp-v1",
+                    "prompt_version": PROMPT_VERSION,
                     "framework": gold["framework"],
                     "framework_version": gold["framework_version"],
                     "gold_count": len(gold["mappings"]),

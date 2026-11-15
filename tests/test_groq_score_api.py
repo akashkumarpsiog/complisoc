@@ -6,7 +6,7 @@ from sqlalchemy.pool import StaticPool
 from complisoc.backend.api.main import app
 from complisoc.backend.database.base import Base
 from complisoc.backend.database.session import get_db
-from complisoc.backend.compliance.mapping import CandidateDecision
+from complisoc.backend.compliance.mapping import CandidateDecision, _finding_fingerprint
 from complisoc.backend.compliance.verification import VerificationDecision
 
 engine = create_engine("sqlite://", connect_args={"check_same_thread": False}, poolclass=StaticPool, future=True)
@@ -43,7 +43,7 @@ client = TestClient(app)
 def test_groq_agreement_value_exposed_in_api():
     with patch("complisoc.backend.compliance.langchain_pipeline.GeminiMapper") as MockMapper, patch("complisoc.backend.compliance.langchain_pipeline.GroqVerifier") as MockVerifier:
         MockMapper.return_value.map_batch.side_effect = lambda items: {
-            items[0][0].id: [CandidateDecision(control_id=items[0][1][0].control_catalog.control_id, maps=True, confidence=0.95, rationale="High signal")],
+            _finding_fingerprint(items[0][0]): [CandidateDecision(control_id=items[0][1][0].control_catalog.control_id, maps=True, confidence=0.95, rationale="High signal")],
         }
         MockVerifier.return_value.verify_batch.return_value = {
             1: VerificationDecision(result="agree", agreement_value=1.0, explanation="Correct"),

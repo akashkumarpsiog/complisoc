@@ -1,5 +1,6 @@
 import logging
 import re
+from concurrent.futures import ThreadPoolExecutor, Future
 from dataclasses import dataclass
 from typing import Any
 
@@ -35,6 +36,11 @@ def is_unavailable_model_error(exc: Exception) -> bool:
 def is_quota_exhausted(exc: Exception) -> bool:
     text = str(exc)
     return "RESOURCE_EXHAUSTED" in text or "rate_limit" in text.lower() or "quota" in text.lower()
+
+
+def is_tpm_limit_exceeded(exc: Exception) -> bool:
+    text = str(exc).lower()
+    return "tokens per minute" in text or ("tpm" in text and ("limit" in text or "exceed" in text))
 
 
 def extract_retry_delay(exc: Exception) -> float | None:
@@ -82,7 +88,7 @@ _SYSTEM_ONE = (
     '{"result": "agree"|"disagree", "explanation": "<concise reason>"}.'
 )
 
-_STRICT_STRUCTURED_MODELS = {"openai/gpt-oss-20b", "openai/gpt-oss-120b"}
+_STRICT_STRUCTURED_MODELS = {"openai/gpt-oss-20b", "openai/gpt-oss-120b", "qwen/qwen3.8-27b"}
 _BATCH_SCHEMA = {
     "type": "object",
     "properties": {
@@ -150,37 +156,68 @@ def _entry_block(item: PendingVerification) -> str:
     )
 
 
+def _run_with_timeout(fn, timeout: float):
+    """Run fn in a thread with a real per-call timeout that cancels on expiry.
+
+    ``future.result(timeout=...)`` alone does not cancel the underlying call:
+    exiting a ``with ThreadPoolExecutor`` block calls ``shutdown(wait=True)``
+    and defeats the timeout. We keep the executor alive, cancel on timeout, and
+    shut down without waiting.
+    """
+    pool = ThreadPoolExecutor(max_workers=1)
+    future: Future = pool.submit(fn)
+    try:
+        return future.result(timeout=timeout)
+    except TimeoutError:
+        future.cancel()
+        pool.shutdown(wait=False, cancel_futures=True)
+        raise TimeoutError(f"Call timed out after {timeout}s")
+    else:
+        pool.shutdown(wait=True)
+
+
 class GroqVerifier:
-    def __init__(self, timeout: float = 60.0) -> None:
+    def __init__(self, timeout: float = 30.0, max_batch_size: int = 25) -> None:
         if not GROQ_API_KEY:
             raise RuntimeError("GROQ_API_KEY is not configured; cannot perform AI verification.")
         self._client = Groq(api_key=GROQ_API_KEY)
         self._timeout = timeout
+        self._max_batch_size = max_batch_size
         # Try the configured model first, then known-good fallbacks. Groq
         # retires models (e.g. llama-3.3-70b-versatile on 2026-08-16), so a
         # fallback avoids a hard failure when the primary is no longer served.
         self._models: list[str] = list(dict.fromkeys([GROQ_MODEL, *GROQ_MODEL_FALLBACKS]))
         self._cache: dict[str, dict[int, VerificationDecision]] = {}
-        logger.info("Groq verifier initialized: models=%s, key_configured=%s", self._models, bool(GROQ_API_KEY))
+        logger.info("Groq verifier initialized: models=%s, key_configured=%s, max_batch_size=%s", self._models, bool(GROQ_API_KEY), self._max_batch_size)
 
-    def _cache_key(self, items: list[PendingVerification]) -> str:
-        """Generate a cache key from finding IDs and control IDs."""
-        parts = []
-        for item in sorted(items, key=lambda x: x.ref):
-            parts.append(f"{item.ref}:{item.finding.id}:{item.control.id}")
+    def _cache_key_from_prompt(self, prompt: str, expected_refs: set[int]) -> str:
+        """Cache key from the serialized prompt payload (not ORM objects)."""
+        parts = [prompt]
+        for ref in sorted(expected_refs):
+            parts.append(str(ref))
         return "|".join(parts)
 
-    def _completion(self, messages: list[dict[str, str]], timeout: float, schema_name: str, schema: dict[str, Any]) -> tuple[str, Any]:
+    def _build_chunk_prompt(
+        self, chunk: list[PendingVerification]
+    ) -> tuple[str, set[int]]:
+        """Serialize ORM objects to plain text in the calling thread.
+
+        All lazy attribute access happens here so worker threads never touch
+        the request-scoped SQLAlchemy session.
+        """
+        prompt = "\n\n---\n\n".join(_entry_block(item) for item in chunk)
+        expected_refs = {item.ref for item in chunk}
+        return prompt, expected_refs
+
+    def _completion(
+        self, messages: list[dict[str, str]], timeout: float, schema_name: str, schema: dict[str, Any]
+    ) -> tuple[str, Any]:
         last_exc: Exception | None = None
         for model in self._models:
             try:
                 request = {
                     "model": model,
                     "messages": messages,
-                    # Groq recommends strict JSON Schema mode for GPT-OSS. It
-                    # eliminates json_validate_failed responses that JSON mode
-                    # can return even when the prompt requests JSON. Keep JSON
-                    # object mode for the non-GPT fallback model.
                     "response_format": (
                         {
                             "type": "json_schema",
@@ -193,18 +230,14 @@ class GroqVerifier:
                     "timeout": timeout,
                 }
                 if model in _STRICT_STRUCTURED_MODELS:
-                    # GPT-OSS spends completion tokens on reasoning. A low
+                    # GPT-OSS and Qwen spend completion tokens on reasoning. A low
                     # budget leaves none for the schema-constrained answer and
                     # yields Groq's json_validate_failed error.
-                    request.update({"reasoning_effort": "low", "max_completion_tokens": 768})
+                    request.update({"reasoning_effort": "low", "max_completion_tokens": 1024})
                 response = self._client.chat.completions.create(**request)
                 return model, response
             except Exception as exc:
                 text = str(exc)
-                # Groq can describe a disabled model as unknown, decommissioned,
-                # retired, or no longer supported. Only these model-specific
-                # errors warrant changing models; authentication and request
-                # errors must remain visible to the caller.
                 if is_unavailable_model_error(exc):
                     last_exc = exc
                     continue
@@ -212,27 +245,26 @@ class GroqVerifier:
         assert last_exc is not None
         raise last_exc
 
-    def verify_batch(self, items: list[PendingVerification]) -> dict[int, VerificationDecision]:
-        if not items:
-            return {}
-
-        cache_key = self._cache_key(items)
+    def _verify_one_chunk(
+        self, prompt: str, expected_refs: set[int]
+    ) -> dict[int, VerificationDecision]:
+        cache_key = self._cache_key_from_prompt(prompt, expected_refs)
         if cache_key in self._cache:
             return self._cache[cache_key]
 
-        prompt = "\n\n---\n\n".join(_entry_block(item) for item in items)
-        expected_refs = {item.ref for item in items}
-
         def _attempt() -> dict[int, VerificationDecision]:
-            model_used, response = self._completion(
-                [
-                    {"role": "system", "content": _SYSTEM_BATCH},
-                    {"role": "user", "content": prompt},
-                ],
-                self._timeout,
-                "verification_batch",
-                _BATCH_SCHEMA,
-            )
+            def _call():
+                return self._completion(
+                    [
+                        {"role": "system", "content": _SYSTEM_BATCH},
+                        {"role": "user", "content": prompt},
+                    ],
+                    self._timeout,
+                    "verification_batch",
+                    _BATCH_SCHEMA,
+                )
+
+            model_used, response = _run_with_timeout(_call, self._timeout)
             data = extract_json(response.choices[0].message.content)
             out: dict[int, VerificationDecision] = {}
             for entry in data.get("results", []):
@@ -258,17 +290,64 @@ class GroqVerifier:
                 )
             if not out:
                 raise ValueError("Groq batch response contained no usable results.")
-            self._cache[cache_key] = out
             return out
 
-        return call_with_retry(
+        result = call_with_retry(
             _attempt,
-            attempts=3,
+            attempts=2,
             backoff=2.0,
             delay_for=extract_retry_delay,
             give_up_on=is_quota_exhausted,
-            max_delay=30.0,
+            max_delay=15.0,
         )
+        self._cache[cache_key] = result
+        return result
+
+    def verify_batch(self, items: list[PendingVerification]) -> dict[int, VerificationDecision]:
+        if not items:
+            return {}
+
+        # Build all prompt payloads in the main thread (ORM access here only).
+        chunks: list[list[PendingVerification]] = []
+        for i in range(0, len(items), self._max_batch_size):
+            chunks.append(items[i:i + self._max_batch_size])
+
+        def verify_chunk(chunk: list[PendingVerification]) -> dict[int, VerificationDecision]:
+            prompt, expected_refs = self._build_chunk_prompt(chunk)
+            try:
+                return self._verify_one_chunk(prompt, expected_refs)
+            except Exception as exc:
+                if len(chunk) <= 1 or not is_tpm_limit_exceeded(exc):
+                    raise
+                midpoint = len(chunk) // 2
+                logger.warning("Groq batch exceeded its TPM limit; retrying as %d smaller batches", 2)
+                return verify_chunk(chunk[:midpoint]) | verify_chunk(chunk[midpoint:])
+
+        if len(chunks) == 1:
+            return verify_chunk(chunks[0])
+
+        # Run chunks in parallel. One failing chunk must not take down the
+        # whole run: partial verdicts are returned and missing refs are handled
+        # by the caller's ``verdict is None`` path.
+        merged: dict[int, VerificationDecision] = {}
+        last_error: Exception | None = None
+        failed_chunks = 0
+        workers = min(4, len(chunks))
+        with ThreadPoolExecutor(max_workers=workers) as pool:
+            futures = [
+                pool.submit(verify_chunk, chunk)
+                for chunk in chunks
+            ]
+            for future in futures:
+                try:
+                    merged.update(future.result())
+                except Exception as exc:
+                    logger.warning("Groq verification chunk failed: %s", exc)
+                    last_error = exc
+                    failed_chunks += 1
+        if failed_chunks == len(chunks):
+            raise RuntimeError(f"Groq verification failed for all {len(chunks)} chunks: {last_error}") from last_error
+        return merged
 
     def verify_one(
         self,
@@ -278,17 +357,22 @@ class GroqVerifier:
         rationale: str,
     ) -> VerificationDecision:
         item = PendingVerification(ref=1, finding=finding, control=control, confidence=confidence, rationale=rationale)
+        prompt = _entry_block(item)
+        expected_refs = {1}
 
         def _attempt() -> VerificationDecision:
-            model_used, response = self._completion(
-                [
-                    {"role": "system", "content": _SYSTEM_ONE},
-                    {"role": "user", "content": _entry_block(item)},
-                ],
-                self._timeout,
-                "verification_result",
-                _ONE_SCHEMA,
-            )
+            def _call():
+                return self._completion(
+                    [
+                        {"role": "system", "content": _SYSTEM_ONE},
+                        {"role": "user", "content": prompt},
+                    ],
+                    self._timeout,
+                    "verification_result",
+                    _ONE_SCHEMA,
+                )
+
+            model_used, response = _run_with_timeout(_call, self._timeout)
             data = extract_json(response.choices[0].message.content)
             result_raw = data.get("result", "")
             if isinstance(result_raw, bool):
@@ -306,11 +390,11 @@ class GroqVerifier:
 
         return call_with_retry(
             _attempt,
-            attempts=3,
+            attempts=2,
             backoff=2.0,
             delay_for=extract_retry_delay,
             give_up_on=is_quota_exhausted,
-            max_delay=30.0,
+            max_delay=15.0,
         )
 
     def clear_cache(self) -> None:

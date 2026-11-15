@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Archive, ArrowRight, CheckCircle2, Play, RotateCcw } from "lucide-react";
 import { api } from "../services/api";
 import { useResource } from "../hooks/useResource";
@@ -10,10 +10,16 @@ import { ScanRunCreator } from "../components/ScanRunCreator";
 
 export function ScanRunsPage({ onSelectScan }: { onSelectScan: (id: number) => void }) {
   const [showArchived, setShowArchived] = useState(false);
-  const scanRuns = useResource(() => api.scanRuns.list(showArchived), [showArchived]);
+  const scanRuns = useResource(() => api.scanRuns.list(showArchived, true), [showArchived]);
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [createdScan, setCreatedScan] = useState<ScanRun | null>(null);
   const [scanCreatorOpen, setScanCreatorOpen] = useState(false);
+
+  useEffect(() => {
+    if (!scanRuns.data?.some((scanRun) => scanRun.status === "running")) return;
+    const timer = window.setInterval(() => void scanRuns.reload(), 3000);
+    return () => window.clearInterval(timer);
+  }, [scanRuns.data, scanRuns.reload]);
 
   async function handleCreated(scanRun: ScanRun) {
     await scanRuns.reload();
@@ -66,7 +72,7 @@ export function ScanRunsPage({ onSelectScan }: { onSelectScan: (id: number) => v
 function ScanRunTable({ data, onOpen, onChanged, selectedIds, onToggleSelect }: { data: ScanRun[]; onOpen: (id: number) => void; onChanged: () => Promise<void>; selectedIds: Set<number>; onToggleSelect: (id: number) => void }) {
   return (
     <DataTable
-      columns={["", "ID", "Environment", "Status", "Created", "Open", "Retention"]}
+      columns={["", "ID", "Environment", "Scan", "AI mapping", "Created", "Open", "Retention"]}
       rows={data.map((scanRun) => [
         <input
           key={scanRun.id}
@@ -78,6 +84,7 @@ function ScanRunTable({ data, onOpen, onChanged, selectedIds, onToggleSelect }: 
         scanRun.id,
         scanRun.target_environment,
         <StatusBadge key={`status-${scanRun.id}`} value={scanRun.status} />,
+        <StatusBadge key={`ai-status-${scanRun.id}`} value={scanRun.ai_status ?? (scanRun.status === "running" ? "pending" : "unknown")} />,
         formatDate(scanRun.created_at),
         <button key={`open-${scanRun.id}`} className="primary-button !h-8 !px-3 !text-xs" onClick={() => onOpen(scanRun.id)}>
           <ArrowRight className="h-3.5 w-3.5" aria-hidden />

@@ -17,7 +17,7 @@ from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
 from complisoc.backend.api.main import app
-from complisoc.backend.compliance.mapping import CandidateDecision
+from complisoc.backend.compliance.mapping import CandidateDecision, _finding_fingerprint
 from complisoc.backend.compliance.verification import VerificationDecision
 from complisoc.backend.compliance.workflow import process_scan_run
 from complisoc.backend.database.base import Base
@@ -102,7 +102,7 @@ def _seed_scan(client, db_session):
         "complisoc.backend.compliance.langchain_pipeline.GroqVerifier"
     ) as MockVerifier:
         MockMapper.return_value.map_batch.side_effect = lambda items: {
-            items[0][0].id: [
+            _finding_fingerprint(items[0][0]): [
                 CandidateDecision(
                     control_id=items[0][1][0].control_catalog.control_id,
                     maps=True,
@@ -548,8 +548,8 @@ class TestAIMetricsAPI:
             "complisoc.backend.compliance.langchain_pipeline.GroqVerifier"
         ) as MockVerifier:
             MockMapper.return_value.map_batch.side_effect = lambda items: {
-                items[0][0].id: [CandidateDecision(control_id=items[0][1][0].control_catalog.control_id, maps=True, confidence=0.95, rationale="oracle")],
-                items[1][0].id: [CandidateDecision(control_id=items[1][1][0].control_catalog.control_id, maps=True, confidence=0.95, rationale="oracle")],
+                _finding_fingerprint(items[0][0]): [CandidateDecision(control_id=items[0][1][0].control_catalog.control_id, maps=True, confidence=0.95, rationale="oracle")],
+                _finding_fingerprint(items[1][0]): [CandidateDecision(control_id=items[1][1][0].control_catalog.control_id, maps=True, confidence=0.95, rationale="oracle")],
             }
             MockVerifier.return_value.verify_batch.return_value = {
                 1: VerificationDecision(result="agree", agreement_value=1.0, explanation="oracle"),

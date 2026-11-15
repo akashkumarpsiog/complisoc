@@ -75,8 +75,12 @@ class TestScanEndpoints:
             f"{_API}/scans",
             json={"target": "example-repository", "scanners": ["checkov"]},
         )
-        assert response.status_code == 201
-        assert response.json()["status"] == "completed"
+        assert response.status_code == 202
+        assert response.json()["status"] == "running"
+        scan_id = response.json()["id"]
+        completed = ai_quality_client.get(f"{_API}/scan-runs/{scan_id}").json()
+        assert completed["status"] == "completed"
+        assert completed["ai_status"] == "ok"
 
     def test_scan_endpoint_rejects_missing_target(self, ai_quality_client):
         response = ai_quality_client.post(f"{_API}/scans", json={})

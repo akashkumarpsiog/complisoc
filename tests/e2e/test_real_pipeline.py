@@ -28,7 +28,7 @@ from sqlalchemy.pool import StaticPool
 
 from complisoc.backend.api.main import app
 from complisoc.backend.api.schemas import ScanRequest
-from complisoc.backend.compliance.mapping import CandidateDecision
+from complisoc.backend.compliance.mapping import CandidateDecision, _finding_fingerprint
 from complisoc.backend.compliance.verification import VerificationDecision
 from complisoc.backend.database.base import Base
 from complisoc.backend.database.session import get_db
@@ -88,6 +88,14 @@ def client():
     db = TestingSessionLocal()
     _seed_controls(db)
 
+    # Bind the API module's SessionLocal to this in-memory engine so the
+    # background scan task (which opens its own fresh session) writes to the
+    # same database the assertions read from.
+    import complisoc.backend.api.main as _api_main
+
+    _previous_bind = _api_main.SessionLocal.kw.get("bind")
+    _api_main.SessionLocal.configure(bind=engine)
+
     def override_get_db():
         yield db
 
@@ -97,12 +105,13 @@ def client():
     finally:
         app.dependency_overrides.clear()
         db.close()
+        _api_main.SessionLocal.configure(bind=_previous_bind)
 
 
 def _oracle_mapper(items):
     out = {}
     for finding, candidates in items:
-        out[finding.id] = [
+        out[_finding_fingerprint(finding)] = [
             CandidateDecision(
                 control_id=candidate.control_catalog.control_id,
                 maps=(rank == 0),
@@ -122,7 +131,7 @@ def _oracle_verifier(items):
 
 
 def _make_run_scanners(kind: str):
-    def _run(target, scanners=None, scan_profile=None, timeout=300, cancel_event=None):
+    def _run(target, scanners=None, scan_profile=None, timeout=300, cancel_event=None, scan_mode=None, **kwargs):
         base = pathlib.Path(target)
         text = ""
         for f in base.rglob("*"):
@@ -219,7 +228,7 @@ def test_e2e_real_pipeline_creates_findings_mappings_artifacts(client, tmp_path,
                 json={"target": str(target_dir), "scanners": ["checkov"]},
             )
 
-    assert response.status_code == 201, response.text
+    assert response.status_code == 202, response.text
     scan_run_id = response.json()["id"]
 
     summary = client.get(f"/api/v1/scan-runs/{scan_run_id}/summary")
@@ -281,7 +290,7 @@ def test_e2e_live_real_scanners_against_scan_targets(client, kind):
             json={"target": str(target_dir), "scanners": ["trivy", "checkov"]},
         )
 
-    assert response.status_code == 201, response.text
+    assert response.status_code == 202, response.text
     scan_run_id = response.json()["id"]
     summary = client.get(f"/api/v1/scan-runs/{scan_run_id}/summary").json()
     assert summary["raw_findings"] >= 1, "live scanners produced no findings"

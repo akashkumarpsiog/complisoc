@@ -13,12 +13,12 @@ from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
 from complisoc.backend.api.schemas import ScanRequest
-from complisoc.backend.api.main import list_available_scanners, run_scan
-from complisoc.backend.compliance.mapping import CandidateDecision
+from complisoc.backend.api.main import list_available_scanners, _execute_scan
+from complisoc.backend.compliance.mapping import CandidateDecision, _finding_fingerprint
 from complisoc.backend.compliance.langchain_pipeline import run_pipeline
 from complisoc.backend.compliance.verification import VerificationDecision
 from complisoc.backend.database.base import Base
-from complisoc.backend.models import ControlCatalog
+from complisoc.backend.models import ControlCatalog, NormalizedFinding, ScanRun
 from complisoc.backend.scanners import runners
 
 
@@ -85,7 +85,7 @@ def test_run_scan_ingests_findings(db_session):
         "complisoc.backend.compliance.langchain_pipeline.GroqVerifier"
     ) as MockVerifier:
         MockMapper.return_value.map_batch.side_effect = lambda items: {
-            items[0][0].id: [
+            _finding_fingerprint(items[0][0]): [
                 CandidateDecision(
                     control_id=items[0][1][0].control_catalog.control_id,
                     maps=True,
@@ -97,8 +97,17 @@ def test_run_scan_ingests_findings(db_session):
         MockVerifier.return_value.verify_batch.return_value = {
             1: VerificationDecision(result="agree", agreement_value=1.0, explanation="Correct")
         }
-        scan_run = run_scan(ScanRequest(target="."), db_session)
+        scan_run = ScanRun(target_environment=".", status="running")
+        db_session.add(scan_run)
+        db_session.commit()
+        db_session.refresh(scan_run)
+        cancel_event = Event()
+        _execute_scan(
+            scan_run.id, ".", None, None, "full", None, cancel_event, db=db_session,
+        )
     assert scan_run.target_environment == "."
+    assert scan_run.status == "completed"
+    assert db_session.query(NormalizedFinding).count() >= 1
 
 
 def test_run_scan_cancels_scanner_work_after_client_disconnect(db_session):
@@ -117,11 +126,18 @@ def test_run_scan_cancels_scanner_work_after_client_disconnect(db_session):
         "complisoc.backend.api.main._run_compliance_pipeline",
         return_value={"scan_run": "cancelled"},
     ):
-        scan_run = run_scan(ScanRequest(target="."), db_session)
+        scan_run = ScanRun(target_environment=".", status="running")
+        db_session.add(scan_run)
+        db_session.commit()
+        db_session.refresh(scan_run)
+        cancel_event = Event()
+        cancel_event.set()  # simulate client-disconnect cancellation
+        _execute_scan(
+            scan_run.id, ".", None, None, "full", None, cancel_event, db=db_session,
+        )
 
-    assert scan_run == "cancelled"
-    # The cancel_event is created in run_scan but not triggered in this test
-    # since there's no client disconnect detection in sync mode
+    assert scan_run.status == "failed"
+    # The cancel_event is passed to scanners so they can stop work.
     assert "cancel_event" in observed
 
 
@@ -485,12 +501,15 @@ def test_defender_missing_env_returns_failure():
 
 
 def test_resolve_scanners_uses_profile_when_present():
-    assert runners.resolve_scanners(None, "azure") == ["defender"]
+    with patch.object(runners.DefenderScanner, "is_available", return_value=True):
+        assert runners.resolve_scanners(None, "azure") == ["defender"]
+    with patch.object(runners.DefenderScanner, "is_available", return_value=False):
+        assert runners.resolve_scanners(None, "azure") == ["checkov", "trivy", "sonarqube"]
     assert runners.resolve_scanners(None, "local") == ["checkov", "trivy", "sonarqube"]
     # Explicit scanner list wins over profile.
     assert runners.resolve_scanners(["trivy"], "azure") == ["trivy"]
-    # Fallback when nothing is supplied.
-    assert set(runners.resolve_scanners(None, None)) == {"trivy", "checkov", "sonarqube", "defender"}
+    # Unspecified profile defaults to local scanners.
+    assert runners.resolve_scanners(None, None) == ["checkov", "trivy", "sonarqube"]
     with pytest.raises(ValueError, match="Unsupported scan profile: aws"):
         runners.resolve_scanners(None, "aws")
 
@@ -507,7 +526,7 @@ def test_azure_profile_runs_only_defender_without_resolving_a_local_path():
 
     assert findings == []
     assert failures == []
-    run_defender.assert_called_once_with("azure-subscription", timeout=60, cancel_event=None)
+    run_defender.assert_called_once_with("azure-subscription", timeout=300, scan_mode="full", cancel_event=None)
     run_checkov.assert_not_called()
     run_trivy.assert_not_called()
     run_sonarqube.assert_not_called()
