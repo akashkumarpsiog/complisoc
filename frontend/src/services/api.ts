@@ -145,7 +145,7 @@ export const api = {
     create: (payload: {
       target_environment: string;
       findings: RawFindingInput[];
-      scanner_failures: ScannerFailureInput[];
+      scanner_failures?: ScannerFailureInput[];
     }) => request<ScanRun>("/scan-runs", { method: "POST", body: JSON.stringify(payload) }),
     summary: (id: number) => request<ScanRunSummary>(`/scan-runs/${id}/summary`),
     get: (id: number) => request<ScanRun>(`/scan-runs/${id}`),
@@ -161,8 +161,8 @@ export const api = {
     list: () => request<ScannerInfo[]>("/scanners"),
   },
   scans: {
-    run: (payload: ScanRequest) =>
-      request<ScanRun>("/scans", { method: "POST", body: JSON.stringify(payload) }),
+    run: (payload: ScanRequest, signal?: AbortSignal) =>
+      request<ScanRun>("/scans", { method: "POST", body: JSON.stringify(payload), signal }),
   },
   findings: {
     list: (query?: Record<string, QueryValue>) => request<NormalizedFinding[]>("/findings", {}, query),
@@ -178,15 +178,15 @@ export const api = {
   },
   reviewQueue: {
     list: (query?: Record<string, QueryValue>) => request<ReviewQueueItem[]>("/review-queue", {}, query),
-    approve: (id: number) =>
+    approve: (id: number, comments?: string) =>
       request<ReviewQueueItem>(`/review-queue/${id}/approve`, {
         method: "POST",
-        body: JSON.stringify({ reviewer_id: "frontend-operator" }),
+        body: JSON.stringify({ reviewer_id: "frontend-operator", comments }),
       }),
-    reject: (id: number) =>
+    reject: (id: number, comments?: string) =>
       request<ReviewQueueItem>(`/review-queue/${id}/reject`, {
         method: "POST",
-        body: JSON.stringify({ reviewer_id: "frontend-operator" }),
+        body: JSON.stringify({ reviewer_id: "frontend-operator", comments }),
       }),
     bulkDecide: (payload: BulkReviewDecision) =>
       request<ReviewQueueItem[]>("/review-queue/bulk-decide", {

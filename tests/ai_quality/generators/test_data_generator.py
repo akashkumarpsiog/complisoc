@@ -54,6 +54,8 @@ class GeneratedControl:
 class TestDataGenerator:
     """Generates realistic test data for AI testing."""
 
+    __test__ = False
+
     FINDING_TEMPLATES = [
         FindingTemplate("access_control", "high", "Weak {resource} password policy",
                        "The {resource} allows passwords shorter than {length} characters", "defender"),
@@ -70,16 +72,14 @@ class TestDataGenerator:
     ]
 
     CONTROL_TEMPLATES = [
-        ControlTemplate("AC-1", "Access Control Policy", "Establish and enforce access control policy", "access_control"),
-        ControlTemplate("AC-2", "Account Management", "Manage information system accounts", "access_control"),
-        ControlTemplate("AC-3", "Access Enforcement", "Enforce approved authorizations", "access_control"),
-        ControlTemplate("AU-1", "Audit Policy", "Establish audit and accountability policy", "audit"),
-        ControlTemplate("AU-2", "Audit Events", "Define auditable events and ensure logging", "audit"),
-        ControlTemplate("SC-1", "System Communications Protection", "Protect system communications", "encryption"),
-        ControlTemplate("SC-8", "Transmission Confidentiality", "Protect transmission confidentiality", "encryption"),
-        ControlTemplate("CM-1", "Configuration Management Policy", "Establish configuration baselines", "configuration"),
-        ControlTemplate("CM-7", "Least Functionality", "Configure systems to provide least functionality", "configuration"),
-        ControlTemplate("SI-1", "System Information Integrity", "Identify and report information integrity issues", "audit"),
+        ControlTemplate("A.5.15", "Access Control", "Limit access based on business and security requirements", "access_control"),
+        ControlTemplate("A.5.18", "Access Rights", "Grant, review, and remove access rights", "access_control"),
+        ControlTemplate("A.8.15", "Logging", "Produce, protect, and analyse security logs", "audit"),
+        ControlTemplate("A.8.16", "Monitoring activities", "Monitor for anomalous behaviour and potential incidents", "audit"),
+        ControlTemplate("A.8.24", "Use of Cryptography", "Use cryptographic controls to protect information", "encryption"),
+        ControlTemplate("A.8.20", "Networks security", "Protect networks and network services", "network"),
+        ControlTemplate("A.8.9", "Configuration management", "Manage secure configurations throughout their lifecycle", "configuration"),
+        ControlTemplate("A.8.13", "Information Backup", "Implement backup procedures to support recovery", "configuration"),
     ]
 
     RESOURCES = ["database", "web application", "API gateway", "file server", "cloud storage", "container"]

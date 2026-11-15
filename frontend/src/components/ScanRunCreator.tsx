@@ -1,18 +1,15 @@
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { ChevronDown, ChevronRight, Cloud, Folder, GitBranch, Loader2, Terminal, X } from "lucide-react";
 import { api } from "../services/api";
 import type { ScanRun, ScannerInfo } from "../types";
-import { sampleFailures, sampleFindings } from "../services/json";
 import { staggerStyle } from "./Primitives";
 
-type Mode = "live" | "sample";
-type TargetType = "local" | "git" | "aws" | "azure";
+type TargetType = "local" | "git" | "azure";
 
 const TARGET_OPTIONS: { value: TargetType; label: string; icon: ReactNode }[] = [
   { value: "local", label: "Local File / Folder", icon: <Folder className="h-4 w-4" aria-hidden /> },
   { value: "git", label: "Git Repository", icon: <GitBranch className="h-4 w-4" aria-hidden /> },
-  { value: "aws", label: "AWS Account", icon: <Cloud className="h-4 w-4" aria-hidden /> },
-  { value: "azure", label: "Azure Subscription", icon: <Cloud className="h-4 w-4" aria-hidden /> },
+  { value: "azure", label: "Azure Defender", icon: <Cloud className="h-4 w-4" aria-hidden /> },
 ];
 
 export function ScanRunCreator({
@@ -24,11 +21,10 @@ export function ScanRunCreator({
   onOpenChange: (open: boolean) => void;
   onCreated: (scanRun: ScanRun) => void | Promise<void>;
 }) {
-  const [mode, setMode] = useState<Mode>("live");
   const [busy, setBusy] = useState(false);
 
   function close() {
-    if (!busy) onOpenChange(false);
+    onOpenChange(false);
   }
 
   if (!open) return null;
@@ -38,33 +34,13 @@ export function ScanRunCreator({
       <div className="absolute inset-0 bg-ink/30 backdrop-blur-sm transition-opacity duration-200" onClick={close} />
       <div className="relative max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-2xl border border-line bg-white shadow-2xl animate-scale-in">
         <div className="sticky top-0 z-10 flex items-center justify-between border-b border-line bg-white/95 backdrop-blur-sm px-6 py-4">
-          <div className="flex gap-2">
-            {(["live", "sample"] as Mode[]).map((m) => (
-              <button
-                key={m}
-                type="button"
-                disabled={busy}
-                className={`rounded-lg px-4 py-2 text-sm font-semibold transition-all duration-150 ${
-                  mode === m
-                    ? "bg-brand-500 text-white shadow-sm shadow-brand-500/20"
-                    : "bg-panel text-muted hover:bg-panel-hover hover:text-ink"
-                }`}
-                onClick={() => setMode(m)}
-              >
-                {m === "live" ? "Live scan" : "Sample scan"}
-              </button>
-            ))}
-          </div>
-          <button className="icon-button !border-0 !p-1.5 text-subtle hover:text-ink hover:bg-panel-hover" disabled={busy} onClick={close} aria-label="Close">
+          <h2 className="text-lg font-semibold text-ink">Run scan</h2>
+          <button className="icon-button !border-0 !p-1.5 text-subtle hover:text-ink hover:bg-panel-hover" onClick={close} aria-label={busy ? "Cancel scan and close" : "Close"}>
             <X className="h-4 w-4" />
           </button>
         </div>
         <div className="p-6">
-          {mode === "live" ? (
-            <LiveScanForm onBusyChange={setBusy} onCreated={onCreated} onClose={() => onOpenChange(false)} />
-          ) : (
-            <SampleScanForm onBusyChange={setBusy} onCreated={onCreated} onClose={() => onOpenChange(false)} />
-          )}
+          <LiveScanForm onBusyChange={setBusy} onCreated={onCreated} onClose={() => onOpenChange(false)} />
         </div>
       </div>
     </div>
@@ -83,11 +59,24 @@ function LiveScanForm({
   const [scanners, setScanners] = useState<ScannerInfo[]>([]);
   const [targetType, setTargetType] = useState<TargetType>("local");
   const [target, setTarget] = useState(".");
-  const [includeLocal, setIncludeLocal] = useState(true);
   const [framework, setFramework] = useState("");
   const [message, setMessage] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [showProviders, setShowProviders] = useState(false);
+  const [elapsedSeconds, setElapsedSeconds] = useState(0);
+  const abortController = useRef<AbortController | null>(null);
+  const scanStartedAt = useRef<number | null>(null);
+
+  useEffect(() => () => abortController.current?.abort(), []);
+
+  useEffect(() => {
+    if (!submitting || scanStartedAt.current === null) return;
+    const timer = window.setInterval(() => {
+      const start = scanStartedAt.current;
+      if (start !== null) setElapsedSeconds(Math.floor((Date.now() - start) / 1000));
+    }, 1000);
+    return () => window.clearInterval(timer);
+  }, [submitting]);
 
   useEffect(() => {
     void api.scanners.list().then(setScanners);
@@ -99,16 +88,12 @@ function LiveScanForm({
 
   useEffect(() => {
     if (targetType === "local") setTarget("scan_targets/terraform");
-    if (targetType === "aws") setTarget("aws-iac-container");
-    if (targetType === "azure") setTarget("scan_targets/azure/");
+    if (targetType === "azure") setTarget("azure-subscription");
     if (targetType === "git") setTarget("");
-    // Local IaC is included by default; the user can disable it for a cloud-only run.
-    setIncludeLocal(true);
   }, [targetType]);
 
   const scannerMap = Object.fromEntries(scanners.map((s) => [s.name, s]));
-  const availableCount = scanners.filter((s) => s.available).length;
-  const isCloud = targetType === "azure" || targetType === "aws";
+  const isCloud = targetType === "azure";
 
   const infrastructure = scannerMap.checkov;
   const vulnerability = scannerMap.trivy;
@@ -118,44 +103,40 @@ function LiveScanForm({
   const isStaticConfigured = staticAnalysis?.available ?? false;
   const isInfraAvailable = infrastructure?.available ?? false;
   const isVulnAvailable = vulnerability?.available ?? false;
-  const isCloudOnly = targetType === "azure" && !includeLocal;
-  const cloudTarget = "azure-cloud";
+  const applicableScanners = isCloud ? [cloudFindings] : [infrastructure, vulnerability, staticAnalysis];
+  const availableCount = applicableScanners.filter((scanner) => scanner?.available).length;
 
   async function submit() {
     if (submitting) return;
     setSubmitting(true);
     setMessage(null);
+    setElapsedSeconds(0);
+    scanStartedAt.current = Date.now();
+    const controller = new AbortController();
+    abortController.current = controller;
     try {
       const result = await api.scans.run({
-        target: isCloudOnly ? cloudTarget : target,
-        ...(isCloudOnly ? { scanners: ["defender"] } : { scan_profile: targetType }),
+        target,
+        scan_profile: targetType,
         framework: framework.trim() || undefined,
-      });
+      }, controller.signal);
       await onCreated(result);
       onClose();
     } catch (err) {
-      setMessage(err instanceof Error ? err.message : "Unable to run scan.");
+      if (!(err instanceof DOMException && err.name === "AbortError")) {
+        setMessage(err instanceof Error ? err.message : "Unable to run scan.");
+      }
     } finally {
+      abortController.current = null;
+      scanStartedAt.current = null;
       setSubmitting(false);
     }
   }
 
   const targetLabel =
-    targetType === "azure"
-      ? "Local IaC path (scanned by Checkov/Trivy) — live Defender uses the configured subscription"
-      : targetType === "aws"
-        ? "Local IaC path (scanned by Checkov/Trivy) — no live AWS scanner is configured yet"
-        : targetType === "git"
-          ? "Repository path or URL (the local clone is scanned)"
-          : "Local file or folder path";
+    targetType === "git" ? "Repository path or URL (the local clone is scanned)" : "Local file or folder path";
   const targetPlaceholder =
-    targetType === "azure"
-      ? "azure-subscription or resource group label"
-      : targetType === "aws"
-        ? "terraform dir, docker image, or project label"
-        : targetType === "git"
-          ? "owner/repo or C:/path/to/repo"
-          : ". or C:/path/to/folder or C:/path/to/file.tf";
+    targetType === "git" ? "owner/repo or C:/path/to/repo" : ". or C:/path/to/folder or C:/path/to/file.tf";
 
   return (
     <div className="grid gap-5">
@@ -181,36 +162,11 @@ function LiveScanForm({
         </div>
       </div>
 
-      {targetType === "azure" && (
-        <div className="flex items-center justify-between gap-3 rounded-xl border border-line bg-white px-4 py-3">
-          <div>
-            <p className="text-sm font-semibold text-ink">Also scan local IaC at this path</p>
-            <p className="text-xs text-subtle">Turn off to scan only live Azure Defender data.</p>
-          </div>
-          <button
-            type="button"
-            role="switch"
-            aria-checked={includeLocal}
-            disabled={submitting}
-            onClick={() => setIncludeLocal((value) => !value)}
-            className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors duration-150 focus:outline-none focus:ring-2 focus:ring-brand-500/40 ${
-              includeLocal ? "bg-brand-500" : "bg-line-strong"
-            }`}
-          >
-            <span
-              className={`inline-flex h-5 w-5 transform rounded-full bg-white shadow transition-transform duration-150 ${
-                includeLocal ? "translate-x-5" : "translate-x-0.5"
-              }`}
-            />
-          </button>
-        </div>
-      )}
-
-      {isCloudOnly ? (
+      {isCloud ? (
         <div className="rounded-xl border border-line bg-panel/40 px-4 py-3">
-          <p className="text-sm font-semibold text-ink">Live cloud target</p>
+          <p className="text-sm font-semibold text-ink">Azure subscription</p>
           <p className="text-xs text-muted mt-0.5">
-            Azure Defender (live cloud) — reads from your configured environment credentials. No local path is scanned.
+            Microsoft Defender for Cloud reads findings from your configured Azure subscription.
           </p>
         </div>
       ) : (
@@ -220,15 +176,10 @@ function LiveScanForm({
         </label>
       )}
 
-      {isCloudOnly ? (
+      {isCloud ? (
         <div className="flex items-center gap-2 rounded-xl border border-brand-200 bg-brand-50 px-4 py-3 text-sm font-semibold text-brand-700">
           <Cloud className="h-4 w-4" aria-hidden />
-          <span>Cloud-only scan — reads live Azure Defender data from your configured subscription. No local files are scanned.</span>
-        </div>
-      ) : isCloud ? (
-        <div className="flex items-center gap-2 rounded-xl border border-brand-200 bg-brand-50 px-4 py-3 text-sm font-semibold text-brand-700">
-          <Cloud className="h-4 w-4" aria-hidden />
-          <span>Live cloud scan — connects to your {targetType === "azure" ? "Azure" : "AWS"} account, plus analyzes the local path below.</span>
+          <span>Reads alerts, security recommendations, and secure scores from the configured Azure subscription.</span>
         </div>
       ) : (
         <div className="flex items-center gap-2 rounded-xl border border-line bg-panel/50 px-4 py-3 text-sm font-semibold text-ink">
@@ -248,7 +199,7 @@ function LiveScanForm({
         </button>
         {showProviders ? (
           <div className="border-t border-line bg-white p-4 grid gap-3">
-            {!isCloudOnly && (
+            {!isCloud && (
               <div>
                 <p className="text-xs font-semibold uppercase tracking-wide text-subtle mb-2">Local analysis (scans the path below)</p>
                 <div className="grid gap-2.5">
@@ -258,7 +209,7 @@ function LiveScanForm({
                 </div>
               </div>
             )}
-            {targetType === "azure" && (
+            {isCloud && (
               <div>
                 <p className="text-xs font-semibold uppercase tracking-wide text-subtle mb-2">Live cloud (connects to your account)</p>
                 <div className="grid gap-2.5">
@@ -266,22 +217,17 @@ function LiveScanForm({
                 </div>
               </div>
             )}
-            {targetType === "aws" && (
-              <p className="text-xs text-muted">No live AWS scanner is configured yet — this mode analyzes local IaC only.</p>
-            )}
             <p className="text-xs text-muted pt-1">
-              {targetType === "aws"
-                ? "AWS scans use Checkov for IaC, Trivy for vulnerabilities, and SonarQube for static code analysis."
-                : targetType === "azure"
-                  ? "Azure scans fetch Defender alerts, recommendations, and secure scores, plus Checkov for IaC, Trivy for vulnerabilities, and SonarQube for static code analysis."
-                  : targetType === "git"
-                    ? "Repository scans use Trivy and Checkov, plus SonarQube if a project is configured."
-                    : "Local scans use Checkov and Trivy, plus SonarQube if a project is configured."}
+              {isCloud
+                ? "Findings are then processed by the compliance mapping workflow."
+                : targetType === "git"
+                  ? "Repository scans use Trivy and Checkov, plus SonarQube if a project is configured."
+                  : "Local scans use Checkov and Trivy, plus SonarQube if a project is configured."}
             </p>
           </div>
         ) : (
           <div className="px-4 py-2.5 text-xs text-muted border-t border-line">
-            {availableCount} of {scanners.length} providers available. SonarQube and Azure Defender require environment configuration.
+            {availableCount} of {applicableScanners.length} providers available for this target.
           </div>
         )}
       </div>
@@ -297,15 +243,20 @@ function LiveScanForm({
         </div>
       )}
       {submitting && (
-        <div className="flex items-center gap-3 rounded-xl border border-brand-200 bg-brand-50 px-4 py-3 text-sm font-medium text-brand-700">
+        <div role="status" aria-live="polite" className="flex items-start gap-3 rounded-xl border border-brand-200 bg-brand-50 px-4 py-3 text-sm font-medium text-brand-700">
           <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
-          Running security scan and generating compliance decisions...
+          <div>
+            <p>
+              Scan is running · {String(Math.floor(elapsedSeconds / 60)).padStart(2, "0")}:
+              {String(elapsedSeconds % 60).padStart(2, "0")} elapsed
+            </p>
+          </div>
         </div>
       )}
 
       <div className="flex items-center justify-end gap-2 pt-2">
-        <button className="secondary-button" disabled={submitting} onClick={onClose}>
-          Cancel
+        <button className="secondary-button" onClick={onClose}>
+          {submitting ? "Cancel scan" : "Cancel"}
         </button>
         <button className="primary-button" disabled={submitting} onClick={submit}>
           {submitting ? (
@@ -361,111 +312,6 @@ function ProviderRow({
           {missing && missing.length > 0 ? `Not configured: ${missing.join(", ")}` : "Not available"}
         </span>
       )}
-    </div>
-  );
-}
-
-function JsonEditor({
-  disabled,
-  label,
-  rows,
-  value,
-  onChange,
-}: {
-  disabled?: boolean;
-  label: string;
-  rows: number;
-  value: string;
-  onChange: (value: string) => void;
-}) {
-  return (
-    <label className="text-sm font-semibold text-ink block">
-      {label}
-      <textarea
-        className="control mt-1.5 w-full resize-y font-mono text-xs leading-relaxed"
-        disabled={disabled}
-        rows={rows}
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-      />
-    </label>
-  );
-}
-
-function SampleScanForm({
-  onBusyChange,
-  onCreated,
-  onClose,
-}: {
-  onBusyChange: (busy: boolean) => void;
-  onCreated: (scanRun: ScanRun) => void | Promise<void>;
-  onClose: () => void;
-}) {
-  const [targetEnvironment, setTargetEnvironment] = useState("sample-iac");
-  const [findingsJson, setFindingsJson] = useState(sampleFindings);
-  const [failuresJson, setFailuresJson] = useState(sampleFailures);
-  const [message, setMessage] = useState<string | null>(null);
-  const [submitting, setSubmitting] = useState(false);
-
-  useEffect(() => {
-    onBusyChange(submitting);
-  }, [onBusyChange, submitting]);
-
-  async function submit() {
-    if (submitting) return;
-    setSubmitting(true);
-    setMessage(null);
-    try {
-      const findings = JSON.parse(findingsJson);
-      const failures = JSON.parse(failuresJson);
-      const result = await api.scanRuns.create({
-        target_environment: targetEnvironment,
-        findings,
-        scanner_failures: failures,
-      });
-      await onCreated(result);
-      onClose();
-    } catch (err) {
-      setMessage(err instanceof Error ? err.message : "Unable to create sample scan.");
-    } finally {
-      setSubmitting(false);
-    }
-  }
-
-  return (
-    <div className="grid gap-4">
-      <label className="text-sm font-semibold text-ink block">
-        Target environment
-        <input
-          className="control mt-1.5"
-          disabled={submitting}
-          value={targetEnvironment}
-          onChange={(event) => setTargetEnvironment(event.target.value)}
-          placeholder="sample-iac"
-        />
-      </label>
-      <JsonEditor disabled={submitting} label="Findings JSON" rows={8} value={findingsJson} onChange={setFindingsJson} />
-      <JsonEditor disabled={submitting} label="Scanner failures JSON (optional)" rows={4} value={failuresJson} onChange={setFailuresJson} />
-      {message && (
-        <div className={`rounded-xl border px-4 py-3 text-sm font-medium animate-slide-up ${message.includes("Created") ? "border-success/20 bg-success-light text-success-dark" : "border-danger/20 bg-danger-light text-danger-dark"}`}>
-          {message}
-        </div>
-      )}
-      {submitting && (
-        <div className="flex items-center gap-3 rounded-xl border border-brand-200 bg-brand-50 px-4 py-3 text-sm font-medium text-brand-700">
-          <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
-          Creating scan, mapping findings, and generating compliance decisions...
-        </div>
-      )}
-      <div className="flex items-center justify-end gap-2 pt-2">
-        <button className="secondary-button" disabled={submitting} onClick={onClose}>
-          Cancel
-        </button>
-        <button className="primary-button" disabled={submitting} onClick={submit}>
-          {submitting ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : null}
-          {submitting ? "Running..." : "Run sample scan"}
-        </button>
-      </div>
     </div>
   );
 }

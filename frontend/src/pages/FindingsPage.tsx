@@ -4,7 +4,7 @@ import { useResource } from "../hooks/useResource";
 import type { ControlMapping, NormalizedFinding } from "../types";
 import { Detail } from "../components/Detail";
 import { ResourceBoundary } from "../components/ResourceBoundary";
-import { DataTable, EmptyState, LoadingState, Section, StatusBadge } from "../components/Primitives";
+import { DataTable, EmptyState, LoadingState, MappingStatusLegend, Section, StatusBadge } from "../components/Primitives";
 import { formatPercent, severityOrder } from "../utils/format";
 
 export function FindingsPage() {
@@ -99,9 +99,10 @@ function FindingDetail({ finding }: { finding: NormalizedFinding | null }) {
           <Detail label="Resource" value={finding.resource_identifier} />
           <Detail label="Description" value={finding.description || "n/a"} />
           <h3 className="pt-3 text-sm font-bold text-ink border-t border-line mt-1">Mappings</h3>
+          <MappingStatusLegend />
           {mappings ? (
             <DataTable
-              columns={["Mapping", "Control", "AI Verdict", "Gemini Score", "Groq Score", "Final Confidence", "Groq Verdict"]}
+              columns={["Mapping", "Control", "Outcome", "Gemini Score", "Groq Score", "Final Confidence", "Groq Verdict"]}
               rows={mappings.map((mapping) => [
                 mapping.id,
                 mapping.control_catalog_id,

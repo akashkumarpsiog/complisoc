@@ -4,8 +4,10 @@ This document captures the authoritative control inventory baseline for the firs
 
 ## 1. ISO/IEC 27001:2022 Annex A
 
-Source of truth:
+Normative source:
 - https://www.iso.org/standard/27001
+
+Explanatory control references:
 - https://www.isms.online/iso-27001/annex-a-2022/
 
 The ISO/IEC 27001:2022 Annex A control set is the primary control catalog for the platform.
@@ -27,9 +29,16 @@ Examples of controls that should be present in the control catalog:
 - A 8.5 Secure Authentication
 - A 8.7 Protection Against Malware
 - A 8.13 Information Backup
-- A 8.20 Network Security
+- A 8.15 Logging
+- A 8.16 Monitoring Activities
+- A 8.20 Networks security
+- A 8.22 Segregation of Networks
 - A 8.24 Use of Cryptography
 - A 8.32 Change Management
+
+The production seed catalog is a selected subset, not the complete set of 93 Annex A controls.
+Benchmark control IDs, titles, descriptions, objectives, and source URLs must match the
+production catalog; synthetic benchmark signals and keywords may be fixture-specific.
 
 ## 2. SOC 2 Trust Services Criteria
 

@@ -122,7 +122,7 @@ def _oracle_verifier(items):
 
 
 def _make_run_scanners(kind: str):
-    def _run(target, scanners=None, scan_profile=None, timeout=300):
+    def _run(target, scanners=None, scan_profile=None, timeout=300, cancel_event=None):
         base = pathlib.Path(target)
         text = ""
         for f in base.rglob("*"):

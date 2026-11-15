@@ -169,6 +169,18 @@ export function StatusBadge({ value, className }: { value?: string | null; class
   );
 }
 
+export function MappingStatusLegend() {
+  return (
+    <aside className="mb-4 rounded-lg border border-line bg-panel/40 p-3 text-sm" aria-label="Mapping outcome guide">
+      <p className="mb-2 font-semibold text-ink">Mapping outcome guide</p>
+      <div className="grid gap-2 md:grid-cols-2">
+        <p className="text-muted"><span className="font-semibold text-success-dark">Published:</span> Passed the 70% confidence threshold after verification. Check the evidence before relying on it; this is not a compliance certification.</p>
+        <p className="text-muted"><span className="font-semibold text-warning-dark">Manual review:</span> Below threshold or not confirmed by an AI step. A person should check the finding, control, and rationale.</p>
+      </div>
+    </aside>
+  );
+}
+
 export function LoadingState({ label = "Loading" }: { label?: string }) {
   return (
     <div className="flex min-h-32 flex-col items-center justify-center gap-4 rounded-xl border border-dashed border-line-strong bg-panel/50 p-6">

@@ -15,9 +15,11 @@ See [ARCHITECTURE.md](ARCHITECTURE.md) for full details.
 The platform ships with deterministic, secret-free test suites that prove
 the compliance pipeline end-to-end:
 
-- **15-control gold-standard benchmark** — `tests/benchmark/gold_standard.json`
-  (15 canonical mappings) validated by `tests/benchmark/validate_mappings.py`
-  (reports precision/recall; currently **1.000 / 1.000**).
+- **Audited ISO 27001 benchmark fixture** — `tests/benchmark/gold_standard.json`
+  (15 controls, 32 curated synthetic mappings) validated against the production
+  seed catalog by `tests/benchmark/validate_mappings.py`. The default harness
+  mocks both AI providers, so its **1.000 / 1.000** precision/recall measures
+  deterministic pipeline agreement only, not ISO mapping or model accuracy.
 - **LangChain (LCEL) pipeline** — the compliance orchestration lives in
   `backend/compliance/langchain_pipeline.py`, a single LangChain / LCEL
   chain (`ingest → Gemini mapping → Groq gap analysis → report`). There is
@@ -99,7 +101,7 @@ Complisoc can ingest Microsoft Defender for Cloud findings (alerts, recommendati
    AZURE_CLIENT_SECRET=<password>
    AZURE_SUBSCRIPTION_ID=<subscription-id>
    ```
-4. Trigger an Azure scan from the frontend (Live scan → Azure Subscription) or call `POST /api/v1/scans` with `scan_profile: "azure"`.
+4. Trigger an Azure scan from the frontend (Live scan → Azure Defender) or call `POST /api/v1/scans` with `scan_profile: "azure"`. This reads Defender alerts, assessments, and secure scores for the configured subscription; it does not scan a local directory.
 
 Defender findings are normalized into the same `NormalizedFinding` schema as other scanners and flow through the standard AI compliance pipeline. See `scan_targets/azure/README.md` for the test IaC target.
 
@@ -126,10 +128,20 @@ python -m pytest -v
 8. Start the API server:
 
 ```powershell
-uvicorn complisoc.backend.api.main:app --reload --port 8000
+python -m uvicorn complisoc.backend.api.main:app --app-dir .. --reload --reload-dir backend --port 8000
 ```
 
-Then open `http://127.0.0.1:8000/api/v1/health`.
+Run this from the repository root (`complisoc`). `--app-dir ..` makes the
+`complisoc.backend` package importable from the parent directory, and limiting
+reload watching to `backend` avoids restarts when tests or benchmark files change.
+Avoid editing backend files while a scan is running. Then open
+`http://127.0.0.1:8000/api/v1/health`.
+Live scanner processes stop after 60 seconds; SonarQube and Defender requests
+have shorter network timeouts. AI provider calls use the existing 60-second
+timeout and retry up to three times. A timeout is recorded as a
+scanner/provider failure instead of leaving the scan request waiting indefinitely.
+If Groq rejects a verification batch because it exceeds the model's TPM limit,
+the batch is split into smaller requests.
 
 ### Frontend (React + TailwindCSS + Vite)
 
@@ -159,9 +171,8 @@ In two terminals:
 
 **Terminal 1 (Backend):**
 ```powershell
-Root repo: C:\Users\akash.kumar\OneDrive - psiog.com\Desktop\sem1
-Set-ExecutionPolicy RemoteSigned -Scope CurrentUser -Force
-.\complisoc\.venv\Scripts\python.exe -m uvicorn complisoc.backend.api.main:app --reload --port 8000
+Set-Location "C:\Users\akash.kumar\OneDrive - psiog.com\Desktop\sem1"
+.\complisoc\.venv\Scripts\python.exe -m uvicorn complisoc.backend.api.main:app --reload --reload-dir .\complisoc\backend --port 8000
 ```
 ## ngrok set up
 ngrok config add-authtoken YOUR_AUTHTOKEN

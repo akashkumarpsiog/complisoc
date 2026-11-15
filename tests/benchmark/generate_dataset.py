@@ -1,7 +1,8 @@
 """Programmatic benchmark dataset generator.
 
-The hand-curated 30-finding ``gold_standard.json`` covers each of the 15
-controls exactly twice (variant 1 and variant 2). To stress-test the
+The hand-curated 32-finding ``gold_standard.json`` covers 15 controls,
+including separate logging and monitoring controls and four cryptography
+findings. To stress-test the
 pipeline at the scale the original proposal committed to (500-1000
 findings), this module generates a larger synthetic dataset from the
 same 15 canonical finding "templates".
@@ -27,6 +28,8 @@ import json
 import pathlib
 import random
 from typing import Any
+
+from catalog_validation import validate_gold_catalog
 
 
 # Severity pool. Each template picks deterministically by index so the
@@ -90,7 +93,7 @@ def expand_benchmark(
 ) -> dict:
     """Expand a hand-curated gold dataset to ``target_count`` findings.
 
-    Each of the 15 base mappings is reused as a "template". The
+    Each base mapping is reused as a "template". The
     generator produces variant findings by:
       - rotating through the severity pool,
       - rotating through resource identifier suffixes,
@@ -102,6 +105,7 @@ def expand_benchmark(
     would rank higher) are skipped. This keeps the benchmark honest
     even at scale.
     """
+    validate_gold_catalog(gold)
     if target_count < len(gold["mappings"]):
         return gold
 
@@ -112,7 +116,7 @@ def expand_benchmark(
     next_id = max(int(m["id"]) for m in base_mappings) + 1
 
     # Always include the original mappings first so the canonical
-    # 30-finding benchmark remains a strict subset of every
+    # 32-finding benchmark remains a strict subset of every
     # expanded run.
     expanded.extend(base_mappings)
 
@@ -139,7 +143,6 @@ def expand_benchmark(
             str(raw.get(k, "")) for k in ("finding_type", "title", "description", "resource_identifier")
         )
         expected_control_id = template["expected_control_id"]
-        expected_control = next(c for c in controls if c["control_id"] == expected_control_id)
         best = _best_control(finding_text, controls)
         if best["control_id"] != expected_control_id:
             # Skip variants that would have a different best control.

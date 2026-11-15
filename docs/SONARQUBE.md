@@ -1,160 +1,172 @@
-# SonarQube Setup Guide
+# SonarQube Setup Guide — AWS EC2
 
-SonarQube is used as a cloud-style scanner in Complisoc. It reads security issues from a configured SonarQube project via the SonarQube Web API.
+SonarQube analyses source code for security vulnerabilities and code-quality issues. Complisoc retrieves these findings through the SonarQube Web API and processes them through its compliance pipeline.
 
-## Prerequisites
+## 1. Prerequisites
+- AWS EC2 instance running Ubuntu 22.04 LTS.
+- Java 17, SSH access and an EC2 key pair.
+- Required network access to port 9000.
 
-- A running SonarQube instance (AWS EC2 or SonarCloud)
-- A SonarQube project with code analysis already completed
-- SonarQube user token with `Execution` + `Browse` permissions
-
-## Environment Variables
-
-Set these in the backend environment before starting the API:
+## 2. Connect to EC2
 
 ```bash
-SONAR_HOST_URL=http://localhost:9000
-SONAR_TOKEN=squ_1234abcd...
+ssh -i ssh -i "C:\Users\akash.kumar\Downloads\complisoc-key.pem" ubuntu@<EC2_PUBLIC_IP>
 ```
-
-If using SonarCloud, the URL pattern is:
-
 ```bash
-SONAR_HOST_URL=https://sonarcloud.io
-SONAR_TOKEN=your_sonarcloud_token
+ngrok http 8000
 ```
 
-## Option A: SonarQube on AWS EC2 (no Docker required)
 
-1. Launch an EC2 instance (Ubuntu 22.04 LTS recommended, t3.large or better)
-2. Install Java 17:
+## 3. Install Java and Dependencies
 
 ```bash
 sudo apt-get update
-sudo apt-get install -y openjdk-17-jdk
+sudo apt-get install -y openjdk-17-jdk unzip wget
+java -version
 ```
 
-3. Download and start SonarQube:
+## 4. Download and Install SonarQube
 
 ```bash
+cd /tmp
 wget https://binaries.sonarsource.com/Distribution/sonarqube/sonarqube-10.5.1.78531.zip
 sudo unzip sonarqube-10.5.1.78531.zip -d /opt
-sudo /opt/sonarqube-10.5.1.78531/bin/linux-x86-64/sonar.sh start
 ```
 
-4. Open port 9000 in the EC2 security group
-5. Complete setup at `http://<EC2_PUBLIC_IP>:9000`
-6. Generate an auth token from your user profile
-7. Set `SONAR_HOST_URL=http://<EC2_PUBLIC_IP>:9000` in Complisoc backend env
+If already downloaded and extracted, skip this step.
 
-## Option B: SonarCloud (SaaS, no infra required)
+## 5. Configure SonarQube User
 
-1. Sign up at https://sonarcloud.io
-2. Create an organization and project
-3. Generate a token from `My Account > Security > Generate Tokens`
-4. Set environment variables:
+SonarQube must not run as root.
 
 ```bash
-SONAR_HOST_URL=https://sonarcloud.io
-SONAR_TOKEN=your_token
+sudo useradd --system --no-create-home --shell /usr/sbin/nologin sonar
+sudo chown -R sonar:sonar /opt/sonarqube-10.5.1.78531
 ```
 
-5. Run analysis against your target project:
+Skip user creation if it already exists.
+
+## 6. Configure Linux Requirements
 
 ```bash
-sonar-scanner \
-  -Dsonar.projectKey=my-project \
-  -Dsonar.organization=my-org \
-  -Dsonar.host.url=https://sonarcloud.io \
-  -Dsonar.token=YOUR_TOKEN
+sudo tee /etc/sysctl.d/99-sonarqube.conf > /dev/null <<'EOF'
+vm.max_map_count=524288
+fs.file-max=131072
+EOF
+
+sudo sysctl --system
 ```
 
-## How Complisoc Uses SonarQube
+## 7. Configure Systemd Service
 
-The reusable GitHub Actions workflow (`target-repo-scan.yml`) runs `sonar-scanner` to upload analysis to your SonarQube server. After analysis is processed, it calls the Complisoc backend `/api/v1/scans` endpoint with `scanners: ["sonarqube"]`.
-
-The backend's `SonarQubeScanner` runner (`backend/scanners/runners.py`) then:
-1. Queries `GET {SONAR_HOST_URL}/api/issues/search?componentKeys={project_key}`
-2. Converts SonarQube issues into the standard raw-finding format:
-   - `rule` → `finding_type`
-   - `message` → `title` and `description`
-   - `severity` → normalized severity
-   - `component` → `resource_identifier`
-3. Normalizes findings through the same pipeline as Trivy and Checkov
-4. Runs candidate narrowing, Gemini mapping, Groq verification, and report generation
-
-**Normalization happens only in the backend.** The GitHub Actions workflow does not parse or normalize SonarQube output. This keeps scanner-specific logic in one place.
-
-## Prerequisites
-
-- A running SonarQube instance (AWS EC2 or SonarCloud)
-- A SonarQube project with code analysis already completed
-- SonarQube user token with `Execution` + `Browse` permissions
-- `sonar-project.properties` committed at the root of the target repository
-
-## Environment Variables
-
-### Backend (required for SonarQube ingestion)
-
-Set these in the Complisoc backend environment before starting the API:
+Create the service file:
 
 ```bash
-SONAR_HOST_URL=http://localhost:9000
-SONAR_TOKEN=squ_1234abcd...
+sudo nano /etc/systemd/system/sonarqube.service
 ```
 
-Without these, the backend `SonarQubeScanner` will be unavailable and the pipeline will route SonarQube findings to manual review.
+Add:
 
-### GitHub Secrets (target repository)
+```ini
+[Unit]
+Description=SonarQube
+After=network.target
 
-Set these in the target repository under **Settings > Secrets and variables > Actions**:
+[Service]
+Type=forking
+User=sonar
+Group=sonar
+LimitNOFILE=131072
+LimitNPROC=8192
+ExecStart=/opt/sonarqube-10.5.1.78531/bin/linux-x86-64/sonar.sh start
+ExecStop=/opt/sonarqube-10.5.1.78531/bin/linux-x86-64/sonar.sh stop
+Restart=on-failure
+RestartSec=10
 
-| Secret | Required | Description |
-|--------|----------|-------------|
-| `SONAR_HOST_URL` | Yes | SonarQube server URL |
-| `SONAR_TOKEN` | Yes | SonarQube token with `Execution` + `Browse` |
-| `SONAR_PROJECT_KEY` | Yes | SonarQube project key |
-| `COMPLISOC_API_URL` | Yes | Base URL of the Complisoc API |
-| `COMPLISOC_API_KEY` | Yes | Bearer token for Complisoc API auth |
+[Install]
+WantedBy=multi-user.target
+```
 
-## Option A: SonarQube on AWS EC2 (no Docker required)
-
-1. Launch an EC2 instance (Ubuntu 22.04 LTS recommended, t3.large or better)
-2. Install Java 17:
+Enable and start:
 
 ```bash
-sudo apt-get update
-sudo apt-get install -y openjdk-17-jdk
+sudo systemctl daemon-reload
+sudo systemctl enable sonarqube
+sudo systemctl start sonarqube
+sudo systemctl status sonarqube
 ```
 
-3. Download and start SonarQube:
+Check logs if startup fails:
 
 ```bash
-wget https://binaries.sonarsource.com/Distribution/sonarqube/sonarqube-10.5.1.78531.zip
-sudo unzip sonarqube-10.5.1.78531.zip -d /opt
-sudo /opt/sonarqube-10.5.1.78531/bin/linux-x86-64/sonar.sh start
+sudo tail -f /opt/sonarqube-10.5.1.78531/logs/sonar.log
 ```
 
-4. Open port 9000 in the EC2 security group
-5. Complete setup at `http://<EC2_PUBLIC_IP>:9000`
-6. Generate an auth token from your user profile
-7. Create a SonarQube project and note the project key
+## 8. Configure AWS Security Group
 
-## Option B: SonarCloud (SaaS, no infra required)
+EC2 → Instances → Select instance → Security Groups → Edit inbound rules.
 
-1. Sign up at https://sonarcloud.io
-2. Create an organization and project
-3. Generate a token from `My Account > Security > Generate Tokens`
-4. Set environment variables:
+Add:
+
+| Setting | Value |
+|---|---|
+| Type | Custom TCP |
+| Port | 9000 |
+| Source | Your IP |
+| Description | SonarQube Web UI |
+
+Restrict access to trusted IPs. GitHub Actions and Complisoc must also be able to reach the server.
+
+## 9. Access SonarQube
+
+Open:
+
+```text
+http://<EC2_PUBLIC_IP>:9000
+```
+
+Default credentials:
+
+```text
+Username: admin
+Password: admin
+```
+
+Change the password when prompted. Create a project and record its project key.
+
+## 10. Generate Authentication Token
+
+Navigate to My Account → Security → Generate Tokens.
+
+Generate a token for the integration. The user needs:
+- Browse permission to retrieve issues.
+- Execute Analysis permission to upload analysis.
+
+Store the token securely.
+
+## 11. Configure Complisoc Backend
+
+Add to the backend `.env` file:
+
+```env
+SONAR_HOST_URL=http://<EC2_PUBLIC_IP>:9000
+SONAR_TOKEN=<YOUR_SONARQUBE_TOKEN>
+```
+
+Use `localhost` only if the backend runs on the same EC2 instance.
+
+Verify connectivity:
 
 ```bash
-SONAR_HOST_URL=https://sonarcloud.io
-SONAR_TOKEN=your_token
+curl -u "$SONAR_TOKEN:" \
+  "$SONAR_HOST_URL/api/system/status"
 ```
 
-## Target Repository Configuration
+The expected status is `UP`.
 
-The target repository must contain `sonar-project.properties` at its root:
+## 12. Configure Target Repository
+
+Create `sonar-project.properties` at the repository root:
 
 ```properties
 sonar.projectKey=your-project-key
@@ -163,11 +175,21 @@ sonar.sources=.
 sonar.sourceEncoding=UTF-8
 ```
 
-The reusable workflow verifies this file exists and fails fast if missing.
+## 13. Configure GitHub Actions Secrets
 
-## CI Integration
+Under Settings → Secrets and variables → Actions, add:
 
-For target projects using GitHub Actions, add a reusable workflow step:
+| Secret | Description |
+|---|---|
+| `SONAR_HOST_URL` | EC2 SonarQube URL |
+| `SONAR_TOKEN` | Authentication token |
+| `SONAR_PROJECT_KEY` | SonarQube project key |
+| `COMPLISOC_API_URL` | Complisoc backend URL |
+| `COMPLISOC_API_KEY` | Complisoc API authentication key |
+
+## 14. Integrate GitHub Actions
+
+Add the reusable workflow to the target repository:
 
 ```yaml
 jobs:
@@ -181,16 +203,28 @@ jobs:
       COMPLISOC_API_KEY: ${{ secrets.COMPLISOC_API_KEY }}
 ```
 
-The reusable workflow:
-1. Runs `sonar-scanner` analysis and uploads to SonarQube
-2. Polls the SonarQube CE API until analysis is processed
-3. Calls Complisoc backend `/api/v1/scans` with `scanners: ["sonarqube"]`
-4. Backend fetches findings via `SonarQubeScanner`, normalizes them, and runs the compliance pipeline
+Replace `your-org` with the actual repository owner.
 
-## Troubleshooting
+## 15. Complisoc Integration Flow
 
-- **"sonar-project.properties not found"**: Ensure the file exists at the target repo root. The workflow fails fast if missing.
-- **"SonarQube analysis did not complete within timeout"**: The workflow polls for up to 120 seconds. Check SonarQube server health and logs.
-- **"SonarQube is not available"**: Ensure `SONAR_HOST_URL` and `SONAR_TOKEN` are set in the backend environment.
-- **0 findings returned**: Ensure the SonarQube project has issues and the token has `Browse` permission.
-- **Connection errors**: Verify the SonarQube URL is reachable from the backend process. For EC2, check the security group allows inbound 9000.
+1. GitHub Actions runs SonarQube analysis and uploads results to EC2.
+2. The workflow polls the SonarQube Compute Engine API until analysis completes.
+3. It calls Complisoc `/api/v1/scans` with `scanners: ["sonarqube"]`.
+4. `SonarQubeScanner` in `backend/scanners/runners.py` retrieves issues using `GET /api/issues/search?componentKeys={project_key}`.
+5. Findings are converted into Complisoc's raw-finding format and normalized by the backend.
+6. Findings proceed through candidate narrowing, Gemini mapping, Groq verification and reporting.
+
+**Architecture:** GitHub Actions uploads analysis; SonarQube stores and processes results; Complisoc retrieves, normalizes and maps findings.
+
+## 16. Useful Commands
+
+```bash
+sudo systemctl start sonarqube
+sudo systemctl stop sonarqube
+sudo systemctl restart sonarqube
+sudo systemctl status sonarqube
+sudo journalctl -u sonarqube -f
+sudo ss -ltnp | grep 9000
+```
+
+**Troubleshooting:** For startup failures, inspect `sonar.log`, `web.log` and `es.log`. Check Java, available memory, Linux kernel limits, EC2 security-group rules and token permissions.

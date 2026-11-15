@@ -104,6 +104,8 @@ class TestGeminiMapper:
             mapper = GeminiMapper()
             result = mapper.map_batch([])
             assert result == {}
+            assert mock_genai.Client.call_args.kwargs == {"api_key": "fake"}
+            assert mapper._timeout == 60.0
 
     def test_map_batch_with_valid_response(self, db_session):
         from complisoc.backend.compliance.mapping import GeminiMapper
@@ -233,10 +235,12 @@ class TestGroqVerifier:
 
         with patch("complisoc.backend.compliance.verification.GROQ_API_KEY", "fake"), patch(
             "complisoc.backend.compliance.verification.Groq"
-        ):
+        ) as mock_groq:
             verifier = GroqVerifier()
             result = verifier.verify_batch([])
             assert result == {}
+            assert mock_groq.call_args.kwargs == {"api_key": "fake"}
+            assert verifier._timeout == 60.0
 
     def test_verify_batch_with_valid_response(self, db_session):
         from complisoc.backend.compliance.verification import GroqVerifier, PendingVerification
@@ -263,6 +267,62 @@ class TestGroqVerifier:
         decision = result[1]
         assert decision.result == "agree"
         assert decision.agreement_value == 1.0
+        assert mock_client.chat.completions.create.call_args.kwargs["max_completion_tokens"] == 512
+
+    def test_verify_batch_splits_only_when_groq_request_exceeds_tpm_limit(self, db_session):
+        from complisoc.backend.compliance.verification import GroqVerifier, PendingVerification
+
+        first_finding = _make_finding(db_session, title="first finding")
+        second_finding = _make_finding(db_session, title="second finding")
+        control = db_session.query(ControlCatalog).first()
+
+        def response(ref):
+            content = json.dumps({
+                "results": [{"ref": ref, "result": "agree", "explanation": "correct mapping"}]
+            })
+            return MagicMock(choices=[MagicMock(message=MagicMock(content=content))])
+
+        mock_client = MagicMock()
+        mock_client.chat.completions.create.side_effect = [
+            RuntimeError(
+                "Error code: 413: rate_limit_exceeded, tokens per minute: Limit 8000, Requested 8140, "
+                "please reduce your message size."
+            ),
+            response(1),
+            response(2),
+        ]
+
+        with patch("complisoc.backend.compliance.verification.GROQ_API_KEY", "fake"), patch(
+            "complisoc.backend.compliance.verification.Groq", return_value=mock_client
+        ):
+            verifier = GroqVerifier()
+            items = [
+                PendingVerification(ref=1, finding=first_finding, control=control, confidence=0.95, rationale="first"),
+                PendingVerification(ref=2, finding=second_finding, control=control, confidence=0.90, rationale="second"),
+            ]
+            result = verifier.verify_batch(items)
+
+        assert mock_client.chat.completions.create.call_count == 3
+        assert set(result) == {1, 2}
+        assert all(decision.result == "agree" for decision in result.values())
+
+    def test_verify_batch_does_not_hide_tpm_error_for_single_mapping(self, db_session):
+        from complisoc.backend.compliance.verification import GroqVerifier, PendingVerification
+
+        finding = _make_finding(db_session)
+        control = db_session.query(ControlCatalog).first()
+        mock_client = MagicMock()
+        mock_client.chat.completions.create.side_effect = RuntimeError(
+            "rate_limit_exceeded, tokens per minute: Limit 8000, Requested 8140"
+        )
+
+        with patch("complisoc.backend.compliance.verification.GROQ_API_KEY", "fake"), patch(
+            "complisoc.backend.compliance.verification.Groq", return_value=mock_client
+        ):
+            verifier = GroqVerifier()
+            item = PendingVerification(ref=1, finding=finding, control=control, confidence=0.95, rationale="test")
+            with pytest.raises(RuntimeError, match="Requested 8140"):
+                verifier.verify_batch([item])
 
     def test_verify_batch_falls_back_when_groq_reports_a_decommissioned_model(self, db_session):
         from complisoc.backend.compliance.verification import GroqVerifier, PendingVerification

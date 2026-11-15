@@ -1,120 +1,133 @@
-"""AI Load Tests
+"""Offline pipeline throughput tests with provider calls mocked.
 
-Load tests for AI endpoints to ensure they meet performance requirements.
-REQUIREMENTS.md SC-008: 500-1000 findings processed in under 30 seconds.
+These measure the real SQLite-backed Complisoc workflow, not live model
+latency or production infrastructure capacity.
 """
 from __future__ import annotations
 
-import time
-from typing import Any
+from time import perf_counter
 
-import pytest
+from complisoc.backend.compliance.workflow import process_scan_run
+from complisoc.backend.models import ScannerExecution
+
+
+def _process_batch(db, make_finding, mocked_ai_services, count: int):
+    findings = [make_finding(index) for index in range(1, count + 1)]
+    started = perf_counter()
+    result = process_scan_run(
+        db,
+        target_environment=f"ai-quality-load-{count}",
+        findings=findings,
+    )
+    elapsed = perf_counter() - started
+    assert len(result["raw_findings"]) == count
+    assert len(result["normalized_findings"]) == count
+    assert len(result["mappings"]) == count
+    return elapsed, result
 
 
 class TestAILoadRequirements:
-    """Tests for AI load requirements (SC-008)."""
+    def test_500_findings_use_real_pipeline_within_local_safety_budget(
+        self, ai_quality_db, ai_quality_finding, mocked_ai_services
+    ):
+        elapsed, _ = _process_batch(ai_quality_db, ai_quality_finding, mocked_ai_services, 500)
+        assert elapsed < 180
 
-    def test_500_findings_within_30_seconds(self):
-        """500 findings should be processed within 30 seconds."""
-        num_findings = 500
-        max_time_seconds = 30
-        # Simulate processing time (mock)
-        processing_time = num_findings * 0.01  # 10ms per finding
-        assert processing_time < max_time_seconds
+    def test_1000_findings_use_real_pipeline_within_scaled_local_safety_budget(
+        self, ai_quality_db, ai_quality_finding, mocked_ai_services
+    ):
+        elapsed, _ = _process_batch(ai_quality_db, ai_quality_finding, mocked_ai_services, 1000)
+        assert elapsed < 360
 
-    def test_1000_findings_within_30_seconds(self):
-        """1000 findings should be processed within 30 seconds."""
-        num_findings = 1000
-        max_time_seconds = 30
-        processing_time = num_findings * 0.01
-        assert processing_time < max_time_seconds
+    def test_batch_processing_persists_each_input_finding(
+        self, ai_quality_db, ai_quality_finding, mocked_ai_services
+    ):
+        _, result = _process_batch(ai_quality_db, ai_quality_finding, mocked_ai_services, 40)
+        assert len({finding.scanner_finding_id for finding in result["raw_findings"]}) == 40
 
-    def test_batch_processing_scales_linearly(self):
-        """Processing time should scale linearly with batch size."""
-        small_batch = 100
-        large_batch = 500
-        time_per_finding = 0.01
-        small_time = small_batch * time_per_finding
-        large_time = large_batch * time_per_finding
-        ratio = large_time / small_time
-        assert ratio == 5.0  # 5x findings = 5x time
+    def test_batch_processing_creates_lineage_for_each_mapping(
+        self, ai_quality_db, ai_quality_finding, mocked_ai_services
+    ):
+        _, result = _process_batch(ai_quality_db, ai_quality_finding, mocked_ai_services, 25)
+        assert {
+            mapping.normalized_finding_id for mapping in result["mappings"]
+        } == {finding.id for finding in result["normalized_findings"]}
 
-    def test_concurrent_requests_handled(self):
-        """System should handle concurrent requests."""
-        max_concurrent = 10
-        current_concurrent = 5
-        assert current_concurrent <= max_concurrent
+    def test_batch_failure_is_retained_in_pipeline_result(self, ai_quality_db):
+        result = process_scan_run(
+            ai_quality_db,
+            target_environment="ai-quality-load-failure",
+            findings=[],
+            scanner_failures=[{"scanner_name": "trivy", "error_message": "scanner unavailable"}],
+        )
+        assert result["scan_run"].status == "failed"
+        execution = ai_quality_db.query(ScannerExecution).filter_by(scanner_name="trivy").one()
+        assert execution.error_message == "scanner unavailable"
 
-    def test_queue_depth_monitored(self):
-        """Queue depth should be monitored."""
-        max_queue_depth = 100
-        current_queue_depth = 25
-        assert current_queue_depth < max_queue_depth
-
-    def test_memory_usage_within_limits(self):
-        """Memory usage should be within limits."""
-        max_memory_mb = 512
-        estimated_memory_per_finding = 0.1  # MB
-        num_findings = 1000
-        estimated_total = num_findings * estimated_memory_per_finding
-        assert estimated_total < max_memory_mb
+    def test_empty_batch_completes_without_mapping_calls(self, ai_quality_db, mocked_ai_services):
+        result = process_scan_run(ai_quality_db, target_environment="ai-quality-load-empty", findings=[])
+        assert result["scan_run"].status == "completed"
+        assert result["mappings"] == []
+        mocked_ai_services.mapper.map_batch.assert_not_called()
 
 
 class TestAIScalability:
-    """Tests for AI scalability."""
+    def test_small_batch_runs_through_pipeline(self, ai_quality_db, ai_quality_finding, mocked_ai_services):
+        _, result = _process_batch(ai_quality_db, ai_quality_finding, mocked_ai_services, 10)
+        assert len(result["mappings"]) == 10
 
-    def test_small_batch_performance(self):
-        """Small batch (10 findings) should be fast."""
-        num_findings = 10
-        max_time_seconds = 5
-        processing_time = num_findings * 0.01
-        assert processing_time < max_time_seconds
+    def test_medium_batch_runs_through_pipeline(self, ai_quality_db, ai_quality_finding, mocked_ai_services):
+        _, result = _process_batch(ai_quality_db, ai_quality_finding, mocked_ai_services, 50)
+        assert len(result["mappings"]) == 50
 
-    def test_medium_batch_performance(self):
-        """Medium batch (50 findings) should be reasonable."""
-        num_findings = 50
-        max_time_seconds = 10
-        processing_time = num_findings * 0.01
-        assert processing_time < max_time_seconds
+    def test_large_batch_runs_through_pipeline(self, ai_quality_db, ai_quality_finding, mocked_ai_services):
+        _, result = _process_batch(ai_quality_db, ai_quality_finding, mocked_ai_services, 100)
+        assert len(result["mappings"]) == 100
 
-    def test_large_batch_performance(self):
-        """Large batch (100 findings) should be acceptable."""
-        num_findings = 100
-        max_time_seconds = 15
-        processing_time = num_findings * 0.01
-        assert processing_time < max_time_seconds
+    def test_measured_throughput_uses_elapsed_pipeline_time(
+        self, ai_quality_db, ai_quality_finding, mocked_ai_services
+    ):
+        elapsed, _ = _process_batch(ai_quality_db, ai_quality_finding, mocked_ai_services, 20)
+        assert elapsed > 0
 
-    def test_throughput_minimum(self):
-        """System should maintain minimum throughput."""
-        min_throughput = 10  # findings per second
-        time_per_finding = 0.01  # 10ms
-        throughput = 1 / time_per_finding
-        assert throughput >= min_throughput
+    def test_identical_scanner_ids_are_deduplicated_by_ingestion(self, ai_quality_db, mocked_ai_services):
+        finding = {
+            "scanner_name": "checkov",
+            "scanner_finding_id": "AIQ-DUPLICATE",
+            "raw_json": {
+                "finding_type": "iam public access permission",
+                "resource_type": "aws_iam_policy",
+                "resource_identifier": "policy.duplicate",
+                "severity": "high",
+                "title": "Public IAM policy",
+                "description": "IAM policy permits public access.",
+            },
+        }
+        result = process_scan_run(
+            ai_quality_db,
+            target_environment="ai-quality-load-dedupe",
+            findings=[finding, finding],
+        )
+        assert len(result["raw_findings"]) == 1
 
-    def test_batch_size_limits(self):
-        """Batch size should have reasonable limits."""
-        max_batch_size = 100
-        min_batch_size = 1
-        assert min_batch_size <= max_batch_size
 
+class TestAIResourceBehavior:
+    def test_pipeline_returns_only_completed_mappings(self, ai_quality_db, ai_quality_finding, mocked_ai_services):
+        _, result = _process_batch(ai_quality_db, ai_quality_finding, mocked_ai_services, 5)
+        assert all(mapping.mapping_status == "published" for mapping in result["mappings"])
 
-class TestAIResourceUtilization:
-    """Tests for AI resource utilization."""
+    def test_pipeline_keeps_scanner_failures_with_findings(self, ai_quality_db, ai_quality_finding, mocked_ai_services):
+        result = process_scan_run(
+            ai_quality_db,
+            target_environment="ai-quality-load-mixed",
+            findings=[ai_quality_finding()],
+            scanner_failures=[{"scanner_name": "trivy", "error_message": "timed out"}],
+        )
+        assert len(result["raw_findings"]) == 1
+        assert result["scan_run"].status == "completed"
+        execution = ai_quality_db.query(ScannerExecution).filter_by(scanner_name="trivy").one()
+        assert execution.error_message == "timed out"
 
-    def test_api_rate_limit_compliance(self):
-        """API calls should respect rate limits."""
-        max_requests_per_minute = 60
-        current_requests = 30
-        assert current_requests <= max_requests_per_minute
-
-    def test_token_budget_compliance(self):
-        """Token usage should be within budget."""
-        max_tokens_per_request = 10000
-        estimated_tokens = 2000
-        assert estimated_tokens <= max_tokens_per_request
-
-    def test_response_size_reasonable(self):
-        """Response size should be reasonable."""
-        max_response_size_kb = 100
-        estimated_size = 10  # KB
-        assert estimated_size < max_response_size_kb
+    def test_mapping_persistence_keeps_final_confidence(self, ai_quality_db, ai_quality_finding, mocked_ai_services):
+        _, result = _process_batch(ai_quality_db, ai_quality_finding, mocked_ai_services, 3)
+        assert all(mapping.final_confidence == 0.97 for mapping in result["mappings"])

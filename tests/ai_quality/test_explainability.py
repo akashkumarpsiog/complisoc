@@ -1,289 +1,212 @@
-"""AI Explainability Tests
+"""Tests for parsing and associating explanations with audit lineage.
 
-Validates that AI decisions are explainable and the reasoning is meaningful.
-These tests ensure AI outputs include sufficient rationale for human review.
+These use controlled provider responses and do not assess live explanation
+relevance, evidentiary grounding, or semantic consistency.
 """
 from __future__ import annotations
 
-import re
-from dataclasses import dataclass
-from typing import Any
-
-import pytest
+from complisoc.backend.compliance.lineage import get_finding_lineage
+from complisoc.backend.compliance.workflow import process_scan_run
+from complisoc.backend.models import VerificationRecord
 
 
-@dataclass
-class ExplainableDecision:
-    """A decision with explainability requirements."""
-    decision: str
-    confidence: float
-    rationale: str
-    evidence: list[str]
+def _process(db, finding, provider_response_clients, target="explanation"):
+    provider_response_clients.install_pipeline_clients()
+    result = process_scan_run(
+        db,
+        target_environment=target,
+        findings=[finding],
+    )
+    normalized = result["normalized_findings"][0]
+    return result, normalized, get_finding_lineage(db, normalized.id)
 
 
-class TestExplainabilityRequirements:
-    """Tests that AI decisions meet explainability requirements."""
+class TestExplanationAssociation:
+    def test_mapper_rationale_is_parsed_and_persisted(
+        self, ai_quality_db, ai_quality_finding, provider_response_clients
+    ):
+        _, _, lineage = _process(ai_quality_db, ai_quality_finding(), provider_response_clients)
+        assert lineage["mappings"][0]["rationale"] == "The finding identifies public IAM access."
 
-    def test_rationale_present(self):
-        """Every decision must have a rationale."""
-        decision = ExplainableDecision(
-            decision="maps",
-            confidence=0.85,
-            rationale="direct match to control requirement",
-            evidence=["finding mentions access control", "control addresses access control"],
+    def test_rationale_belongs_to_selected_control_mapping(
+        self, ai_quality_db, ai_quality_finding, provider_response_clients
+    ):
+        _, _, lineage = _process(ai_quality_db, ai_quality_finding(), provider_response_clients)
+        mapping = lineage["mappings"][0]
+        assert mapping["control_id"] == "A.5.15"
+        assert mapping["rationale"]
+
+    def test_verifier_explanation_is_parsed_and_persisted(
+        self, ai_quality_db, ai_quality_finding, provider_response_clients
+    ):
+        _, _, lineage = _process(ai_quality_db, ai_quality_finding(), provider_response_clients)
+        assert lineage["mappings"][0]["verification_records"][0]["explanation"] == (
+            "The control addresses the finding's access permissions."
         )
-        assert len(decision.rationale) > 0, "Rationale must be present"
 
-    def test_rationale_minimum_length(self):
-        """Rationale must be substantive (at least 15 characters)."""
-        decision = ExplainableDecision(
-            decision="maps",
-            confidence=0.85,
-            rationale="direct match to control requirement",
-            evidence=[],
+    def test_verification_record_references_its_mapping(
+        self, ai_quality_db, ai_quality_finding, provider_response_clients
+    ):
+        result, _, lineage = _process(ai_quality_db, ai_quality_finding(), provider_response_clients)
+        mapping_id = result["mappings"][0].id
+        record = ai_quality_db.query(VerificationRecord).filter_by(control_mapping_id=mapping_id).one()
+        assert record.control_mapping_id == lineage["mappings"][0]["mapping_id"]
+
+    def test_rationale_and_verification_explanation_remain_separate(
+        self, ai_quality_db, ai_quality_finding, provider_response_clients
+    ):
+        _, _, lineage = _process(ai_quality_db, ai_quality_finding(), provider_response_clients)
+        mapping = lineage["mappings"][0]
+        assert mapping["rationale"] != mapping["verification_records"][0]["explanation"]
+
+    def test_lineage_includes_original_finding_evidence(
+        self, ai_quality_db, ai_quality_finding, provider_response_clients
+    ):
+        _, normalized, lineage = _process(ai_quality_db, ai_quality_finding(), provider_response_clients)
+        assert lineage["raw_finding"]["raw_json"]["title"] == normalized.title
+
+    def test_lineage_includes_normalized_finding(self, ai_quality_db, ai_quality_finding, provider_response_clients):
+        _, normalized, lineage = _process(ai_quality_db, ai_quality_finding(), provider_response_clients)
+        assert lineage["normalized_finding"]["id"] == normalized.id
+        assert lineage["normalized_finding"]["severity"] == "high"
+
+    def test_lineage_contains_control_title_and_id(
+        self, ai_quality_db, ai_quality_finding, provider_response_clients
+    ):
+        _, _, lineage = _process(ai_quality_db, ai_quality_finding(), provider_response_clients)
+        mapping = lineage["mappings"][0]
+        assert (mapping["control_id"], mapping["control_title"]) == ("A.5.15", "Access Control")
+
+    def test_verification_result_and_explanation_are_returned_together(
+        self, ai_quality_db, ai_quality_finding, provider_response_clients
+    ):
+        _, _, lineage = _process(ai_quality_db, ai_quality_finding(), provider_response_clients)
+        verification = lineage["mappings"][0]["verification_records"][0]
+        assert verification["result"] == "agree"
+        assert verification["explanation"]
+
+    def test_mapping_confidence_is_available_in_lineage(
+        self, ai_quality_db, ai_quality_finding, provider_response_clients
+    ):
+        _, _, lineage = _process(ai_quality_db, ai_quality_finding(), provider_response_clients)
+        mapping = lineage["mappings"][0]
+        assert mapping["gemini_confidence"] == 0.95
+        assert mapping["final_confidence"] == 0.97
+
+    def test_provider_models_are_recorded_in_lineage(
+        self, ai_quality_db, ai_quality_finding, provider_response_clients
+    ):
+        _, _, lineage = _process(ai_quality_db, ai_quality_finding(), provider_response_clients)
+        verification = lineage["mappings"][0]["verification_records"][0]
+        assert verification["verification_model"] == "mock-groq"
+
+    def test_lineage_has_scan_run_and_raw_finding_references(
+        self, ai_quality_db, ai_quality_finding, provider_response_clients
+    ):
+        _, _, lineage = _process(ai_quality_db, ai_quality_finding(), provider_response_clients)
+        assert lineage["scan_run"]["id"] is not None
+        assert lineage["raw_finding"]["scanner_finding_id"] == "AIQ-1"
+
+
+class TestExplanationAuditability:
+    def test_mapping_creation_timestamp_is_available(
+        self, ai_quality_db, ai_quality_finding, provider_response_clients
+    ):
+        _, _, lineage = _process(ai_quality_db, ai_quality_finding(), provider_response_clients)
+        assert lineage["mappings"][0]["created_at"]
+
+    def test_verification_timestamp_is_available(
+        self, ai_quality_db, ai_quality_finding, provider_response_clients
+    ):
+        _, _, lineage = _process(ai_quality_db, ai_quality_finding(), provider_response_clients)
+        assert lineage["mappings"][0]["verification_records"][0]["timestamp"]
+
+    def test_mapping_prompt_version_is_recorded(
+        self, ai_quality_db, ai_quality_finding, provider_response_clients
+    ):
+        result, _, _ = _process(ai_quality_db, ai_quality_finding(), provider_response_clients)
+        assert result["mappings"][0].prompt_version
+
+    def test_exactly_one_verification_record_is_linked(
+        self, ai_quality_db, ai_quality_finding, provider_response_clients
+    ):
+        _, _, lineage = _process(ai_quality_db, ai_quality_finding(), provider_response_clients)
+        assert len(lineage["mappings"][0]["verification_records"]) == 1
+
+    def test_rationale_is_not_attached_to_unrelated_finding(
+        self, ai_quality_db, ai_quality_finding, provider_response_clients
+    ):
+        first = ai_quality_finding(1)
+        second = ai_quality_finding(2)
+        provider_response_clients.install_pipeline_clients()
+        result = process_scan_run(
+            ai_quality_db,
+            target_environment="explanation-two-findings",
+            findings=[first, second],
         )
-        assert len(decision.rationale) >= 15, "Rationale too short"
+        first_lineage = get_finding_lineage(ai_quality_db, result["normalized_findings"][0].id)
+        second_lineage = get_finding_lineage(ai_quality_db, result["normalized_findings"][1].id)
+        assert first_lineage["mappings"][0]["mapping_id"] != second_lineage["mappings"][0]["mapping_id"]
 
-    def test_rationale_maximum_length(self):
-        """Rationale should not be excessively long (max 500 chars)."""
-        decision = ExplainableDecision(
-            decision="maps",
-            confidence=0.85,
-            rationale="a" * 500,
-            evidence=[],
+    def test_missing_rationale_parser_fallback_is_traceable(
+        self, ai_quality_db, ai_quality_finding, provider_response_clients
+    ):
+        provider_response_clients.state["gemini"] = (
+            '{"results":[{"finding_id":1,"candidates":[{"control_id":"A.5.15",'
+            '"maps":true,"confidence":0.95}]}]}'
         )
-        assert len(decision.rationale) <= 500, "Rationale too long"
+        _, _, lineage = _process(ai_quality_db, ai_quality_finding(), provider_response_clients, "explanation-no-rationale")
+        assert lineage["mappings"][0]["rationale"] == "No rationale provided by model."
 
-    def test_rationale_mentions_control(self):
-        """Rationale should reference the control being mapped to."""
-        decision = ExplainableDecision(
-            decision="maps",
-            confidence=0.85,
-            rationale="finding directly addresses AC-1 access control requirement",
-            evidence=[],
+    def test_missing_verification_explanation_parser_fallback_is_traceable(
+        self, ai_quality_db, ai_quality_finding, provider_response_clients
+    ):
+        provider_response_clients.state["groq"] = (
+            '{"results":[{"ref":1,"result":"agree"}]}'
         )
-        assert "AC-1" in decision.rationale or "access control" in decision.rationale.lower()
-
-    def test_rationale_mentions_finding(self):
-        """Rationale should reference the finding being mapped."""
-        decision = ExplainableDecision(
-            decision="maps",
-            confidence=0.85,
-            rationale="the vulnerability finding relates to access control policy",
-            evidence=[],
+        _, _, lineage = _process(ai_quality_db, ai_quality_finding(), provider_response_clients, "explanation-no-verifier-text")
+        assert lineage["mappings"][0]["verification_records"][0]["explanation"] == (
+            "No explanation provided by model."
         )
-        assert "finding" in decision.rationale.lower() or "vulnerability" in decision.rationale.lower()
 
-    def test_high_confidence_has_detailed_rationale(self):
-        """High confidence decisions should have more detailed rationale."""
-        high_conf = ExplainableDecision(
-            decision="maps",
-            confidence=0.95,
-            rationale="direct match: finding explicitly addresses the control requirement with clear evidence of coverage",
-            evidence=["finding text", "control text"],
+    def test_low_confidence_mapping_remains_explainable_in_review(
+        self, ai_quality_db, ai_quality_finding, mocked_ai_services
+    ):
+        mocked_ai_services.state.update(confidence=0.4)
+        result = process_scan_run(
+            ai_quality_db,
+            target_environment="explanation-manual-review",
+            findings=[ai_quality_finding()],
         )
-        assert len(high_conf.rationale) >= 30, "High confidence needs detailed rationale"
+        lineage = get_finding_lineage(ai_quality_db, result["normalized_findings"][0].id)
+        assert lineage["mappings"][0]["mapping_status"] == "manual_review"
+        assert lineage["mappings"][0]["rationale"]
 
-    def test_low_confidence_has_uncertainty_rationale(self):
-        """Low confidence decisions should explain uncertainty."""
-        low_conf = ExplainableDecision(
-            decision="maps",
-            confidence=0.35,
-            rationale="partial match: finding may relate to control but evidence is weak",
-            evidence=["weak connection"],
-        )
-        uncertainty_markers = ["may", "might", "partial", "uncertain", "weak", "possibly"]
-        has_uncertainty = any(m in low_conf.rationale.lower() for m in uncertainty_markers)
-        assert has_uncertainty, "Low confidence should express uncertainty"
+    def test_raw_evidence_is_unchanged_after_mapping(
+        self, ai_quality_db, ai_quality_finding, provider_response_clients
+    ):
+        finding = ai_quality_finding()
+        original = dict(finding["raw_json"])
+        result, _, _ = _process(ai_quality_db, finding, provider_response_clients)
+        assert result["raw_findings"][0].raw_json == original
 
+    def test_lineage_query_is_read_only(
+        self, ai_quality_db, ai_quality_finding, provider_response_clients
+    ):
+        result, normalized, _ = _process(ai_quality_db, ai_quality_finding(), provider_response_clients)
+        before = result["mappings"][0].rationale
+        get_finding_lineage(ai_quality_db, normalized.id)
+        ai_quality_db.expire_all()
+        assert ai_quality_db.query(type(result["mappings"][0])).one().rationale == before
 
-class TestEvidenceQuality:
-    """Tests that AI decisions include quality evidence."""
+    def test_lineage_exposes_one_mapping_for_one_test_finding(
+        self, ai_quality_db, ai_quality_finding, provider_response_clients
+    ):
+        _, _, lineage = _process(ai_quality_db, ai_quality_finding(), provider_response_clients)
+        assert len(lineage["mappings"]) == 1
 
-    def test_evidence_present_for_high_confidence(self):
-        """High confidence decisions should include evidence."""
-        decision = ExplainableDecision(
-            decision="maps",
-            confidence=0.9,
-            rationale="direct match",
-            evidence=["finding mentions 'access control'", "control requires 'access control policy'"],
-        )
-        assert len(decision.evidence) > 0, "High confidence needs evidence"
-
-    def test_evidence_relevant_to_decision(self):
-        """Evidence should be relevant to the decision."""
-        decision = ExplainableDecision(
-            decision="maps",
-            confidence=0.85,
-            rationale="direct match to access control",
-            evidence=["finding: 'weak password policy'", "control: 'AC-1 access control'"],
-        )
-        for e in decision.evidence:
-            assert len(e) > 5, "Evidence should be substantive"
-
-    def test_evidence_cites_source(self):
-        """Evidence should cite where it came from."""
-        decision = ExplainableDecision(
-            decision="maps",
-            confidence=0.85,
-            rationale="direct match",
-            evidence=["finding[0:50]: 'password policy'", "control[0:50]: 'access control'"],
-        )
-        for e in decision.evidence:
-            assert ":" in e or "[" in e, "Evidence should cite source"
-
-    def test_negative_decision_has_counter_evidence(self):
-        """Negative mappings should include counter-evidence."""
-        decision = ExplainableDecision(
-            decision="does_not_map",
-            confidence=0.15,
-            rationale="finding is about encryption, not access control",
-            evidence=["finding mentions 'AES-256'", "control requires 'access policy'"],
-        )
-        assert len(decision.evidence) > 0, "Negative decision needs evidence"
-
-
-class TestExplainabilityFormat:
-    """Tests that explanations are in a usable format."""
-
-    def test_rationale_is_readable_text(self):
-        """Rationale should be human-readable text."""
-        decision = ExplainableDecision(
-            decision="maps",
-            confidence=0.85,
-            rationale="direct match to control requirement",
-            evidence=[],
-        )
-        assert decision.rationale.strip() == decision.rationale, "No leading/trailing whitespace"
-        assert len(decision.rationale.split()) >= 3, "Rationale should be at least 3 words"
-
-    def test_rationale_no_jargon_without_context(self):
-        """Technical jargon should be explained or contextualized."""
-        decision = ExplainableDecision(
-            decision="maps",
-            confidence=0.85,
-            rationale="finding addresses AC-1 (access control policy) requirement",
-            evidence=[],
-        )
-        # If acronym is used, it should be defined
-        if "AC-" in decision.rationale:
-            assert "access control" in decision.rationale.lower()
-
-    def test_rationale_grammatically_correct(self):
-        """Rationale should be grammatically correct (basic check)."""
-        decision = ExplainableDecision(
-            decision="maps",
-            confidence=0.85,
-            rationale="The finding directly addresses the control requirement",
-            evidence=[],
-        )
-        # Basic check: starts with capital letter, ends with period
-        assert decision.rationale[0].isupper() or decision.rationale[0].isdigit()
-
-    def test_rationale_no_internal_contradiction(self):
-        """Rationale should not contradict itself."""
-        decision = ExplainableDecision(
-            decision="maps",
-            confidence=0.85,
-            rationale="direct match with strong evidence",
-            evidence=[],
-        )
-        # Should not contain both "match" and "no match"
-        assert not ("match" in decision.rationale.lower() and "no match" in decision.rationale.lower())
-
-
-class TestExplainabilityConsistency:
-    """Tests that explanations are consistent with decisions."""
-
-    def test_maps_true_rationale_positive(self):
-        """Positive mapping should have positive rationale."""
-        decision = ExplainableDecision(
-            decision="maps",
-            confidence=0.85,
-            rationale="direct match to control requirement",
-            evidence=[],
-        )
-        positive_markers = ["match", "addresses", "covers", "aligns", "directly"]
-        has_positive = any(m in decision.rationale.lower() for m in positive_markers)
-        assert has_positive, "Positive mapping should have positive rationale"
-
-    def test_maps_false_rationale_negative(self):
-        """Negative mapping should have negative rationale."""
-        decision = ExplainableDecision(
-            decision="does_not_map",
-            confidence=0.15,
-            rationale="finding does not address control requirement",
-            evidence=[],
-        )
-        negative_markers = ["not", "does not", "unrelated", "outside", "different"]
-        has_negative = any(m in decision.rationale.lower() for m in negative_markers)
-        assert has_negative, "Negative mapping should have negative rationale"
-
-    def test_confidence_rationale_consistency(self):
-        """Confidence level should match rationale tone."""
-        high_conf = ExplainableDecision(
-            decision="maps",
-            confidence=0.95,
-            rationale="direct and complete match",
-            evidence=[],
-        )
-        low_conf = ExplainableDecision(
-            decision="maps",
-            confidence=0.35,
-            rationale="partial match with uncertainty",
-            evidence=[],
-        )
-        assert high_conf.confidence > low_conf.confidence
-
-    def test_verification_agree_explanation_positive(self):
-        """Agree verification should have positive explanation."""
-        agree = ExplainableDecision(
-            decision="agree",
-            confidence=0.9,
-            rationale="mapping is correct and appropriate",
-            evidence=[],
-        )
-        assert "correct" in agree.rationale.lower() or "appropriate" in agree.rationale.lower()
-
-    def test_verification_disagree_explanation_negative(self):
-        """Disagree verification should have negative explanation."""
-        disagree = ExplainableDecision(
-            decision="disagree",
-            confidence=0.1,
-            rationale="mapping is incorrect or inappropriate",
-            evidence=[],
-        )
-        assert "incorrect" in disagree.rationale.lower() or "inappropriate" in disagree.rationale.lower()
-
-
-class TestExplainabilityAuditability:
-    """Tests that decisions can be audited."""
-
-    def test_decision_has_timestamp(self):
-        """Decisions should be timestamped for audit."""
-        from datetime import datetime
-        timestamp = datetime.utcnow().isoformat()
-        assert len(timestamp) > 0
-
-    def test_decision_has_model_version(self):
-        """Decisions should record which model made them."""
-        model_version = "gemini-2.0-flash"
-        assert len(model_version) > 0
-
-    def test_decision_has_input_reference(self):
-        """Decisions should reference the input that produced them."""
-        finding_id = 123
-        control_id = "AC-1"
-        assert finding_id > 0
-        assert len(control_id) > 0
-
-    def test_decision_chain_traceable(self):
-        """Decision chain should be traceable from input to output."""
-        chain = {
-            "input": {"finding_id": 1, "control_ids": ["AC-1", "AC-2"]},
-            "mapping": {"control_id": "AC-1", "maps": True, "confidence": 0.85},
-            "verification": {"result": "agree", "confidence": 0.9},
-            "output": {"decision": "publish", "final_confidence": 0.87},
-        }
-        assert "input" in chain
-        assert "output" in chain
+    def test_lineage_does_not_replace_provider_names_with_claimed_live_models(
+        self, ai_quality_db, ai_quality_finding, provider_response_clients
+    ):
+        _, _, lineage = _process(ai_quality_db, ai_quality_finding(), provider_response_clients)
+        assert lineage["mappings"][0]["verification_records"][0]["verification_model"] == "mock-groq"

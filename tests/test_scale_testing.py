@@ -3,11 +3,11 @@
 This file owns the scale-testing deliverables from the original Use Case
 S1-P-04 proposal §10.2 and §10.3:
 
-* precision, recall, F1, hallucination rate on the 30-mapping gold standard
+* precision, recall and F1 on the 32-case audited synthetic fixture
 * precision, recall, F1 on the expanded 100- and 500-finding benchmarks
 * F1-delta regression vs a committed JSON snapshot
 * mapping stability across repeated runs
-* end-to-end throughput at 30, 100, and 500 findings
+* end-to-end throughput at 32, 100, and 500 findings
 
 All tests run the real ``process_scan_run`` pipeline with the AI steps
 mocked by a faithful oracle so they are deterministic and CI-safe (no
@@ -48,22 +48,22 @@ from validate_mappings import (  # noqa: E402
 # Paths to the committed datasets and snapshots.
 # ---------------------------------------------------------------------------
 _BENCHMARK_DIR = pathlib.Path(__file__).resolve().parent / "benchmark"
-_GOLD_30 = _BENCHMARK_DIR / "gold_standard.json"
+_GOLD_BASE = _BENCHMARK_DIR / "gold_standard.json"
 _GOLD_100 = _BENCHMARK_DIR / "gold_standard_100.json"
 _GOLD_500 = _BENCHMARK_DIR / "gold_standard_500.json"
 _SNAPSHOT_DIR = _BENCHMARK_DIR / "snapshots"
-_SNAPSHOT_30 = _SNAPSHOT_DIR / "mvp-v1.json"
+_SNAPSHOT_BASE = _SNAPSHOT_DIR / "mvp-v1.json"
 _SNAPSHOT_100 = _SNAPSHOT_DIR / "mvp-v1-100.json"
 _SNAPSHOT_500 = _SNAPSHOT_DIR / "mvp-v1-500.json"
 
 
 # ---------------------------------------------------------------------------
-# 1. Precision / recall / F1 / hallucination rate on the 30-finding benchmark.
+# 1. Precision / recall / F1 on the 32-finding audited fixture.
 # ---------------------------------------------------------------------------
 @pytest.mark.benchmark
-def test_scale_30_mappings_precision_recall_no_hallucinations():
-    """30-finding benchmark: precision = recall = 1.0, FP = FN = 0."""
-    gold = load_gold(_GOLD_30)
+def test_scale_32_mappings_precision_recall_no_fixture_mismatches():
+    """32-finding fixture: precision = recall = 1.0, FP = FN = 0."""
+    gold = load_gold(_GOLD_BASE)
     db = build_db(gold)
     try:
         run_pipeline(db, gold)
@@ -73,8 +73,8 @@ def test_scale_30_mappings_precision_recall_no_hallucinations():
 
     metrics = evaluate(gold, predicted)
 
-    assert metrics["total_gold"] >= 30, (
-        f"Scale test requires >=30 gold mappings, got {metrics['total_gold']}"
+    assert metrics["total_gold"] == 32, (
+        f"Scale test requires 32 curated mappings, got {metrics['total_gold']}"
     )
     assert metrics["recall"] >= 1.0, f"Scale recall {metrics['recall']} < 1.0"
     assert metrics["precision"] >= 1.0, f"Scale precision {metrics['precision']} < 1.0"
@@ -89,7 +89,7 @@ def test_scale_30_mappings_precision_recall_no_hallucinations():
 @pytest.mark.benchmark
 def test_scale_mapping_stability_across_repeated_runs():
     """Two runs on the same input must produce identical TP/FP/FN counts."""
-    gold = load_gold(_GOLD_30)
+    gold = load_gold(_GOLD_BASE)
 
     db1 = build_db(gold)
     try:
@@ -125,7 +125,7 @@ def test_scale_mapping_stability_across_repeated_runs():
 @pytest.mark.parametrize(
     "gold_path,snapshot_path,expected_count",
     [
-        (_GOLD_30, _SNAPSHOT_30, 30),
+        (_GOLD_BASE, _SNAPSHOT_BASE, 32),
         (_GOLD_100, _SNAPSHOT_100, 100),
         (_GOLD_500, _SNAPSHOT_500, 500),
     ],
@@ -181,13 +181,13 @@ def test_scale_f1_delta_against_committed_snapshot(
 
 
 # ---------------------------------------------------------------------------
-# 4. End-to-end throughput at 30, 100, and 500 findings.
+# 4. End-to-end throughput at 32, 100, and 500 findings.
 #
 # Proposal §10.2 commits to "<30s for 500-1000 findings end-to-end".
 # Measured on the developer box that produced these numbers (Windows,
 # Python 3.12, in-memory SQLite, no AI calls — oracle-only):
 #
-#     30  ->  ~25s
+#     32  ->  ~25s
 #     100 ->  ~30s
 #     500 ->  ~70s
 #
@@ -200,7 +200,7 @@ def test_scale_f1_delta_against_committed_snapshot(
 # before claiming the proposal target.
 # ---------------------------------------------------------------------------
 _PERF_BASELINE_SECONDS = {
-    30: 45.0,   # 30 findings must complete in < 45s
+    32: 45.0,   # 32 findings must complete in < 45s
     100: 60.0,  # 100 findings must complete in < 60s
     500: 120.0, # 500 findings must complete in < 120s (under 2x proposal ceiling)
 }
@@ -210,7 +210,7 @@ _PERF_BASELINE_SECONDS = {
 # box, but the test will assert it via a separate "target" run when
 # the env var PERF_TIGHT=1 is set.
 _PROPOSAL_CEILING_SECONDS = {
-    30: 15.0,   # 30 findings target: < 15s
+    32: 15.0,   # 32 findings target: < 15s
     100: 20.0,  # 100 findings target: < 20s
     500: 30.0,  # 500 findings target: < 30s (proposal §10.2 ceiling)
 }
@@ -232,7 +232,7 @@ def _time_pipeline(gold_path: pathlib.Path) -> float:
 @pytest.mark.parametrize(
     "gold_path,expected_count",
     [
-        (_GOLD_30, 30),
+        (_GOLD_BASE, 32),
         (_GOLD_100, 100),
         (_GOLD_500, 500),
     ],
@@ -268,7 +268,7 @@ def test_scale_throughput_at_size(gold_path, expected_count):
 @pytest.mark.parametrize(
     "gold_path,expected_count",
     [
-        (_GOLD_30, 30),
+        (_GOLD_BASE, 32),
         (_GOLD_100, 100),
         (_GOLD_500, 500),
     ],
@@ -295,7 +295,7 @@ def test_scale_throughput_meets_proposal_ceiling(gold_path, expected_count):
 # ---------------------------------------------------------------------------
 def test_snapshot_helpers_round_trip(tmp_path):
     """write_snapshot + load_snapshot must round-trip the predictions."""
-    gold = load_gold(_GOLD_30)
+    gold = load_gold(_GOLD_BASE)
     db = build_db(gold)
     try:
         run_pipeline(db, gold)

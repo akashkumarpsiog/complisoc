@@ -164,7 +164,7 @@ def test_process_scan_run_creates_full_lineage(db_session):
     assert manual_review.groq_agreement_value == pytest.approx(0.0)
 
 
-def test_groq_verifies_a_gemini_rejected_candidate(db_session):
+def test_gemini_rejected_candidate_skips_groq_verification(db_session):
     with patch("complisoc.backend.compliance.langchain_pipeline.GeminiMapper") as MockMapper, patch(
         "complisoc.backend.compliance.langchain_pipeline.GroqVerifier"
     ) as MockVerifier:
@@ -178,17 +178,17 @@ def test_groq_verifies_a_gemini_rejected_candidate(db_session):
                 )
             ]
         }
-        MockVerifier.return_value.verify_batch.return_value = {
-            1: VerificationDecision(result="disagree", agreement_value=0.0, explanation="Independent rejection")
-        }
 
         process_scan_run(db_session, target_environment="aws-iac", findings=[high_signal_finding()])
 
     mapping = db_session.query(ControlMapping).one()
-    assert MockVerifier.return_value.verify_batch.call_count == 1
-    assert mapping.verification_status == "disagree"
-    assert mapping.groq_agreement_value == pytest.approx(0.0)
+    # Groq verifier should NOT be called when Gemini rejects the mapping
+    assert MockVerifier.return_value.verify_batch.call_count == 0
+    assert mapping.verification_status is None
+    assert mapping.groq_agreement_value is None
     assert mapping.mapping_status == "manual_review"
+    assert mapping.gemini_confidence == pytest.approx(0.1)
+    assert mapping.final_confidence == pytest.approx(0.1)
 
 
 def test_api_scan_run_and_reports(client):

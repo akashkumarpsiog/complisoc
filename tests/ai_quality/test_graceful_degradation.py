@@ -1,189 +1,213 @@
-"""Enhanced Graceful Degradation Tests
-
-Tests that the system degrades gracefully when AI services are unavailable,
-rate-limited, or return errors. These tests ensure the pipeline continues
-to function (with reduced quality) rather than failing completely.
-"""
+"""Provider-failure tests against the real persistence workflow."""
 from __future__ import annotations
 
-from dataclasses import dataclass
-from typing import Any
+import json
 
-import pytest
+from complisoc.backend.compliance import langchain_pipeline, mapping as mapping_module
+from complisoc.backend.compliance import verification as verification_module
+from complisoc.backend.compliance.mapping import CandidateDecision
+from complisoc.backend.compliance.workflow import process_scan_run
 
 
-@dataclass
-class DegradationScenario:
-    """A scenario for graceful degradation testing."""
-    name: str
-    gemini_available: bool
-    groq_available: bool
-    expected_outcome: str
-    description: str
+def _run(db, finding, mocked_ai_services, target="ai-quality-degradation"):
+    return process_scan_run(db, target_environment=target, findings=[finding])
 
 
 class TestGracefulDegradation:
-    """Tests for graceful degradation when AI services are unavailable."""
+    def test_available_providers_publish_through_full_pipeline(
+        self, ai_quality_db, ai_quality_finding, mocked_ai_services
+    ):
+        result = _run(ai_quality_db, ai_quality_finding(), mocked_ai_services, "degradation-available")
+        assert result["mappings"][0].mapping_status == "published"
+        assert result["mappings"][0].verification_status == "agree"
 
-    SCENARIOS = [
-        DegradationScenario("both_available", True, True, "full_ai", "Both AI services available"),
-        DegradationScenario("gemini_only", True, False, "gemini_only", "Only Gemini available"),
-        DegradationScenario("groq_only", False, True, "groq_only", "Only Groq available"),
-        DegradationScenario("both_unavailable", False, False, "manual_review", "Both AI services unavailable"),
-    ]
+    def test_gemini_unavailable_queues_mapping_for_review(
+        self, ai_quality_db, ai_quality_finding, mocked_ai_services, monkeypatch
+    ):
+        def unavailable():
+            raise RuntimeError("GEMINI_API_KEY is not configured")
 
-    def test_both_available_full_pipeline(self):
-        """When both services available, full AI pipeline runs."""
-        scenario = self.SCENARIOS[0]
-        assert scenario.gemini_available and scenario.groq_available
-        assert scenario.expected_outcome == "full_ai"
+        monkeypatch.setattr(langchain_pipeline, "GeminiMapper", unavailable)
+        result = _run(ai_quality_db, ai_quality_finding(), mocked_ai_services, "degradation-no-gemini")
+        assert result["mappings"][0].mapping_status == "manual_review"
+        assert result["review_items"][0].review_reason_code == "AI_MAPPER_FAILURE"
 
-    def test_gemini_unavailable_fallback(self):
-        """When Gemini unavailable, findings go to manual review."""
-        scenario = self.SCENARIOS[1]
-        assert scenario.gemini_available and not scenario.groq_available
-        assert scenario.expected_outcome == "gemini_only"
+    def test_gemini_timeout_does_not_persist_success(
+        self, ai_quality_db, ai_quality_finding, mocked_ai_services
+    ):
+        mocked_ai_services.mapper.map_batch.side_effect = TimeoutError("provider timeout")
+        result = _run(ai_quality_db, ai_quality_finding(), mocked_ai_services, "degradation-gemini-timeout")
+        assert result["mappings"][0].mapping_status == "manual_review"
+        assert result["mappings"][0].gemini_confidence is None
 
-    def test_groq_unavailable_uses_gemini_only(self):
-        """When Groq unavailable, only Gemini confidence is used."""
-        scenario = self.SCENARIOS[2]
-        assert not scenario.gemini_available and scenario.groq_available
-        assert scenario.expected_outcome == "groq_only"
+    def test_gemini_malformed_json_is_handled_by_pipeline(
+        self, ai_quality_db, ai_quality_finding, provider_response_clients, monkeypatch
+    ):
+        provider_response_clients.state["gemini"] = "{invalid"
+        provider_response_clients.install_pipeline_clients()
+        monkeypatch.setattr(mapping_module, "call_with_retry", lambda fn, **_: fn())
+        result = process_scan_run(
+            ai_quality_db,
+            target_environment="degradation-gemini-json",
+            findings=[ai_quality_finding()],
+        )
+        assert result["mappings"][0].mapping_status == "manual_review"
 
-    def test_both_unavailable_manual_review(self):
-        """When both unavailable, all findings go to manual review."""
-        scenario = self.SCENARIOS[3]
-        assert not scenario.gemini_available and not scenario.groq_available
-        assert scenario.expected_outcome == "manual_review"
+    def test_partial_gemini_batch_keeps_missing_finding_in_review(
+        self, ai_quality_db, ai_quality_finding, mocked_ai_services
+    ):
+        def partial(items):
+            finding, candidates = items[0]
+            return {
+                finding.id: [
+                    CandidateDecision(
+                        control_id=candidates[0].control_catalog.control_id,
+                        maps=True,
+                        confidence=0.95,
+                        rationale="controlled provider response",
+                    )
+                ]
+            }
 
-    def test_scenarios_cover_all_combinations(self):
-        """All availability combinations should be covered."""
-        assert len(self.SCENARIOS) == 4
-
-
-class TestAIServiceFailureModes:
-    """Tests for various AI service failure modes."""
-
-    def test_gemini_timeout_handled(self):
-        """Gemini timeout should be handled gracefully."""
-        error = TimeoutError("Gemini request timed out")
-        assert isinstance(error, TimeoutError)
-        fallback = "manual_review"
-        assert fallback is not None
-
-    def test_gemini_invalid_response_handled(self):
-        """Gemini returning invalid JSON should be handled."""
-        invalid_response = "not valid JSON"
-        try:
-            import json
-            json.loads(invalid_response)
-            parsed = True
-        except Exception:
-            parsed = False
-        assert not parsed
-        action = "retry_or_fallback"
-        assert action is not None
-
-    def test_groq_timeout_handled(self):
-        """Groq timeout should be handled."""
-        error = TimeoutError("Groq request timed out")
-        assert isinstance(error, TimeoutError)
-
-    def test_groq_model_unavailable_handled(self):
-        """Groq model retired/unavailable should use fallback."""
-        available_models = ["llama-3.3-70b", "mixtral-8x7b"]
-        primary_model = "llama-3.3-70b"
-        if primary_model not in available_models:
-            fallback = available_models[0]
-        else:
-            fallback = primary_model
-        assert fallback in available_models
-
-    def test_groq_invalid_json_handled(self):
-        """Groq returning invalid JSON should be handled."""
-        invalid_response = "{invalid}"
-        try:
-            import json
-            json.loads(invalid_response)
-            parsed = True
-        except Exception:
-            parsed = False
-        assert not parsed
-
-    def test_partial_batch_failure_handled(self):
-        """Partial failure in batch should not fail entire batch."""
-        batch_results = [
-            {"finding_id": 1, "success": True},
-            {"finding_id": 2, "success": False},
-            {"finding_id": 3, "success": True},
+        mocked_ai_services.mapper.map_batch.side_effect = partial
+        result = process_scan_run(
+            ai_quality_db,
+            target_environment="degradation-partial-gemini",
+            findings=[ai_quality_finding(1), ai_quality_finding(2)],
+        )
+        assert sorted(mapping.mapping_status for mapping in result["mappings"]) == [
+            "manual_review",
+            "published",
         ]
-        successful = [r for r in batch_results if r["success"]]
-        failed = [r for r in batch_results if not r["success"]]
-        assert len(successful) == 2
-        assert len(failed) == 1
+
+    def test_empty_gemini_results_are_not_treated_as_success(
+        self, ai_quality_db, ai_quality_finding, mocked_ai_services
+    ):
+        mocked_ai_services.mapper.map_batch.side_effect = None
+        mocked_ai_services.mapper.map_batch.return_value = {}
+        result = _run(ai_quality_db, ai_quality_finding(), mocked_ai_services, "degradation-empty-gemini")
+        assert result["mappings"][0].mapping_status == "manual_review"
+        assert result["review_items"][0].review_reason_code == "AI_MAPPER_FAILURE"
+
+    def test_groq_unavailable_forces_manual_review_even_with_high_gemini_confidence(
+        self, ai_quality_db, ai_quality_finding, mocked_ai_services, monkeypatch
+    ):
+        def unavailable(*args, **kwargs):
+            raise RuntimeError("GROQ_API_KEY is not configured")
+
+        monkeypatch.setattr(langchain_pipeline, "GroqVerifier", unavailable)
+        result = _run(ai_quality_db, ai_quality_finding(), mocked_ai_services, "degradation-no-groq")
+        assert result["mappings"][0].gemini_confidence == 0.95
+        assert result["mappings"][0].mapping_status == "manual_review"
+        assert result["review_items"][0].review_reason_code == "AI_VERIFIER_FAILURE"
+
+    def test_groq_timeout_forces_manual_review(self, ai_quality_db, ai_quality_finding, mocked_ai_services):
+        mocked_ai_services.verifier.verify_batch.side_effect = TimeoutError("provider timeout")
+        result = _run(ai_quality_db, ai_quality_finding(), mocked_ai_services, "degradation-groq-timeout")
+        assert result["mappings"][0].mapping_status == "manual_review"
+        assert result["mappings"][0].verification_status == "failed"
+
+    def test_groq_malformed_json_forces_manual_review(
+        self, ai_quality_db, ai_quality_finding, provider_response_clients, monkeypatch
+    ):
+        provider_response_clients.state["groq"] = "{invalid"
+        provider_response_clients.install_pipeline_clients()
+        monkeypatch.setattr(verification_module, "call_with_retry", lambda fn, **_: fn())
+        result = process_scan_run(
+            ai_quality_db,
+            target_environment="degradation-groq-json",
+            findings=[ai_quality_finding()],
+        )
+        assert result["mappings"][0].mapping_status == "manual_review"
+
+    def test_groq_invalid_result_forces_manual_review(
+        self, ai_quality_db, ai_quality_finding, provider_response_clients, monkeypatch
+    ):
+        response = json.loads(provider_response_clients.state["groq"])
+        response["results"][0]["result"] = "unknown"
+        provider_response_clients.state["groq"] = json.dumps(response)
+        provider_response_clients.install_pipeline_clients()
+        monkeypatch.setattr(verification_module, "call_with_retry", lambda fn, **_: fn())
+        result = process_scan_run(
+            ai_quality_db,
+            target_environment="degradation-groq-invalid-result",
+            findings=[ai_quality_finding()],
+        )
+        assert result["mappings"][0].mapping_status == "manual_review"
 
 
 class TestPartialResults:
-    """Tests for handling partial results from AI services."""
+    def test_missing_verifier_result_is_manual_review(
+        self, ai_quality_db, ai_quality_finding, mocked_ai_services
+    ):
+        mocked_ai_services.verifier.verify_batch.side_effect = None
+        mocked_ai_services.verifier.verify_batch.return_value = {}
+        result = _run(ai_quality_db, ai_quality_finding(), mocked_ai_services, "degradation-no-verdict")
+        assert result["mappings"][0].verification_status == "failed"
+        assert result["mappings"][0].mapping_status == "manual_review"
 
-    def test_partial_gemini_results_accepted(self):
-        """Partial Gemini results should be accepted."""
-        expected_count = 10
-        returned_count = 7
-        assert returned_count < expected_count
-        processed = returned_count
-        assert processed == 7
+    def test_missing_verifier_result_creates_review_item(
+        self, ai_quality_db, ai_quality_finding, mocked_ai_services
+    ):
+        mocked_ai_services.verifier.verify_batch.side_effect = None
+        mocked_ai_services.verifier.verify_batch.return_value = {}
+        result = _run(ai_quality_db, ai_quality_finding(), mocked_ai_services, "degradation-no-verdict-item")
+        assert result["review_items"][0].review_reason_code == "AI_VERIFIER_FAILURE"
 
-    def test_partial_groq_results_accepted(self):
-        """Partial Groq results should be accepted."""
-        expected_count = 10
-        returned_count = 8
-        assert returned_count < expected_count
+    def test_two_findings_keep_separate_mapping_rows(
+        self, ai_quality_db, ai_quality_finding, mocked_ai_services
+    ):
+        result = process_scan_run(
+            ai_quality_db,
+            target_environment="degradation-two-findings",
+            findings=[ai_quality_finding(1), ai_quality_finding(2)],
+        )
+        assert len(result["mappings"]) == 2
+        assert len({mapping.normalized_finding_id for mapping in result["mappings"]}) == 2
 
-    def test_missing_results_flagged_for_retry(self):
-        """Missing results should be flagged for retry."""
-        all_ids = [1, 2, 3, 4, 5]
-        processed_ids = [1, 2, 3]
-        missing_ids = [id for id in all_ids if id not in processed_ids]
-        assert missing_ids == [4, 5]
+    def test_findings_remain_persisted_after_gemini_failure(
+        self, ai_quality_db, ai_quality_finding, mocked_ai_services
+    ):
+        mocked_ai_services.mapper.map_batch.side_effect = RuntimeError("provider unavailable")
+        result = _run(ai_quality_db, ai_quality_finding(), mocked_ai_services, "degradation-retain-finding")
+        assert len(result["raw_findings"]) == 1
+        assert len(result["normalized_findings"]) == 1
 
+    def test_no_findings_does_not_invoke_provider(self, ai_quality_db, mocked_ai_services):
+        result = process_scan_run(ai_quality_db, target_environment="degradation-empty-input", findings=[])
+        assert result["scan_run"].status == "completed"
+        mocked_ai_services.mapper.map_batch.assert_not_called()
+        mocked_ai_services.verifier.verify_batch.assert_not_called()
 
-class TestRetryBehavior:
-    """Tests for retry behavior on transient failures."""
+    def test_scanner_failure_is_recorded_without_success_shaped_mapping(self, ai_quality_db):
+        result = process_scan_run(
+            ai_quality_db,
+            target_environment="degradation-scanner-failure",
+            findings=[],
+            scanner_failures=[{"scanner_name": "trivy", "error_message": "timeout"}],
+        )
+        assert result["scan_run"].status == "failed"
+        assert result["mappings"] == []
 
-    def test_transient_error_retried(self):
-        """Transient errors should be retried."""
-        max_retries = 3
-        attempt = 0
-        success = False
-        while not success and attempt < max_retries:
-            attempt += 1
-            if attempt == max_retries:
-                success = True
-        assert attempt == max_retries
+    def test_both_providers_unavailable_preserve_finding_and_manual_review(
+        self, ai_quality_db, ai_quality_finding, monkeypatch
+    ):
+        def unavailable(*args, **kwargs):
+            raise RuntimeError("provider unavailable")
 
-    def test_permanent_error_not_retried(self):
-        """Permanent errors should not be retried."""
-        status_code = 400
-        if status_code >= 400 and status_code < 500:
-            retry = False
-        else:
-            retry = True
-        assert not retry
+        monkeypatch.setattr(langchain_pipeline, "GeminiMapper", unavailable)
+        monkeypatch.setattr(langchain_pipeline, "GroqVerifier", unavailable)
+        result = process_scan_run(
+            ai_quality_db,
+            target_environment="degradation-both-unavailable",
+            findings=[ai_quality_finding()],
+        )
+        assert result["mappings"][0].mapping_status == "manual_review"
+        assert len(result["raw_findings"]) == 1
 
-    def test_retry_with_backoff(self):
-        """Retries should use exponential backoff."""
-        base_delay = 1.0
-        attempt = 3
-        delay = min(base_delay * (2 ** attempt), 60.0)
-        assert delay == 8.0
-
-    def test_retry_preserves_original_request(self):
-        """Retry should preserve original request data."""
-        original_request = {
-            "finding_id": 1,
-            "candidates": ["AC-1", "AC-2"],
-            "timestamp": "2024-01-01T00:00:00Z",
-        }
-        retry_request = original_request.copy()
-        assert retry_request == original_request
+    def test_provider_failure_is_reported_in_pipeline_result(
+        self, ai_quality_db, ai_quality_finding, mocked_ai_services
+    ):
+        mocked_ai_services.mapper.map_batch.side_effect = RuntimeError("provider unavailable")
+        result = _run(ai_quality_db, ai_quality_finding(), mocked_ai_services, "degradation-reported-error")
+        assert any("provider unavailable" in item["error_message"] for item in result["failures"])

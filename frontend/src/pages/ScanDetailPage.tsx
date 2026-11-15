@@ -5,7 +5,7 @@ import { useResource } from "../hooks/useResource";
 import type { AuditBundle, BulkReviewDecision, ComplianceReport, ControlMapping, NormalizedFinding, ReviewQueueItem, ScanRun, ScanRunSummary, ScannerExecution, VerificationRecord } from "../types";
 import { Detail } from "../components/Detail";
 import { ResourceBoundary } from "../components/ResourceBoundary";
-import { DataTable, EmptyState, LoadingState, MetricCard, Section, StatusBadge } from "../components/Primitives";
+import { DataTable, EmptyState, LoadingState, MappingStatusLegend, MetricCard, Section, StatusBadge } from "../components/Primitives";
 import { formatDate, formatPercent, severityOrder } from "../utils/format";
 
 const TABS = [
@@ -117,7 +117,7 @@ function SummaryTab({ summary, scanRun }: { summary: ScanRunSummary | undefined 
     trivy: "Trivy (local vulns)",
     sonarqube: "SonarQube (local static)",
     defender: "Azure Defender (live cloud)",
-    manual: "Manual / sample",
+    manual: "Manual",
   };
 
   return (
@@ -137,9 +137,7 @@ function SummaryTab({ summary, scanRun }: { summary: ScanRunSummary | undefined 
               <div key={execution.id} className="flex items-center justify-between rounded-xl border border-line bg-white px-4 py-2.5 text-sm">
                 <span className="font-medium text-ink">{SOURCE_LABELS[execution.scanner_name] ?? execution.scanner_name}</span>
                 {execution.status === "failed" ? (
-                  <span className="text-xs font-semibold text-danger" title={execution.error_message ?? undefined}>
-                    Failed{execution.error_message ? `: ${execution.error_message.slice(0, 120)}` : ""}
-                  </span>
+                  <span className="text-xs font-semibold text-danger">Failed</span>
                 ) : (
                   <span className="text-xs font-semibold text-success">Ran</span>
                 )}
@@ -152,7 +150,7 @@ function SummaryTab({ summary, scanRun }: { summary: ScanRunSummary | undefined 
   );
 }
 
-function FindingsTab({
+export function FindingsTab({
   findings,
   resource,
   onRefresh,
@@ -205,36 +203,41 @@ function FindingsTab({
       <ResourceBoundary resource={{ ...resource, data: filtered }}>
         {(data) => (
           <DataTable
-            columns={["ID", "Severity", "Scanner", "Resource", "Title", "Description", "Details"]}
+            columns={["ID", "Severity", "Scanner", "Resource", "Title", "Description"]}
             rows={data.map((finding) => {
               const description = finding.description || "No description";
-              const isDefender = finding.scanner_name === "defender";
-              const meta = (finding.metadata_json || {}) as Record<string, unknown>;
               return [
                 finding.id,
                 <StatusBadge value={finding.severity} />,
                 finding.scanner_name,
-                finding.resource_identifier,
+                <span className="block whitespace-normal break-all" title={finding.resource_identifier}>{finding.resource_identifier}</span>,
                 finding.title,
-                <span className="block max-w-full truncate text-muted" title={description}>{description}</span>,
-                isDefender ? (
-                  <button className="whitespace-nowrap text-sm font-semibold text-brand-600 hover:text-brand-700 transition-colors duration-150" onClick={() => toggle(finding.id)}>
-                    {expanded.has(finding.id) ? "Hide" : "Show"} details
-                  </button>
-                ) : null,
+                <button
+                  className={`block w-full whitespace-normal text-left text-muted hover:text-brand-700 transition-colors duration-150 ${expanded.has(finding.id) ? "" : "line-clamp-2"}`}
+                  aria-expanded={expanded.has(finding.id)}
+                  onClick={() => toggle(finding.id)}
+                >
+                  {description}
+                </button>,
               ];
             })}
             expandableRows={data.map((finding) => {
-              if (finding.scanner_name !== "defender" || !expanded.has(finding.id)) return null;
+              if (!expanded.has(finding.id)) return null;
               const meta = (finding.metadata_json || {}) as Record<string, unknown>;
+              const description = finding.description || "No description";
+              const isDefender = finding.scanner_name === "defender";
               const alertType = typeof meta.alertType === "string" ? meta.alertType : typeof meta.assessmentType === "string" ? meta.assessmentType : null;
               const resourceType = typeof meta.resourceType === "string" ? meta.resourceType : typeof meta.resource_type === "string" ? meta.resource_type : null;
               const remediationSteps = typeof meta.remediationSteps === "string" ? meta.remediationSteps : null;
               return (
                 <div key={finding.id} className="space-y-2 text-sm text-ink/90">
-                  {alertType ? <div><span className="font-semibold text-ink">Type:</span> {alertType}</div> : null}
-                  {resourceType ? <div><span className="font-semibold text-ink">Resource type:</span> {resourceType}</div> : null}
-                  {remediationSteps ? <div><span className="font-semibold text-ink">Remediation:</span> {remediationSteps}</div> : null}
+                  <div>
+                    <span className="font-semibold text-ink">Description:</span>
+                    <p className="mt-1 whitespace-pre-wrap break-words text-muted">{description}</p>
+                  </div>
+                  {isDefender && alertType ? <div><span className="font-semibold text-ink">Type:</span> {alertType}</div> : null}
+                  {isDefender && resourceType ? <div><span className="font-semibold text-ink">Resource type:</span> {resourceType}</div> : null}
+                  {isDefender && remediationSteps ? <div><span className="font-semibold text-ink">Remediation:</span> {remediationSteps}</div> : null}
                 </div>
               );
             })}
@@ -276,6 +279,7 @@ function MappingsTab({ mappings, resource, scanRunId }: { mappings: ControlMappi
   return (
     <div>
       <Section title="Mappings" description="Findings mapped to compliance controls for this scan.">
+        <MappingStatusLegend />
         <ResourceBoundary resource={{ ...resource, data: mappings }}>
           {(data) => (
             <DataTable
@@ -350,7 +354,7 @@ function MappingsTab({ mappings, resource, scanRunId }: { mappings: ControlMappi
             <Detail label="Gemini Score" value={formatPercent(selected.gemini_confidence)} />
             <Detail label="Groq Score" value={formatPercent(selected.groq_agreement_value)} />
             <Detail label="Final Confidence" value={formatPercent(selected.final_confidence)} />
-            <Detail label="AI Verdict" value={<StatusBadge value={selected.mapping_status} />} />
+            <Detail label="Outcome" value={<StatusBadge value={selected.mapping_status} />} />
             <Detail label="Model" value={selected.mapping_model} />
             <Detail label="Rationale" value={selected.rationale || "n/a"} />
             <h3 className="pt-3 text-sm font-bold text-ink border-t border-line mt-2">Verification</h3>

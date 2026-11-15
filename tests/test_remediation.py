@@ -165,14 +165,14 @@ def _evaluate_rubric(steps, finding_title, control_id, resource):
 
 SAMPLES = [
     ("IAM public access", "A.5.15", "aws_iam_policy.public_access"),
-    ("Unencrypted S3 bucket", "A.8.1", "aws_s3_bucket.unencrypted"),
-    ("KMS key not rotated", "A.8.2", "aws_kms_key.old_key"),
-    ("CloudTrail logging disabled", "A.9.1", "aws_cloudtrail.disabled"),
-    ("Open security group port", "A.12.1", "aws_security_group.sg_80"),
-    ("No backup policy", "A.13.1", "aws_rds_instance.no_backup"),
+    ("Unencrypted S3 bucket", "A.8.24", "aws_s3_bucket.unencrypted"),
+    ("KMS key not rotated", "A.8.24", "aws_kms_key.old_key"),
+    ("CloudTrail logging disabled", "A.8.15", "aws_cloudtrail.disabled"),
+    ("Open security group port", "A.8.20", "aws_security_group.sg_80"),
+    ("No backup policy", "A.8.13", "aws_rds_instance.no_backup"),
     ("Privileged IAM role", "A.5.18", "aws_iam_role.privileged"),
     ("Vulnerable npm dependency", "A.8.8", "npm_package.lodash_old"),
-    ("Weak MFA policy", "A.5.17", "aws_iam_user.no_mfa"),
+    ("Weak MFA policy", "A.8.5", "aws_iam_user.no_mfa"),
     ("EC2 instance not hardened", "A.8.9", "aws_ec2_instance.default"),
 ]
 

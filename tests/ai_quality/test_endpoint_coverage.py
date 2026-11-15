@@ -1,303 +1,297 @@
-"""Tests for Missing AI-Related Endpoints
-
-Tests for endpoints that were missing test coverage:
-- POST /api/v1/scans (full scan pipeline)
-- GET /api/v1/scan-runs/{id}/drift
-- GET /api/v1/findings/{id}/lineage
-- POST /api/v1/reports/scenario
-"""
+"""HTTP integration tests against the documented FastAPI routes."""
 from __future__ import annotations
 
-from typing import Any
-from unittest.mock import MagicMock, patch
+from complisoc.backend.models import ControlCatalog, ReviewQueueItem
 
-import pytest
-
-
-class TestScanPipelineEndpoint:
-    """Tests for POST /api/v1/scans endpoint."""
-
-    def test_scan_requires_target_environment(self):
-        """Scan request should require target_environment."""
-        required_fields = ["target_environment"]
-        payload = {"target_environment": "production"}
-        missing = [f for f in required_fields if f not in payload]
-        assert len(missing) == 0
-
-    def test_scan_accepts_findings(self):
-        """Scan request should accept findings list."""
-        payload = {
-            "target_environment": "production",
-            "findings": [
-                {"title": "finding1", "severity": "high"},
-                {"title": "finding2", "severity": "medium"},
-            ],
-        }
-        assert len(payload["findings"]) == 2
-
-    def test_scan_accepts_scanner_failures(self):
-        """Scan request should accept scanner failures."""
-        payload = {
-            "target_environment": "production",
-            "findings": [],
-            "scanner_failures": [
-                {"scanner_name": "trivy", "error_message": "timeout"},
-            ],
-        }
-        assert len(payload["scanner_failures"]) == 1
-
-    def test_scan_empty_findings_handled(self):
-        """Scan with empty findings should be handled."""
-        payload = {"target_environment": "production", "findings": []}
-        if not payload["findings"]:
-            result = {"status": "no_findings", "scan_run_id": 1}
-        assert result["status"] == "no_findings"
-
-    def test_scan_returns_scan_run(self):
-        """Scan should return a scan run object."""
-        response = {
-            "id": 1,
-            "target_environment": "production",
-            "status": "running",
-        }
-        assert response["id"] > 0
-        assert response["status"] in ("created", "running", "completed", "failed")
+_API = "/api/v1"
 
 
-class TestDriftEndpoint:
-    """Tests for GET /api/v1/scan-runs/{id}/drift endpoint."""
-
-    def test_drift_requires_scan_run_id(self):
-        """Drift endpoint should require scan_run_id."""
-        scan_run_id = 1
-        assert scan_run_id > 0
-
-    def test_drift_accepts_compare_to(self):
-        """Drift endpoint should accept compare_to parameter."""
-        scan_run_id = 2
-        compare_to = 1
-        assert scan_run_id > compare_to
-
-    def test_drift_response_structure(self):
-        """Drift response should have expected structure."""
-        response = {
-            "added_findings": [{"id": 3, "title": "new finding"}],
-            "removed_findings": [{"id": 1, "title": "old finding"}],
-            "common_findings": [{"id": 2, "title": "same finding"}],
-            "severity_changes": [],
-        }
-        assert "added_findings" in response
-        assert "removed_findings" in response
-        assert "common_findings" in response
-
-    def test_drift_empty_when_no_previous(self):
-        """Drift should be empty when no previous scan."""
-        response = {
-            "added_findings": [{"id": 1}, {"id": 2}],
-            "removed_findings": [],
-            "common_findings": [],
-        }
-        assert len(response["added_findings"]) == 2
-        assert len(response["removed_findings"]) == 0
-
-    def test_detects_new_findings(self):
-        """Drift should detect new findings."""
-        previous = [{ "id": 1}, {"id": 2}]
-        current = [{"id": 1}, {"id": 2}, {"id": 3}]
-        previous_ids = {f["id"] for f in previous}
-        new_findings = [f for f in current if f["id"] not in previous_ids]
-        assert len(new_findings) == 1
-        assert new_findings[0]["id"] == 3
-
-    def test_detects_removed_findings(self):
-        """Drift should detect removed findings."""
-        previous = [{"id": 1}, {"id": 2}, {"id": 3}]
-        current = [{"id": 1}, {"id": 3}]
-        current_ids = {f["id"] for f in current}
-        removed = [f for f in previous if f["id"] not in current_ids]
-        assert len(removed) == 1
-        assert removed[0]["id"] == 2
+def _create_scan(client, finding, target="api-quality"):
+    response = client.post(
+        f"{_API}/scan-runs",
+        json={"target_environment": target, "findings": [finding]},
+    )
+    assert response.status_code == 201
+    return response.json()
 
 
-class TestLineageEndpoint:
-    """Tests for GET /api/v1/findings/{id}/lineage endpoint."""
-
-    def test_lineage_requires_finding_id(self):
-        """Lineage endpoint should require finding_id."""
-        finding_id = 1
-        assert finding_id > 0
-
-    def test_lineage_response_structure(self):
-        """Lineage response should have expected structure."""
-        response = {
-            "scan_run": {"id": 1, "target_environment": "production"},
-            "raw_finding": {"id": 10, "scanner_finding_id": "SCAN-001"},
-            "normalized_finding": {"id": 100, "title": "Weak password"},
-            "mappings": [
-                {
-                    "mapping_id": 1,
-                    "control_id": "AC-1",
-                    "mapping_status": "published",
-                    "final_confidence": 0.85,
-                }
-            ],
-        }
-        assert "scan_run" in response
-        assert "raw_finding" in response
-        assert "normalized_finding" in response
-        assert "mappings" in response
-
-    def test_lineage_includes_verification_records(self):
-        """Lineage should include verification records for each mapping."""
-        mapping = {
-            "mapping_id": 1,
-            "verification_records": [
-                {"id": 1, "result": "agree", "explanation": "correct"},
-            ],
-        }
-        assert len(mapping["verification_records"]) > 0
-
-    def test_lineage_empty_mappings(self):
-        """Lineage with no mappings should return empty list."""
-        response = {
-            "scan_run": {"id": 1},
-            "raw_finding": {"id": 10},
-            "normalized_finding": {"id": 100},
-            "mappings": [],
-        }
-        assert len(response["mappings"]) == 0
-
-    def test_lineage_scan_run_not_found(self):
-        """Lineage should handle missing scan run."""
-        response = {
-            "scan_run": None,
-            "raw_finding": {"id": 10},
-            "normalized_finding": {"id": 100},
-            "mappings": [],
-        }
-        assert response["scan_run"] is None
-
-    def test_lineage_confidence_values_valid(self):
-        """All confidence values in lineage should be valid."""
-        mappings = [
-            {"final_confidence": 0.85, "gemini_confidence": 0.9, "groq_agreement_value": 1.0},
-            {"final_confidence": 0.45, "gemini_confidence": 0.5, "groq_agreement_value": 0.0},
-        ]
-        for m in mappings:
-            if m["final_confidence"] is not None:
-                assert 0 <= m["final_confidence"] <= 1
-            if m["gemini_confidence"] is not None:
-                assert 0 <= m["gemini_confidence"] <= 1
-            if m["groq_agreement_value"] is not None:
-                assert 0 <= m["groq_agreement_value"] <= 1
+def _create_manual_review(client, finding, mocked_ai_services, target="api-quality-review"):
+    mocked_ai_services.state["confidence"] = 0.4
+    return _create_scan(client, finding, target)
 
 
-class TestScenarioReportEndpoint:
-    """Tests for POST /api/v1/reports/scenario endpoint."""
+class TestScanEndpoints:
+    def test_health_endpoint_returns_service_status(self, ai_quality_client):
+        response = ai_quality_client.get(f"{_API}/health")
+        assert response.status_code == 200
+        assert response.json() == {"status": "ok"}
 
-    def test_scenario_requires_scan_run_id(self):
-        """Scenario report should require scan_run_id."""
-        required_fields = ["scan_run_id", "scenario"]
-        payload = {"scan_run_id": 1, "scenario": "container"}
-        missing = [f for f in required_fields if f not in payload]
-        assert len(missing) == 0
+    def test_readiness_endpoint_checks_database(self, ai_quality_client):
+        response = ai_quality_client.get(f"{_API}/readiness")
+        assert response.status_code == 200
+        assert response.json()["database"] == "ok"
 
-    def test_scenario_valid_types(self):
-        """Scenario should only accept valid types."""
-        valid_scenarios = ["container", "iac", "code-security"]
-        for scenario in valid_scenarios:
-            assert scenario in valid_scenarios
+    def test_scanner_list_uses_scanner_registry(self, ai_quality_client):
+        response = ai_quality_client.get(f"{_API}/scanners")
+        assert response.status_code == 200
+        assert isinstance(response.json(), list)
 
-    def test_scenario_invalid_type_rejected(self):
-        """Invalid scenario type should be rejected."""
-        valid_scenarios = ["container", "iac", "code-security"]
-        invalid_scenario = "invalid"
-        assert invalid_scenario not in valid_scenarios
+    def test_scan_run_creation_processes_finding(
+        self, ai_quality_client, ai_quality_finding, mocked_ai_services
+    ):
+        scan = _create_scan(ai_quality_client, ai_quality_finding())
+        assert scan["status"] == "completed"
+        assert scan["id"] > 0
 
-    def test_scenario_response_structure(self):
-        """Scenario report response should have expected structure."""
-        response = {
-            "id": 1,
-            "scan_run_id": 1,
-            "report_type": "scenario",
-            "scenario": "container",
-            "status": "generated",
-            "content_path": "/path/to/report.pdf",
-        }
-        assert response["id"] > 0
-        assert response["scenario"] in ("container", "iac", "code-security")
+    def test_scan_run_creation_rejects_missing_environment(self, ai_quality_client):
+        response = ai_quality_client.post(f"{_API}/scan-runs", json={"findings": []})
+        assert response.status_code == 422
 
-    def test_scenario_generates_pdf(self):
-        """Scenario report should generate PDF."""
-        response = {
-            "id": 1,
-            "content_path": "/reports/scenario-container-scan-1.pdf",
-        }
-        assert response["content_path"].endswith(".pdf")
+    def test_scan_run_creation_rejects_wrong_scanner_type(self, ai_quality_client):
+        response = ai_quality_client.post(
+            f"{_API}/scan-runs",
+            json={
+                "target_environment": "api-invalid-scanner",
+                "findings": [
+                    {
+                        "scanner_name": 123,
+                        "scanner_finding_id": "BAD-1",
+                        "raw_json": {},
+                    }
+                ],
+            },
+        )
+        assert response.status_code == 422
 
-    def test_scenario_catalog_ids_valid(self):
-        """Scenario report should reference valid catalog IDs."""
-        response = {
-            "id": 1,
-            "control_ids_referenced": ["A.5.15", "A.8.8"],
-        }
-        for cid in response["control_ids_referenced"]:
-            assert len(cid) > 0
+    def test_scan_endpoint_runs_scanners_and_pipeline(
+        self, ai_quality_client, ai_quality_finding, mocked_ai_services, monkeypatch
+    ):
+        from complisoc.backend.api import main as api_module
+
+        finding = ai_quality_finding()
+        monkeypatch.setattr(api_module, "run_scanners", lambda *_, **__: ([finding], []))
+        monkeypatch.setattr(api_module, "resolve_scanners", lambda *_, **__: ["checkov"])
+        response = ai_quality_client.post(
+            f"{_API}/scans",
+            json={"target": "example-repository", "scanners": ["checkov"]},
+        )
+        assert response.status_code == 201
+        assert response.json()["status"] == "completed"
+
+    def test_scan_endpoint_rejects_missing_target(self, ai_quality_client):
+        response = ai_quality_client.post(f"{_API}/scans", json={})
+        assert response.status_code == 422
+
+    def test_scan_runs_list_returns_database_rows(
+        self, ai_quality_client, ai_quality_finding, mocked_ai_services
+    ):
+        _create_scan(ai_quality_client, ai_quality_finding())
+        response = ai_quality_client.get(f"{_API}/scan-runs")
+        assert response.status_code == 200
+        assert len(response.json()) == 1
+
+    def test_scan_run_detail_returns_existing_record(
+        self, ai_quality_client, ai_quality_finding, mocked_ai_services
+    ):
+        scan = _create_scan(ai_quality_client, ai_quality_finding())
+        response = ai_quality_client.get(f"{_API}/scan-runs/{scan['id']}")
+        assert response.status_code == 200
+        assert response.json()["id"] == scan["id"]
+
+    def test_missing_scan_run_returns_not_found(self, ai_quality_client):
+        assert ai_quality_client.get(f"{_API}/scan-runs/999").status_code == 404
+
+    def test_scan_run_summary_uses_persisted_findings(
+        self, ai_quality_client, ai_quality_finding, mocked_ai_services
+    ):
+        scan = _create_scan(ai_quality_client, ai_quality_finding())
+        response = ai_quality_client.get(f"{_API}/scan-runs/{scan['id']}/summary")
+        assert response.status_code == 200
+        assert response.json()
+
+    def test_scan_run_archive_mutates_lifecycle_state(
+        self, ai_quality_client, ai_quality_finding, mocked_ai_services
+    ):
+        scan = _create_scan(ai_quality_client, ai_quality_finding())
+        response = ai_quality_client.post(f"{_API}/scan-runs/{scan['id']}/archive")
+        assert response.status_code == 200
+        assert response.json()["archived_at"] is not None
+
+    def test_archived_scan_is_hidden_by_default(
+        self, ai_quality_client, ai_quality_finding, mocked_ai_services
+    ):
+        scan = _create_scan(ai_quality_client, ai_quality_finding())
+        ai_quality_client.post(f"{_API}/scan-runs/{scan['id']}/archive")
+        response = ai_quality_client.get(f"{_API}/scan-runs")
+        assert response.status_code == 200
+        assert response.json() == []
+
+    def test_archived_scan_can_be_restored(
+        self, ai_quality_client, ai_quality_finding, mocked_ai_services
+    ):
+        scan = _create_scan(ai_quality_client, ai_quality_finding())
+        ai_quality_client.post(f"{_API}/scan-runs/{scan['id']}/archive")
+        response = ai_quality_client.post(f"{_API}/scan-runs/{scan['id']}/restore")
+        assert response.status_code == 200
+        assert response.json()["archived_at"] is None
 
 
-class TestBulkOperations:
-    """Tests for bulk operations endpoints."""
+class TestFindingAndMappingEndpoints:
+    def test_findings_list_returns_normalized_rows(
+        self, ai_quality_client, ai_quality_finding, mocked_ai_services
+    ):
+        _create_scan(ai_quality_client, ai_quality_finding())
+        response = ai_quality_client.get(f"{_API}/findings")
+        assert response.status_code == 200
+        assert response.json()[0]["severity"] == "high"
 
-    def test_bulk_archive_requires_ids(self):
-        """Bulk archive should require scan_run_ids."""
-        payload = {"scan_run_ids": [1, 2, 3]}
-        assert len(payload["scan_run_ids"]) > 0
+    def test_finding_detail_returns_requested_finding(
+        self, ai_quality_client, ai_quality_finding, mocked_ai_services
+    ):
+        _create_scan(ai_quality_client, ai_quality_finding())
+        finding = ai_quality_client.get(f"{_API}/findings").json()[0]
+        response = ai_quality_client.get(f"{_API}/findings/{finding['id']}")
+        assert response.status_code == 200
+        assert response.json()["id"] == finding["id"]
+        assert ai_quality_client.get(f"{_API}/findings/999").status_code == 404
 
-    def test_bulk_archive_returns_count(self):
-        """Bulk archive should return archived count."""
-        response = {"archived_count": 3}
-        assert response["archived_count"] > 0
+    def test_mappings_list_returns_persisted_decision(
+        self, ai_quality_client, ai_quality_finding, mocked_ai_services
+    ):
+        _create_scan(ai_quality_client, ai_quality_finding())
+        response = ai_quality_client.get(f"{_API}/mappings")
+        assert response.status_code == 200
+        assert response.json()[0]["control_catalog_id"] > 0
 
-    def test_bulk_decide_requires_decisions(self):
-        """Bulk decide should require decisions list."""
-        payload = {
-            "decisions": [
-                {"id": 1, "decision": "approve"},
-                {"id": 2, "decision": "reject"},
-            ],
-        }
-        assert len(payload["decisions"]) > 0
+    def test_mapping_detail_and_verification_routes_return_lineage(
+        self, ai_quality_client, ai_quality_finding, mocked_ai_services
+    ):
+        _create_scan(ai_quality_client, ai_quality_finding())
+        mapping = ai_quality_client.get(f"{_API}/mappings").json()[0]
+        detail = ai_quality_client.get(f"{_API}/mappings/{mapping['id']}")
+        verification = ai_quality_client.get(f"{_API}/mappings/{mapping['id']}/verification")
+        assert detail.status_code == 200
+        assert verification.status_code == 200
+        assert verification.json()[0]["result"] == "agree"
 
-    def test_bulk_decide_valid_decisions(self):
-        """Bulk decide should only accept approve or reject."""
-        valid_decisions = ["approve", "reject"]
-        decisions = [{"id": 1, "decision": "approve"}, {"id": 2, "decision": "reject"}]
-        for d in decisions:
-            assert d["decision"] in valid_decisions
+    def test_review_queue_lists_low_confidence_mapping(
+        self, ai_quality_client, ai_quality_finding, mocked_ai_services
+    ):
+        _create_manual_review(ai_quality_client, ai_quality_finding(), mocked_ai_services)
+        response = ai_quality_client.get(f"{_API}/review-queue")
+        assert response.status_code == 200
+        assert response.json()[0]["status"] == "pending"
+
+    def test_review_item_detail_returns_persisted_item(
+        self, ai_quality_client, ai_quality_finding, ai_quality_db, mocked_ai_services
+    ):
+        _create_manual_review(ai_quality_client, ai_quality_finding(), mocked_ai_services)
+        item = ai_quality_db.query(ReviewQueueItem).one()
+        response = ai_quality_client.get(f"{_API}/review-queue/{item.id}")
+        assert response.status_code == 200
+        assert response.json()["id"] == item.id
+
+    def test_approval_updates_review_and_mapping(
+        self, ai_quality_client, ai_quality_finding, ai_quality_db, mocked_ai_services
+    ):
+        _create_manual_review(ai_quality_client, ai_quality_finding(), mocked_ai_services)
+        item = ai_quality_db.query(ReviewQueueItem).one()
+        response = ai_quality_client.post(
+            f"{_API}/review-queue/{item.id}/approve",
+            json={"reviewer_id": "reviewer", "comments": "verified"},
+        )
+        assert response.status_code == 200
+        assert response.json()["status"] == "approved"
+
+    def test_rejection_updates_review_item(
+        self, ai_quality_client, ai_quality_finding, ai_quality_db, mocked_ai_services
+    ):
+        _create_manual_review(ai_quality_client, ai_quality_finding(), mocked_ai_services)
+        item = ai_quality_db.query(ReviewQueueItem).one()
+        response = ai_quality_client.post(f"{_API}/review-queue/{item.id}/reject", json={})
+        assert response.status_code == 200
+        assert response.json()["status"] == "rejected"
+
+    def test_bulk_review_rejects_invalid_action(self, ai_quality_client):
+        response = ai_quality_client.post(
+            f"{_API}/review-queue/bulk-decide",
+            json={"item_ids": [1], "action": "publish"},
+        )
+        assert response.status_code == 422
+
+    def test_bulk_archive_returns_affected_count(
+        self, ai_quality_client, ai_quality_finding, mocked_ai_services
+    ):
+        scan = _create_scan(ai_quality_client, ai_quality_finding())
+        response = ai_quality_client.post(
+            f"{_API}/scan-runs/bulk-archive",
+            json={"scan_run_ids": [scan["id"]]},
+        )
+        assert response.status_code == 200
+        assert response.json()["archived_count"] == 1
 
 
-class TestAuditBundleVerifyAll:
-    """Tests for POST /api/v1/audit-bundles/verify-all endpoint."""
+class TestCatalogAndReportingEndpoints:
+    def test_controls_route_filters_real_catalog(
+        self, ai_quality_client, ai_quality_db
+    ):
+        control = ai_quality_db.query(ControlCatalog).first()
+        response = ai_quality_client.get(
+            f"{_API}/controls",
+            params={"framework": control.framework_name},
+        )
+        assert response.status_code == 200
+        assert all(item["framework_name"] == control.framework_name for item in response.json())
 
-    def test_verify_all_returns_list(self):
-        """Verify all should return list of results."""
-        response = [
-            {"bundle_id": 1, "status": "valid"},
-            {"bundle_id": 2, "status": "valid"},
-        ]
-        assert isinstance(response, list)
+    def test_control_detail_uses_database_primary_key(self, ai_quality_client, ai_quality_db):
+        control = ai_quality_db.query(ControlCatalog).first()
+        response = ai_quality_client.get(f"{_API}/controls/{control.id}")
+        assert response.status_code == 200
+        assert response.json()["control_id"] == control.control_id
 
-    def test_verify_all_includes_status(self):
-        """Each result should include status."""
-        results = [
-            {"bundle_id": 1, "status": "valid", "bundle_verified": True},
-            {"bundle_id": 2, "status": "tampered", "bundle_verified": False},
-        ]
-        for r in results:
-            assert "status" in r
-            assert "bundle_verified" in r
+    def test_drift_and_lineage_routes_use_persisted_evidence(
+        self, ai_quality_client, ai_quality_finding, mocked_ai_services
+    ):
+        finding_payload = ai_quality_finding()
+        previous_scan = _create_scan(ai_quality_client, finding_payload)
+        current_scan = _create_scan(ai_quality_client, finding_payload)
+        finding = ai_quality_client.get(f"{_API}/findings").json()[0]
+        drift = ai_quality_client.get(
+            f"{_API}/scan-runs/{current_scan['id']}/drift",
+            params={"compare_to": previous_scan["id"]},
+        )
+        lineage = ai_quality_client.get(f"{_API}/findings/{finding['id']}/lineage")
+        assert drift.status_code == 200
+        assert drift.json()["unchanged_count"] == 1
+        assert lineage.status_code == 200
+        assert lineage.json()["mappings"][0]["control_id"] == "A.5.15"
 
-    def test_verify_all_empty_when_no_bundles(self):
-        """Verify all should return empty list when no bundles."""
-        response = []
-        assert len(response) == 0
+    def test_dashboard_endpoints_return_database_aggregates(
+        self, ai_quality_client, ai_quality_finding, mocked_ai_services
+    ):
+        _create_scan(ai_quality_client, ai_quality_finding())
+        for endpoint in (
+            "control-coverage",
+            "severity-distribution",
+            "gap-summary",
+            "remediation-backlog",
+            "trends",
+            "cloud-findings",
+            "ai-metrics",
+        ):
+            response = ai_quality_client.get(f"{_API}/dashboard/{endpoint}")
+            assert response.status_code == 200, endpoint
+
+    def test_report_and_audit_collection_routes_return_empty_database_state(self, ai_quality_client):
+        reports = ai_quality_client.get(f"{_API}/reports")
+        bundles = ai_quality_client.get(f"{_API}/audit-bundles")
+        scenario = ai_quality_client.post(f"{_API}/reports/scenario", json={"scan_run_id": 1})
+        missing_report = ai_quality_client.get(f"{_API}/reports/999")
+        missing_bundle = ai_quality_client.get(f"{_API}/audit-bundles/999")
+        assert reports.status_code == 200
+        assert reports.json() == []
+        assert bundles.status_code == 200
+        assert bundles.json() == []
+        assert scenario.status_code == 422
+        assert missing_report.status_code == 404
+        assert missing_bundle.status_code == 404

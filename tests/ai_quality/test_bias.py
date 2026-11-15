@@ -1,231 +1,181 @@
-"""AI Bias Detection Tests
+"""Mocked workflow checks, not measurements of Gemini/Groq model bias.
 
-Checks for systematic biases in AI outputs that could lead to unfair or incorrect decisions.
-These tests ensure the AI treats different input types consistently.
+An independently labeled and representative fairness dataset does not exist
+in the repository. These tests exercise Complisoc's real mapping pipeline
+with controlled provider decisions; live bias claims remain unsupported.
 """
 from __future__ import annotations
 
-from dataclasses import dataclass
-from typing import Any
+from complisoc.backend.models import VerificationRecord
+from complisoc.backend.compliance.workflow import process_scan_run
 
-import pytest
+_CATEGORY_FINDINGS = {
+    "access_control": ("A.5.15", "IAM public access permission"),
+    "encryption": ("A.8.24", "unencrypted data encryption key rotation"),
+    "audit": ("A.8.15", "audit logging missing security event records"),
+    "monitoring": ("A.8.16", "monitoring alert anomaly detection"),
+    "network": ("A.8.20", "network firewall open ingress port"),
+    "backup": ("A.8.13", "backup restore failover data recovery"),
+    "configuration": ("A.8.9", "configuration baseline drift management"),
+}
 
 
-@dataclass
-class BiasSample:
-    """A sample for bias testing."""
-    category: str
-    input_text: str
-    confidence: float
-    decision: bool
+def _process(
+    db,
+    make_finding,
+    mocked_ai_services,
+    category: str = "access_control",
+    index: int = 1,
+):
+    control_id, description = _CATEGORY_FINDINGS[category]
+    finding = make_finding(index)
+    finding["raw_json"].update(
+        {
+            "finding_type": category,
+            "title": description,
+            "description": description,
+        }
+    )
+    result = process_scan_run(
+        db,
+        target_environment=f"ai-quality-{category}-{index}",
+        findings=[finding],
+    )
+    assert result["scan_run"].status == "completed"
+    assert len(result["mappings"]) == 1
+    mapping = result["mappings"][0]
+    assert mapping.control_catalog.control_id == control_id
+    return result, mapping
 
 
 class TestSelectionBias:
-    """Tests for systematic selection bias in AI decisions."""
+    def test_access_control_input_traverses_real_pipeline(self, ai_quality_db, ai_quality_finding, mocked_ai_services):
+        _, mapping = _process(ai_quality_db, ai_quality_finding, mocked_ai_services)
+        assert mapping.mapping_status == "published"
 
-    def test_no_category_always_rejected(self):
-        """No single category should always be rejected."""
-        samples = [
-            BiasSample("network", "network finding", 0.8, True),
-            BiasSample("network", "network issue", 0.7, True),
-            BiasSample("network", "network vulnerability", 0.3, False),
-        ]
-        network_results = [s.decision for s in samples if s.category == "network"]
-        assert not all(r == False for r in network_results), "Network category always rejected"
-        assert not all(r == True for r in network_results), "Network category always accepted"
+    def test_encryption_input_uses_catalog_candidate(self, ai_quality_db, ai_quality_finding, mocked_ai_services):
+        _, mapping = _process(ai_quality_db, ai_quality_finding, mocked_ai_services, "encryption")
+        assert mapping.mapping_status == "published"
 
-    def test_no_category_always_accepted(self):
-        """No single category should always be accepted."""
-        samples = [
-            BiasSample("access_control", "access finding", 0.9, True),
-            BiasSample("access_control", "access issue", 0.85, True),
-            BiasSample("access_control", "access vulnerability", 0.35, False),
-        ]
-        access_results = [s.decision for s in samples if s.category == "access_control"]
-        assert not all(r == True for r in access_results), "Access control always accepted"
+    def test_logging_input_uses_2022_control(self, ai_quality_db, ai_quality_finding, mocked_ai_services):
+        _, mapping = _process(ai_quality_db, ai_quality_finding, mocked_ai_services, "audit")
+        assert mapping.control_catalog.control_id == "A.8.15"
 
-    def test_similar_confidence_across_categories(self):
-        """Similar findings should have similar confidence regardless of category."""
-        network = BiasSample("network", "weak firewall", 0.75, True)
-        access = BiasSample("access_control", "weak password", 0.72, True)
-        audit = BiasSample("audit", "missing logs", 0.70, True)
-        confidences = [network.confidence, access.confidence, audit.confidence]
-        spread = max(confidences) - min(confidences)
-        assert spread < 0.15, f"Confidence varies too much across categories: {spread}"
+    def test_monitoring_input_uses_monitoring_control(self, ai_quality_db, ai_quality_finding, mocked_ai_services):
+        _, mapping = _process(ai_quality_db, ai_quality_finding, mocked_ai_services, "monitoring")
+        assert mapping.control_catalog.control_id == "A.8.16"
 
-    def test_category_confidence_not_extreme(self):
-        """No category should have extreme average confidence."""
-        samples = [
-            BiasSample("network", "finding 1", 0.5, True),
-            BiasSample("network", "finding 2", 0.6, True),
-            BiasSample("network", "finding 3", 0.4, False),
-        ]
-        avg_confidence = sum(s.confidence for s in samples) / len(samples)
-        assert 0.2 <= avg_confidence <= 0.9, f"Category average confidence extreme: {avg_confidence}"
+    def test_network_input_uses_network_control(self, ai_quality_db, ai_quality_finding, mocked_ai_services):
+        _, mapping = _process(ai_quality_db, ai_quality_finding, mocked_ai_services, "network")
+        assert mapping.control_catalog.control_id == "A.8.20"
+
+    def test_backup_input_uses_backup_control(self, ai_quality_db, ai_quality_finding, mocked_ai_services):
+        _, mapping = _process(ai_quality_db, ai_quality_finding, mocked_ai_services, "backup")
+        assert mapping.control_catalog.control_id == "A.8.13"
+
+    def test_configuration_input_uses_configuration_control(self, ai_quality_db, ai_quality_finding, mocked_ai_services):
+        _, mapping = _process(ai_quality_db, ai_quality_finding, mocked_ai_services, "configuration")
+        assert mapping.control_catalog.control_id == "A.8.9"
 
 
-class TestMeasurementBias:
-    """Tests for measurement bias in AI outputs."""
+class TestControlledProviderProcessing:
+    def test_provider_mapping_response_is_processed(self, ai_quality_db, ai_quality_finding, mocked_ai_services):
+        _, mapping = _process(ai_quality_db, ai_quality_finding, mocked_ai_services)
+        mocked_ai_services.mapper.map_batch.assert_called_once()
+        assert mapping.gemini_confidence == 0.95
 
-    def test_confidence_not_correlated_with_input_length(self):
-        """Confidence should not be correlated with input length."""
-        short_input = BiasSample("test", "short", 0.7, True)
-        long_input = BiasSample("test", "a" * 1000, 0.72, True)
-        # Confidence should be similar regardless of input length
-        assert abs(short_input.confidence - long_input.confidence) < 0.2
+    def test_provider_verification_response_is_processed(self, ai_quality_db, ai_quality_finding, mocked_ai_services):
+        _, mapping = _process(ai_quality_db, ai_quality_finding, mocked_ai_services)
+        mocked_ai_services.verifier.verify_batch.assert_called_once()
+        assert mapping.verification_status == "agree"
 
-    def test_confidence_not_correlated_with_severity_keyword(self):
-        """Confidence should not be artificially inflated by severity keywords."""
-        critical = BiasSample("test", "CRITICAL vulnerability", 0.85, True)
-        low = BiasSample("test", "low priority issue", 0.45, False)
-        # Confidence should reflect actual match, not just severity
-        assert critical.confidence > low.confidence
+    def test_lower_mocked_confidence_routes_to_manual_review(
+        self, ai_quality_db, ai_quality_finding, mocked_ai_services
+    ):
+        mocked_ai_services.state["confidence"] = 0.4
+        _, mapping = _process(ai_quality_db, ai_quality_finding, mocked_ai_services)
+        assert mapping.mapping_status == "manual_review"
 
-    def test_rationale_quality_not_input_dependent(self):
-        """Rationale quality should not depend on input complexity."""
-        simple_rationale = "direct match"
-        complex_rationale = "direct match with comprehensive evidence"
-        # Both should be valid rationales
-        assert len(simple_rationale) >= 10
-        assert len(complex_rationale) >= 10
+    def test_verifier_disagreement_routes_to_manual_review(
+        self, ai_quality_db, ai_quality_finding, mocked_ai_services
+    ):
+        mocked_ai_services.state.update(verification_result="disagree", agreement_value=0.0)
+        _, mapping = _process(ai_quality_db, ai_quality_finding, mocked_ai_services)
+        assert mapping.verification_status == "disagree"
+        assert mapping.mapping_status == "manual_review"
 
-    def test_verification_not_biased_by_mapping_confidence(self):
-        """Verification should be independent of mapping confidence."""
-        high_mapping = BiasSample("test", "finding", 0.95, True)
-        low_mapping = BiasSample("test", "finding", 0.3, False)
-        # Verification should evaluate independently
-        assert high_mapping.confidence != low_mapping.confidence
+    def test_rationale_is_associated_with_persisted_mapping(
+        self, ai_quality_db, ai_quality_finding, mocked_ai_services
+    ):
+        rationale = "The finding identifies public IAM access."
+        mocked_ai_services.state["rationale"] = rationale
+        _, mapping = _process(ai_quality_db, ai_quality_finding, mocked_ai_services)
+        assert mapping.rationale == rationale
 
+    def test_verifier_explanation_is_persisted_as_evidence(
+        self, ai_quality_db, ai_quality_finding, mocked_ai_services
+    ):
+        explanation = "The access control addresses the finding's public permissions."
+        mocked_ai_services.state["explanation"] = explanation
+        _, mapping = _process(ai_quality_db, ai_quality_finding, mocked_ai_services)
+        record = ai_quality_db.query(VerificationRecord).filter_by(control_mapping_id=mapping.id).one()
+        assert record.explanation == explanation
 
-class TestConfirmationBias:
-    """Tests for confirmation bias in AI decisions."""
+    def test_mapping_keeps_finding_lineage(self, ai_quality_db, ai_quality_finding, mocked_ai_services):
+        result, mapping = _process(ai_quality_db, ai_quality_finding, mocked_ai_services)
+        assert mapping.normalized_finding_id == result["normalized_findings"][0].id
 
-    def test_verification_not_always_agree(self):
-        """Verification should not always agree with mapping."""
-        samples = [
-            BiasSample("test", "finding 1", 0.9, True),
-            BiasSample("test", "finding 2", 0.3, False),
-            BiasSample("test", "finding 3", 0.5, False),
-        ]
-        decisions = [s.decision for s in samples]
-        assert not all(d == True for d in decisions), "Verification always agrees"
-        assert not all(d == False for d in decisions), "Verification always disagrees"
+    def test_raw_finding_is_preserved(self, ai_quality_db, ai_quality_finding, mocked_ai_services):
+        result, _ = _process(ai_quality_db, ai_quality_finding, mocked_ai_services)
+        raw = result["raw_findings"][0]
+        assert raw.raw_json["description"] == "IAM public access permission"
 
-    def test_mapping_not_self_fulfilling(self):
-        """High mapping confidence should not guarantee verification agree."""
-        high_conf_agree = BiasSample("test", "finding 1", 0.95, True)
-        high_conf_disagree = BiasSample("test", "finding 2", 0.92, False)
-        # Both should be possible
-        assert high_conf_agree.decision != high_conf_disagree.decision
+    def test_provider_models_are_recorded(self, ai_quality_db, ai_quality_finding, mocked_ai_services):
+        _, mapping = _process(ai_quality_db, ai_quality_finding, mocked_ai_services)
+        assert mapping.mapping_model
+        record = ai_quality_db.query(VerificationRecord).filter_by(control_mapping_id=mapping.id).one()
+        assert record.verification_model == "mock-groq"
 
-    def test_low_confidence_can_still_be_correct(self):
-        """Low confidence decisions can still be correct."""
-        low_conf_correct = BiasSample("test", "finding", 0.35, True)
-        assert low_conf_correct.decision == True
+    def test_distinct_findings_are_not_collapsed(self, ai_quality_db, ai_quality_finding, mocked_ai_services):
+        first = ai_quality_finding(1)
+        second = ai_quality_finding(2)
+        result = process_scan_run(
+            ai_quality_db,
+            target_environment="ai-quality-distinct",
+            findings=[first, second],
+        )
+        assert len(result["raw_findings"]) == 2
+        assert len(result["normalized_findings"]) == 2
 
-    def test_high_confidence_can_still_be_wrong(self):
-        """High confidence decisions can still be wrong."""
-        high_conf_wrong = BiasSample("test", "finding", 0.95, False)
-        assert high_conf_wrong.decision == False
+    def test_severity_survives_normalization(self, ai_quality_db, ai_quality_finding, mocked_ai_services):
+        result, _ = _process(ai_quality_db, ai_quality_finding, mocked_ai_services)
+        assert result["normalized_findings"][0].severity == "high"
 
+    def test_control_family_and_identifier_are_persisted(self, ai_quality_db, ai_quality_finding, mocked_ai_services):
+        _, mapping = _process(ai_quality_db, ai_quality_finding, mocked_ai_services)
+        assert mapping.control_catalog.control_id == "A.5.15"
+        assert mapping.control_catalog.title == "Access Control"
 
-class TestConsistencyBias:
-    """Tests for consistency bias across similar inputs."""
+    def test_confidence_uses_provider_outputs(self, ai_quality_db, ai_quality_finding, mocked_ai_services):
+        result, mapping = _process(ai_quality_db, ai_quality_finding, mocked_ai_services)
+        assert mapping.final_confidence == 0.97
+        assert result["scan_run"].status == "completed"
 
-    def test_similar_inputs_similar_outputs(self):
-        """Similar inputs should produce similar outputs."""
-        samples = [
-            BiasSample("test", "weak password policy", 0.85, True),
-            BiasSample("test", "weak password configuration", 0.83, True),
-            BiasSample("test", "password policy weakness", 0.87, True),
-        ]
-        confidences = [s.confidence for s in samples]
-        spread = max(confidences) - min(confidences)
-        assert spread < 0.1, f"Similar inputs have very different confidence: {spread}"
+    def test_low_confidence_creates_review_queue_item(
+        self, ai_quality_db, ai_quality_finding, mocked_ai_services
+    ):
+        mocked_ai_services.state["confidence"] = 0.4
+        result, _ = _process(ai_quality_db, ai_quality_finding, mocked_ai_services)
+        assert len(result["review_items"]) == 1
 
-    def test_order_independence(self):
-        """Order of inputs should not affect individual decisions."""
-        sample1 = BiasSample("test", "finding A", 0.8, True)
-        sample2 = BiasSample("test", "finding B", 0.6, False)
-        # Each decision should be independent
-        assert sample1.confidence != sample2.confidence
+    def test_mapping_and_verification_records_share_mapping_id(
+        self, ai_quality_db, ai_quality_finding, mocked_ai_services
+    ):
+        _, mapping = _process(ai_quality_db, ai_quality_finding, mocked_ai_services)
+        record = ai_quality_db.query(VerificationRecord).filter_by(control_mapping_id=mapping.id).one()
+        assert record.control_mapping_id == mapping.id
 
-    def test_repeated_input_same_output(self):
-        """Same input should produce same output (deterministic)."""
-        sample1 = BiasSample("test", "same finding", 0.75, True)
-        sample2 = BiasSample("test", "same finding", 0.75, True)
-        assert sample1.confidence == sample2.confidence
-        assert sample1.decision == sample2.decision
-
-    def test_paraphrase_invariance(self):
-        """Paraphrased inputs should produce similar outputs."""
-        original = BiasSample("test", "weak access controls", 0.8, True)
-        paraphrase = BiasSample("test", "access controls are weak", 0.78, True)
-        assert abs(original.confidence - paraphrase.confidence) < 0.1
-
-
-class TestReportingBias:
-    """Tests for bias in how results are reported."""
-
-    def test_all_categories_represented(self):
-        """All categories should be represented in results."""
-        categories = ["network", "access_control", "audit", "encryption", "configuration"]
-        for cat in categories:
-            assert len(cat) > 0
-
-    def test_no_category_overrepresented(self):
-        """No single category should dominate results."""
-        category_counts = {
-            "network": 10,
-            "access_control": 12,
-            "audit": 8,
-            "encryption": 9,
-            "configuration": 11,
-        }
-        total = sum(category_counts.values())
-        for cat, count in category_counts.items():
-            proportion = count / total
-            assert proportion < 0.4, f"Category {cat} overrepresented: {proportion:.1%}"
-
-    def test_confidence_distribution_reported(self):
-        """Confidence distribution should be reported, not just average."""
-        confidences = [0.9, 0.8, 0.7, 0.6, 0.5, 0.4, 0.3, 0.2, 0.1]
-        avg = sum(confidences) / len(confidences)
-        median = sorted(confidences)[len(confidences) // 2]
-        # For symmetric distributions avg == median, that's OK
-        # The point is both should be available for reporting
-        assert avg == median  # Symmetric distribution
-
-    def test_uncertainty_quantified(self):
-        """Uncertainty should be quantified, not hidden."""
-        decision = {
-            "confidence": 0.75,
-            "confidence_interval": [0.65, 0.85],
-            "sample_size": 100,
-        }
-        assert "confidence" in decision
-        assert decision["confidence_interval"][0] <= decision["confidence"] <= decision["confidence_interval"][1]
-
-
-class TestHistoricalBias:
-    """Tests for bias from historical data patterns."""
-
-    def test_no_feedback_loop(self):
-        """AI should not reinforce its own previous decisions."""
-        previous = BiasSample("test", "finding", 0.8, True)
-        current = BiasSample("test", "similar finding", 0.5, False)
-        # Current decision should be independent of previous
-        assert current.confidence != previous.confidence or current.decision != previous.decision
-
-    def test_no_anchoring(self):
-        """AI should not anchor on initial values."""
-        initial = BiasSample("test", "finding", 0.9, True)
-        revised = BiasSample("test", "finding with more context", 0.6, False)
-        # Revised decision can differ from initial
-        assert revised.confidence != initial.confidence
-
-    def test_no_recency_bias(self):
-        """Recent findings should not be treated differently."""
-        old_finding = BiasSample("test", "old finding", 0.75, True)
-        new_finding = BiasSample("test", "new finding", 0.73, True)
-        assert abs(old_finding.confidence - new_finding.confidence) < 0.1
+    def test_mocked_verification_result_is_not_claimed_as_live(self, ai_quality_db, ai_quality_finding, mocked_ai_services):
+        _, mapping = _process(ai_quality_db, ai_quality_finding, mocked_ai_services)
+        record = ai_quality_db.query(VerificationRecord).filter_by(control_mapping_id=mapping.id).one()
+        assert record.verification_model == "mock-groq"

@@ -1,4 +1,4 @@
-"""15-control gold-standard mapping validator.
+"""15-control audited synthetic mapping validator.
 
 Deterministic benchmark that proves the production mapping pipeline selects
 the canonical compliance control for each of 15 curated findings.
@@ -32,6 +32,8 @@ from unittest.mock import patch
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
+
+from catalog_validation import validate_gold_catalog
 
 # Make the ``complisoc`` package importable regardless of CWD.
 _THIS = pathlib.Path(__file__).resolve()
@@ -99,6 +101,7 @@ def load_gold(path: pathlib.Path) -> dict:
 
 
 def build_db(gold: dict):
+    validate_gold_catalog(gold)
     engine = create_engine(
         "sqlite://",
         connect_args={"check_same_thread": False},
@@ -182,8 +185,29 @@ def collect_predictions(db) -> dict[str, dict]:
             "framework": mapping.control_catalog.framework_name,
             "status": mapping.mapping_status,
             "final_confidence": mapping.final_confidence,
+            "gemini_confidence": mapping.gemini_confidence,
+            "verification_status": mapping.verification_status,
+            "groq_agreement_value": mapping.groq_agreement_value,
         }
     return predicted
+
+
+def live_provider_failures(gold: dict, predicted: dict[str, dict]) -> list[str]:
+    """Return findings lacking successful Gemini and Groq evaluation results."""
+    failures = []
+    for entry in gold["mappings"]:
+        finding_id = entry["scanner_finding_id"]
+        result = predicted.get(finding_id)
+        if result is None:
+            failures.append(f"{finding_id}: no mapping result")
+        elif result.get("gemini_confidence") is None:
+            failures.append(f"{finding_id}: no Gemini decision")
+        elif (
+            result.get("verification_status") not in {"agree", "disagree"}
+            or result.get("groq_agreement_value") is None
+        ):
+            failures.append(f"{finding_id}: no Groq verification")
+    return failures
 
 
 def compute_f1(metrics: dict) -> float:
@@ -302,14 +326,26 @@ _GOLD_PATH_DEFAULT = pathlib.Path(__file__).with_name("gold_standard.json")
 
 def evaluate(gold: dict, predicted: dict) -> dict:
     tp = fp = fn = 0
+    invalid_control_predictions = 0
     per_item = []
     gold_by_id = {entry["scanner_finding_id"]: entry for entry in gold["mappings"]}
+    catalog_control_ids = {control["control_id"] for control in gold["controls"]}
 
     for entry in gold["mappings"]:
         sfid = entry["scanner_finding_id"]
         expected = entry["expected_control_id"]
         pred = predicted.get(sfid)
-        if pred is None:
+        if expected is None:
+            if pred is None:
+                per_item.append((sfid, None, None, "NO_MAPPING"))
+            else:
+                fp += 1
+                status = "UNEXPECTED"
+                if pred["control_id"] not in catalog_control_ids:
+                    invalid_control_predictions += 1
+                    status = "INVALID_CONTROL"
+                per_item.append((sfid, None, pred["control_id"], status))
+        elif pred is None:
             fn += 1
             per_item.append((sfid, expected, None, "MISSING"))
         elif pred["control_id"] == expected:
@@ -318,13 +354,21 @@ def evaluate(gold: dict, predicted: dict) -> dict:
         else:
             fn += 1
             fp += 1
-            per_item.append((sfid, expected, pred["control_id"], "WRONG"))
+            status = "WRONG"
+            if pred["control_id"] not in catalog_control_ids:
+                invalid_control_predictions += 1
+                status = "INVALID_CONTROL"
+            per_item.append((sfid, expected, pred["control_id"], status))
 
     # Predictions not present in the gold set count as false positives.
     for sfid, pred in predicted.items():
         if sfid not in gold_by_id:
             fp += 1
-            per_item.append((sfid, None, pred["control_id"], "EXTRA"))
+            status = "EXTRA"
+            if pred["control_id"] not in catalog_control_ids:
+                invalid_control_predictions += 1
+                status = "INVALID_CONTROL"
+            per_item.append((sfid, None, pred["control_id"], status))
 
     precision = tp / (tp + fp) if (tp + fp) else 0.0
     recall = tp / (tp + fn) if (tp + fn) else 0.0
@@ -333,6 +377,7 @@ def evaluate(gold: dict, predicted: dict) -> dict:
         "tp": tp,
         "fp": fp,
         "fn": fn,
+        "invalid_control_predictions": invalid_control_predictions,
         "precision": precision,
         "recall": recall,
         "f1": f1,
@@ -344,7 +389,7 @@ def evaluate(gold: dict, predicted: dict) -> dict:
 
 def print_report(gold: dict, metrics: dict) -> None:
     print("=" * 72)
-    print("Complisoc 15-control gold-standard mapping validation")
+    print("Complisoc 15-control audited synthetic mapping validation")
     print("=" * 72)
     print(f"{'finding_id':<12}{'expected':<12}{'predicted':<12}{'result'}")
     print("-" * 72)
@@ -356,6 +401,7 @@ def print_report(gold: dict, metrics: dict) -> None:
     print(f"True positives    : {metrics['tp']}")
     print(f"False positives   : {metrics['fp']}")
     print(f"False negatives   : {metrics['fn']}")
+    print(f"Invalid control IDs: {metrics['invalid_control_predictions']}")
     print(f"Precision          : {metrics['precision']:.3f}")
     print(f"Recall             : {metrics['recall']:.3f}")
     print("=" * 72)
@@ -373,6 +419,13 @@ def validate(gold_path: pathlib.Path, live: bool = False) -> dict:
         predicted = collect_predictions(db)
     finally:
         db.close()
+    if live:
+        failures = live_provider_failures(gold, predicted)
+        if failures:
+            raise RuntimeError(
+                f"Live provider evaluation incomplete for {len(failures)} findings: "
+                + "; ".join(failures[:10])
+            )
     metrics = evaluate(gold, predicted)
     return metrics
 
@@ -396,7 +449,7 @@ def run_and_capture(gold_path: pathlib.Path, live: bool = False) -> tuple:
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Validate 15-control gold-standard mappings.")
+    parser = argparse.ArgumentParser(description="Validate audited 15-control synthetic mappings.")
     parser.add_argument(
         "--gold",
         type=pathlib.Path,
@@ -455,6 +508,33 @@ def main(argv: list[str] | None = None) -> int:
         predicted = collect_predictions(db)
     finally:
         db.close()
+    if args.live:
+        failures = live_provider_failures(gold, predicted)
+        if failures:
+            print(
+                f"FAIL: live provider evaluation incomplete for {len(failures)} "
+                f"of {len(gold['mappings'])} findings."
+            )
+            for failure in failures[:10]:
+                print(f"  {failure}")
+            print("No live accuracy metrics are reported for an incomplete provider run.")
+            args.output.parent.mkdir(parents=True, exist_ok=True)
+            args.output.write_text(
+                json.dumps(
+                    {
+                        "mode": "live",
+                        "evaluation_status": "blocked",
+                        "framework": gold["framework"],
+                        "framework_version": gold["framework_version"],
+                        "gold_count": len(gold["mappings"]),
+                        "provider_failures": failures,
+                    },
+                    indent=2,
+                ),
+                encoding="utf-8",
+            )
+            print(f"Blocked live-run details written to {args.output}")
+            return 2
     metrics = evaluate(gold, predicted)
     print_report(gold, metrics)
 
@@ -498,7 +578,7 @@ def main(argv: list[str] | None = None) -> int:
             f"or recall {metrics['recall']:.3f} < {args.min_recall}"
         )
         return 1
-    print("PASS: gold-standard mapping validation succeeded.")
+    print("PASS: audited synthetic mapping validation succeeded.")
 
     if args.live:
         args.output.parent.mkdir(parents=True, exist_ok=True)

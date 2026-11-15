@@ -1,9 +1,16 @@
 import { describe, expect, it } from "vitest";
-import { parseFailureJson, parseFindingJson, sampleFindings } from "./json";
+import { parseFailureJson, parseFindingJson } from "./json";
 
 describe("scan-run JSON parsing", () => {
   it("accepts valid scanner findings", () => {
-    expect(parseFindingJson(sampleFindings)).toHaveLength(4);
+    const findings = JSON.stringify([
+      {
+        scanner_name: "checkov",
+        scanner_finding_id: "CKV_TEST_1",
+        raw_json: { title: "Test finding" },
+      },
+    ]);
+    expect(parseFindingJson(findings)).toHaveLength(1);
   });
 
   it("rejects malformed findings", () => {

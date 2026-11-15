@@ -6,6 +6,7 @@ through the full pipeline: run_scanners → process_scan_run → DB assertions.
 
 from __future__ import annotations
 
+import asyncio
 import json
 import os
 from unittest.mock import MagicMock, patch
@@ -92,7 +93,7 @@ class TestTrivyIntegration:
                 }
             ]
         }
-        with patch.object(runners.subprocess, "run", return_value=_fake_run(stdout=json.dumps(report))):
+        with patch.object(runners, "_run_command", return_value=_fake_run(stdout=json.dumps(report))):
             findings, failures = runners.TrivyScanner().run(".")
         assert len(findings) == 1
         assert findings[0]["scanner_name"] == "trivy"
@@ -115,7 +116,7 @@ class TestCheckovIntegration:
                 ]
             }
         }
-        with patch.object(runners.subprocess, "run", return_value=_fake_run(stdout=json.dumps(report))):
+        with patch.object(runners, "_run_command", return_value=_fake_run(stdout=json.dumps(report))):
             findings, failures = runners.CheckovScanner().run(".")
         assert len(findings) == 1
         assert findings[0]["raw_json"]["finding_type"] == "CKV_AWS_1"
@@ -308,9 +309,13 @@ class TestScanRunDBLineage:
             MockVerifier.return_value.verify_batch.return_value = {
                 1: VerificationDecision(result="agree", agreement_value=1.0, explanation="Correct")
             }
-            scan_run = run_scan(ScanRequest(target="."), app_db)
+            scan_run = asyncio.run(run_scan(ScanRequest(target="."), _ConnectedRequest(), app_db))
         app_db.commit()
         raw_findings = app_db.query(RawFinding).filter(RawFinding.scanner_execution_id == scan_run.id).all()
         assert len(raw_findings) == 1
         assert raw_findings[0].scanner_name == "trivy"
 
+
+class _ConnectedRequest:
+    async def is_disconnected(self):
+        return False

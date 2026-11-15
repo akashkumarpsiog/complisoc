@@ -90,7 +90,7 @@ The dashboard consumes the four backend views:
 # Backend (Python) + JUnit XML for CI / Moodle
 python -m pytest tests --junitxml=docs/moodle_evidence/test_run_logs/pytest-junit.xml -q
 
-# 15-control gold-standard benchmark
+# Audited synthetic ISO control benchmark
 python tests/benchmark/validate_mappings.py
 
 # Frontend (vitest)

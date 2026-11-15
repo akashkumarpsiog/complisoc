@@ -1,10 +1,10 @@
 # Complisoc — Scale Testing Documentation
 
-> **Interpretation note:** This document describes benchmark mechanics and historical run details. The authoritative claim boundaries and current QA strategy are in [TESTING_STRATEGY.md](TESTING_STRATEGY.md). In particular, oracle-mocked precision/recall are deterministic pipeline checks, not AI accuracy measurements; generated 100/500-finding files are workload variants, not independently curated findings.
+> **ISO control-ID audit (2026-11):** Earlier benchmark files used several incorrect ISO/IEC 27001:2022 control IDs. All accuracy claims from the former expected labels, including prior live Gemini/Groq runs, are withdrawn and must not be cited. The current 32-case fixture uses corrected IDs and checks its control metadata against the production seed catalog, but remains synthetic and is not an independent ISO mapping evaluation. Oracle-mocked metrics only test deterministic pipeline behavior.
 
 **Version:** 1.0
 **Owner:** QA Engineering
-**Last updated:** September 2026
+**Last updated:** November 2026 (ISO control-ID audit)
 
 ---
 
@@ -14,7 +14,7 @@ This document describes the scale testing strategy, implementation, and results 
 
 > *"Run compliance evaluation harness on synthetic benchmark dataset to measure precision, recall, hallucination rate, and mapping stability under large-scale scan workloads."*
 
-The goal is to prove that the AI compliance mapping pipeline produces accurate, stable, and reproducible control mappings at scale, suitable for SOC 2 / ISO 27001:2022 audit evidence.
+The goal is to test deterministic pipeline behavior and throughput. The synthetic ISO fixture is not suitable as independent compliance evidence or as a claim of AI mapping accuracy.
 
 ---
 
@@ -22,7 +22,7 @@ The goal is to prove that the AI compliance mapping pipeline produces accurate, 
 
 **In scope:**
 
-- Synthetic benchmark dataset of curated security findings with manually validated control mappings
+- Synthetic benchmark dataset of security findings with control IDs checked against the selected 2022 production catalog
 - Evaluation harness measuring precision, recall, F1-score, hallucination rate, and mapping stability
 - Performance under large-scale scan workloads (500–1000 findings)
 - Regression detection via F1-delta vs. committed JSON snapshot
@@ -42,8 +42,8 @@ Complisoc scale testing operates at three levels:
 
 | Level | Tool | Dataset | Measures | Reproducible |
 |-------|------|---------|----------|--------------|
-| **Unit benchmark** | `validate_mappings.py` (oracle-mocked) | 30 curated findings (15 controls × 2 variants) | Precision, recall, F1, FP count | ✅ Yes (CI-safe) |
-| **Live AI benchmark** | `validate_mappings.py` (real Gemini/Groq) | Same 30 findings | Precision, recall, F1 against real models | ⚠️ Manual (requires API keys) |
+| **Unit benchmark** | `validate_mappings.py` (oracle-mocked) | 32 synthetic findings across 15 controls | Deterministic pipeline agreement | ✅ Yes (CI-safe) |
+| **Live AI smoke run** | `validate_mappings.py` (real Gemini/Groq) | Same synthetic fixture | Provider integration only; not independent accuracy | ⚠️ Manual (requires API keys) |
 | **API load test** | Locust | Synthetic HTTP traffic | Throughput, latency, error rate | ✅ Yes (CI-safe) |
 
 The unit benchmark is the primary gate. It runs on every CI build and must pass before merge.
@@ -60,42 +60,41 @@ The unit benchmark is the primary gate. It runs on every CI build and must pass 
 
 The dataset is a JSON document with three sections:
 
-1. **`controls`** — 15 control catalog entries from ISO/IEC 27001:2022 Annex A, covering all four families:
+1. **`controls`** — 15 selected control catalog entries from ISO/IEC 27001:2022 Annex A:
    - Organizational (A.5.x)
-   - People (A.6.x)
    - Physical (A.7.x)
-   - Technological (A.8.x, A.9.x, A.12.x, A.13.x, A.15.x, A.16.x, A.18.x)
+   - Technological (A.8.x)
 
    Each control includes:
    - `control_id`, `control_family`, `title`, `description`, `objective`
    - `scanner_signals` — tokens that deterministic narrowing uses to match findings
    - `keywords` — additional matching tokens
-   - `source_url` — authoritative reference
+   - `source_url` — explanatory reference; ISO is the normative source
 
-2. **`mappings`** — 30 finding-to-control pairs (each of the 15 controls has 2 variants):
-   - `scanner_finding_id` — unique identifier (GOLD-1 through GOLD-30)
+2. **`mappings`** — 32 synthetic finding-to-control pairs (14 controls have 2 examples; A.8.24 has 4):
+   - `scanner_finding_id` — unique identifier (GOLD-1 through GOLD-32)
    - `scanner_name` — which scanner produced the finding (checkov, trivy, sonarqube, defender)
-   - `expected_control_id` — the manually validated ground truth
+   - `expected_control_id` — the reviewed expected control
    - `raw_json` — synthetic scanner output in the same schema as real findings
 
 3. **`framework`** and **`framework_version`** — the compliance framework reference (ISO/IEC 27001:2022 Annex A, version 2022).
 
 ### 4.3 Design Rationale
 
-The benchmark is constructed so that:
+The fixture is constructed so that:
 
 - **Controls have disjoint `scanner_signals` and `keywords`.** This means the deterministic candidate narrowing algorithm (`backend/compliance/candidate_narrowing.py`) will rank the correct control as #1 for every finding.
-- **Each control has 2 finding variants** (e.g., one with severity "high" and one with "critical", or one with a Terraform resource and one with a CloudFormation resource). This tests that the pipeline handles finding diversity without changing the control mapping.
-- **The dataset covers all major control families** to ensure no family is over- or under-represented in the evaluation.
+- **Most controls have two finding variants; A.8.24 has four** because both encryption and key-management findings map to use of cryptography.
+- **The selected controls cover organizational, physical, and technological families.** This is not a complete Annex A catalog or broad family-representative sample.
 
 ### 4.4 Current Size
 
-The 30-finding hand-curated set remains the source of truth. From it, `tests/benchmark/generate_dataset.py` programmatically expands into 100-finding and 500-finding datasets that reuse the same control set with severity pool rotations and resource-suffix / title / description perturbations, while preserving an invariant that each generated variant still maps to the same control. Generated artifacts:
+The 32-finding hand-curated set is the source for `tests/benchmark/generate_dataset.py`, which expands it into 100- and 500-finding workloads using severity rotations and resource-suffix / title / description perturbations. Generated artifacts:
 
-- `tests/benchmark/gold_standard_100.json` (100 findings, 15 controls, 6–7 per control)
-- `tests/benchmark/gold_standard_500.json` (500 findings, 15 controls, 33–34 per control)
+- `tests/benchmark/gold_standard_100.json` (100 findings, 15 controls)
+- `tests/benchmark/gold_standard_500.json` (500 findings, 15 controls)
 
-See Section 8 for the throughput targets validated against these datasets.
+These are repeated synthetic workload variants, not independently curated gold findings.
 
 ---
 
@@ -110,7 +109,7 @@ See Section 8 for the throughput targets validated against these datasets.
 The harness:
 
 1. Loads `gold_standard.json`.
-2. Builds a fresh in-memory SQLite database and seeds the 15 control catalog entries.
+2. Verifies control IDs and core metadata against the production seed migrations, then builds a fresh in-memory SQLite database from the fixture.
 3. Runs the **real** `process_scan_run` pipeline (via `langchain_pipeline.run_pipeline`), but patches the two AI steps with a faithful oracle:
    - **Gemini oracle:** Accepts only the first-ranked candidate from deterministic narrowing (confidence = 0.95 for top-1, 0.10 for others). This isolates the measurement to the narrowing + workflow selection logic.
    - **Groq oracle:** Always agrees (agreement_value = 1.0). This ensures mappings are published, not dropped to manual review.
@@ -136,7 +135,7 @@ The harness reports:
 - F1 ≥ 0.85
 - Hallucination rate ≤ 0.05 (i.e., FP rate ≤ 5%)
 
-**Current results (oracle-mocked, 30 findings):**
+**Current result (oracle-mocked, 32 synthetic findings):**
 
 - Precision: 1.000
 - Recall: 1.000
@@ -144,15 +143,17 @@ The harness reports:
 - Hallucination rate: 0.000
 - Stability: ✅ Identical TP count across repeated runs
 
-**Important caveat:** The oracle accepts the top-1 candidate unconditionally. Because the gold dataset is constructed so that the correct control is always ranked #1 by deterministic narrowing, precision and recall are tautologically 1.0. The benchmark validates that **the pipeline plumbing works end-to-end at scale** and that **deterministic narrowing can select the correct control when keywords are well-separated**. It does **not** validate Gemini's ability to accept or reject ambiguous candidates — that requires the live AI benchmark (see Section 6).
+**Important caveat:** The oracle accepts the top-1 candidate unconditionally. The expected mappings were deliberately constructed around separable keywords, so perfect oracle-mocked scores only show deterministic plumbing on this fixture. They do **not** validate Gemini/Groq accuracy, ambiguity handling, or general ISO control mapping.
 
 ---
 
-## 6. Live AI Benchmark (Manual)
+## 6. Live AI Smoke Run (Manual)
 
 ### 6.1 Purpose
 
-The oracle-mocked benchmark cannot catch regressions in Gemini's actual mapping behavior. The live benchmark runs the same 30 findings through the real Gemini 2.5 Flash and Groq Llama 3.3 70B (or current model fallback) APIs and measures precision/recall against the gold set.
+The live command exercises real provider calls on the synthetic fixture. It is an integration smoke run, not an independent accuracy benchmark.
+
+The previously reported live results used the now-corrected, invalid control labels. Those results are withdrawn and must not be used as evidence of ISO mapping accuracy.
 
 ### 6.2 How to Run
 
@@ -166,16 +167,9 @@ The `--live` flag disables the oracle mocks and lets the real AI steps execute a
 
 > The `COMPLISOC_LIVE_BENCHMARK` env var documented in earlier revisions is no longer required — `--live` on the CLI is the single switch that activates the live path.
 
-### 6.3 Expected Results
+### 6.3 Interpretation
 
-With the current prompt (PROMPT_VERSION = "mvp-v1") and the current models (Gemini 2.5 Flash, openai/gpt-oss-20b on Groq), the live benchmark is expected to achieve:
-
-- Precision: ≥ 0.90 (Gemini occasionally maps to a semantically related but technically wrong control)
-- Recall: ≥ 0.95 (Groq verification catches most incorrect mappings and routes them to manual review)
-- F1: ≥ 0.92
-- Hallucination rate: ≤ 0.10
-
-If the live benchmark falls below these thresholds, the regression alert fires (see Section 7).
+Do not interpret live scores on this synthetic fixture as ISO accuracy or validate them against the former expected labels. An independent, expert-reviewed and broader evaluation set is required before making accuracy claims.
 
 ---
 
@@ -191,7 +185,7 @@ The original proposal committed to:
 
 **Snapshots committed under `tests/benchmark/snapshots/`:**
 
-- `mvp-v1.json` — 30-finding snapshot
+- `mvp-v1.json` — 32-finding snapshot
 - `mvp-v1-100.json` — 100-finding snapshot
 - `mvp-v1-500.json` — 500-finding snapshot
 
@@ -230,9 +224,9 @@ From the original proposal §10.2:
 
 ### 8.2 Datasets
 
-- `tests/benchmark/gold_standard.json` — 30 findings, hand-curated.
-- `tests/benchmark/gold_standard_100.json` — 100 findings, generated from the 30-finding set with severity pool rotations and resource-suffix / title / description perturbations.
-- `tests/benchmark/gold_standard_500.json` — 500 findings, same generator pattern at 33–34 findings per control.
+- `tests/benchmark/gold_standard.json` — 32 synthetic findings, with corrected control IDs checked against production seed metadata.
+- `tests/benchmark/gold_standard_100.json` — 100 generated workload variants.
+- `tests/benchmark/gold_standard_500.json` — 500 generated workload variants.
 
 `tests/benchmark/generate_dataset.py` is the generator. It enforces an invariant: a generated variant must still map to the same control as its seed under the deterministic narrowing algorithm. If a candidate variant would rank a different control higher (i.e. keyword overlap changed because the perturbation was too aggressive), the generator **skips** that variant and tries the next template rather than emitting a bad sample. This guarantees that synthetic scaling does not introduce artificial precision/recall regressions.
 
@@ -254,11 +248,13 @@ This dropped the 500-finding run from ~10 minutes to ~68 s on the dev box. No se
 | 100 | 30 s | 90 s | `test_pipeline_throughput_under_budget[100]` |
 | 500 | 68 s | 180 s | `test_pipeline_throughput_under_budget[500]` |
 
-All three tests pass. The 30-finding baseline of 23.5 s is dominated by AI client import and the SQLite in-memory create/drop cycle, not the per-finding work — it does not change with batch size.
+All three tests pass. The 23.5 s base-case figure is from the former 30-finding run; the corrected 32-finding fixture has not been separately timed. It remains a historical performance observation, not current benchmark evidence.
 
 ### 8.5 Gap vs. Proposal Target
 
 The proposal target of **<30 s for 500–1000 findings** is **not yet met on the dev box** (current: 68 s for 500). The dev box runs single-threaded and shares CPU with the AI client import path. Production deploys would use gunicorn workers, a warm process, and a connection-pooled Postgres backend; the test budgets (180 s for 500) are set at ~3× observed runtime as a regression guard rather than a stretch goal. Closing the remaining 2.3× gap to reach <30 s on the dev box is tracked as a P2 item — likely requires lazy AI client import and reuse of the in-memory DB across the test run.
+
+The separate `tests/ai_quality/test_load.py` exercises the SQLite-backed application workflow with provider calls mocked. Its 500- and 1000-finding cases use 180 s and 360 s ceilings, respectively, as broad regression safety budgets scaled from the 500-finding benchmark budget; they are not evidence that the proposal's <30 s target is met and do not measure live-provider latency.
 
 ### 8.6 Throughput Expectations (Live AI, Projected)
 
@@ -352,19 +348,19 @@ locust -f tests/load/locustfile.py --headless -u 50 -r 5 --run-time 1m --host=ht
 
 ### 10.2 CI Integration
 
-The unit benchmark and pytest scale tests are included in the CI pipeline (`.github/workflows/`). The live AI benchmark and load test are **not** in CI (they require external API keys and a running backend, respectively).
+The deterministic benchmark and pytest scale tests are included in CI (`.github/workflows/`). The live provider smoke run and load test are **not** in CI (they require external API keys and a running backend, respectively).
 
 ### 10.3 Latest Results
 
 The numbers below are reproducible from the commands in §10.1 — they are
 **not** stored as artifacts in the repository.
 
-**Latest oracle-mocked run (30-finding set):**
+**Current oracle-mocked run (32-finding set):**
 
 ```
-Gold mappings      : 30
-Pipeline mappings : 30
-True positives    : 30
+Gold mappings      : 32
+Pipeline mappings : 32
+True positives    : 32
 False positives   : 0
 False negatives   : 0
 Precision          : 1.000
@@ -374,31 +370,15 @@ Hallucination rate : 0.000
 Mapping stability  : OK (identical across 3 runs)
 ```
 
-**Latest F1-delta snapshot check (oracle-mocked, 30/100/500 findings):**
+**Current F1-delta snapshot check (oracle-mocked, 32/100/500 synthetic findings):**
 
 | Dataset | Snapshot F1 | Current F1 | F1-delta | Threshold | Pass |
 |---------|-------------|------------|----------|-----------|------|
-| 30 findings (`mvp-v1.json`) | 1.000 | 1.000 | 0.000 | 0.05 | ✅ |
+| 32 findings (`mvp-v1.json`) | 1.000 | 1.000 | 0.000 | 0.05 | ✅ |
 | 100 findings (`mvp-v1-100.json`) | 1.000 | 1.000 | 0.000 | 0.05 | ✅ |
 | 500 findings (`mvp-v1-500.json`) | 1.000 | 1.000 | 0.000 | 0.05 | ✅ |
 
-**Latest live AI run (`--live`, real Gemini 2.5 Flash + Groq openai/gpt-oss-20b, 30 findings):**
-
-| Metric | Value | Target | Pass |
-| --- | --- | --- | --- |
-| Precision | 1.000 | ≥ 0.90 | ✅ |
-| Recall | 1.000 | ≥ 0.95 | ✅ |
-| F1 | 1.000 | ≥ 0.92 | ✅ |
-| Hallucination rate (FP) | 0.000 | ≤ 0.10 | ✅ |
-| All 30 findings published (both Gemini + Groq agreed at conf ≥ 0.70) | Yes | — | ✅ |
-
-Per-finding output (final_confidence, mapping_status, per-finding predicted
-control) is written to the `--output` path when `--live` is used; it is
-**not** committed. Re-run with `python tests/benchmark/validate_mappings.py
---live --output /tmp/benchmark_live.json`. This is the run that exercises the
-cross-model verification path described in the approved proposal §10.3
-(Gemini maps, Groq verifies, mapping publishes only when both agree at the
-0.70 confidence threshold).
+No current live AI accuracy result is reported. The old live run and repeated-run figures were based on the invalidated control labels; retain them only as historical provider-call records, not as performance evidence.
 
 **Latest load test run:** re-run on demand with the command in §9.6 — the last
 run recorded 124 requests, 0 failures, 11.8 RPS.
@@ -409,7 +389,7 @@ run recorded 124 requests, 0 failures, 11.8 RPS.
 
 ### 11.1 Known Gaps
 
-1. **Oracle-mocked benchmark does not measure AI accuracy.** The oracle accepts the top-1 candidate unconditionally, so precision/recall reflect the deterministic narrowing algorithm, not Gemini's mapping behavior. The live AI benchmark (Section 6) addresses this but is manual, not CI-gated.
+1. **No independent AI accuracy benchmark is available.** The oracle-mocked benchmark measures only deterministic behavior on a synthetic fixture. Previous live scores used incorrect expected control IDs and are withdrawn.
 
 2. **No cost measurement.** The live AI benchmark does not report API token usage or cost per finding. This is important for budget planning (current budget: ₹0/semester, ceiling: ₹2,500).
 
@@ -428,7 +408,7 @@ The following P0/P1 items from the original gap list are now resolved:
 - ✅ Performance budgets enforced in `test_pipeline_throughput_under_budget[30|100|500]`.
 - ✅ Pipeline batch-commit optimization (per-finding → per-stage commit) cut 500-finding runtime ~9×.
 - ✅ Locust load test executed end-to-end against a running backend (see §9.6 for the re-run command and the recorded numbers from the latest run).
-- ✅ Live AI benchmark executed end-to-end with real Gemini 2.5 Flash + Groq `openai/gpt-oss-20b` against all 30 gold findings. Precision/recall/F1 = 1.000, 0 hallucinations, 30/30 mappings published (both AI models agreed at conf ≥ 0.70). The cross-model verification path from the approved proposal has now been demonstrated end-to-end, not just exercised through the deterministic oracle.
+- ✅ Corrected selected benchmark controls and metadata are checked against the production seed catalog. Previous live accuracy claims are withdrawn; new independent AI evaluation remains outstanding.
 
 ### 11.3 Planned Improvements (remaining)
 
@@ -444,11 +424,11 @@ The following P0/P1 items from the original gap list are now resolved:
 
 Scale testing is considered complete when:
 
-- ✅ 30+ finding benchmark with precision/recall/F1 ≥ 0.85 (oracle-mocked) — **F1 = 1.000**
-- ✅ F1-delta regression test against committed snapshot — **passes on 30/100/500 with delta 0.000**
+- ✅ 30+ finding synthetic benchmark with production-catalog metadata validation — **32 curated fixtures; oracle-mocked only**
+- ✅ F1-delta regression test against committed snapshot — **passes on 32/100/500 synthetic workloads**
 - ✅ 500+ finding performance test with a budget enforced in CI — **68 s observed, 180 s budget, 30 s proposal target not yet met (P2)**
 - ✅ Load test with documented results — **0% error rate, see §9.6 for the re-run command**
-- ✅ Live AI benchmark with F1 ≥ 0.85 — **executed with real Gemini 2.5 Flash + Groq `openai/gpt-oss-20b` against the 30-finding gold set, F1 = 1.000, all 30 findings published**
+- ⬜ Independent live AI accuracy benchmark — **not established; former results were withdrawn after control-ID audit**
 
 ---
 
@@ -458,12 +438,12 @@ Scale testing is considered complete when:
 
 | File | Purpose |
 |------|---------|
-| `tests/benchmark/gold_standard.json` | Hand-curated 30-finding benchmark |
+| `tests/benchmark/gold_standard.json` | 32-finding audited synthetic benchmark fixture |
 | `tests/benchmark/gold_standard_100.json` | Generated 100-finding benchmark |
 | `tests/benchmark/gold_standard_500.json` | Generated 500-finding benchmark |
-| `tests/benchmark/generate_dataset.py` | Programmatic expansion from 30 → N findings with invariant check |
+| `tests/benchmark/generate_dataset.py` | Programmatic expansion from 32 → N findings with invariant check |
 | `tests/benchmark/validate_mappings.py` | Evaluation harness with `--update-snapshot` / `--check-snapshot` CLI |
-| `tests/benchmark/snapshots/mvp-v1.json` | Committed F1 snapshot, 30 findings |
+| `tests/benchmark/snapshots/mvp-v1.json` | Committed F1 snapshot, 32 findings |
 | `tests/benchmark/snapshots/mvp-v1-100.json` | Committed F1 snapshot, 100 findings |
 | `tests/benchmark/snapshots/mvp-v1-500.json` | Committed F1 snapshot, 500 findings |
 | `tests/test_scale_testing.py` | 9-test scale suite: precision/recall, mapping stability, F1-delta × 3, throughput × 3, snapshot round-trip |

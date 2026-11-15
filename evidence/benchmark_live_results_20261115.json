@@ -1,0 +1,20 @@
+{
+  "mode": "live",
+  "evaluation_status": "blocked",
+  "framework": "ISO/IEC 27001:2022 Annex A",
+  "framework_version": "2022",
+  "gold_count": 32,
+  "provider_failures": [
+    "GOLD-8: no Groq verification",
+    "GOLD-12: no Groq verification",
+    "GOLD-14: no Groq verification",
+    "GOLD-17: no Groq verification",
+    "GOLD-19: no Groq verification",
+    "GOLD-22: no Groq verification",
+    "GOLD-23: no Groq verification",
+    "GOLD-27: no Groq verification",
+    "GOLD-29: no Groq verification",
+    "GOLD-31: no Groq verification",
+    "GOLD-32: no Groq verification"
+  ]
+}

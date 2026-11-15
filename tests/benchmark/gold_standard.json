@@ -1,173 +1,347 @@
 {
-  "version": "gold-1",
-  "description": "Canonical 15-control benchmark used by validate_mappings.py. Each entry pairs a synthetic scanner finding with the single compliance control it must map to. Controls use disjoint keywords/scanner_signals so the deterministic candidate narrowing selects exactly the intended control as its top candidate. The validation script ingests these findings through the real pipeline (with the AI mapping mocked to accept the top candidate) and compares predicted control ids against the gold expectations, reporting precision/recall.",
+  "version": "audited-32",
+  "description": "Audited synthetic benchmark: expected controls and canonical metadata are checked against the production ISO/IEC 27001:2022 seed catalog. Findings test candidate narrowing and workflow behavior; they are not an independent 500-case AI accuracy evaluation.",
   "framework": "ISO/IEC 27001:2022 Annex A",
   "framework_version": "2022",
   "controls": [
     {
       "control_id": "A.5.15",
-      "control_family": "Access Control",
-      "title": "Access control",
-      "description": "Rules to control access to information and other associated assets.",
-      "objective": "Limit access to information and systems based on business and security requirements.",
-      "evidence_examples": ["access_review_report"],
-      "scanner_signals": ["iam", "public_access", "permission"],
-      "keywords": ["access", "iam", "permission", "public"],
-      "source_url": "https://example.test/iso-a-5-15"
+      "control_family": "Organizational",
+      "title": "Access Control",
+      "description": "Limit access to information and systems based on business and security requirements.",
+      "objective": "Prevent unauthorized access to systems, applications, data, and services.",
+      "evidence_examples": [
+        "access_review_report"
+      ],
+      "scanner_signals": [
+        "iam",
+        "public_access",
+        "permission"
+      ],
+      "keywords": [
+        "access",
+        "iam",
+        "permission",
+        "public"
+      ],
+      "source_url": "https://www.isms.online/iso-27001/annex-a-2022/5-15-access-control-2022/"
     },
     {
-      "control_id": "A.8.1",
-      "control_family": "Cryptography",
-      "title": "Encryption of information",
-      "description": "Protection of the confidentiality, authenticity and/or integrity of information.",
-      "objective": "Ensure safe use of cryptography to protect the confidentiality of information.",
-      "evidence_examples": ["encryption_report"],
-      "scanner_signals": ["encryption", "tls", "at_rest"],
-      "keywords": ["encryption", "tls", "at_rest", "cipher"],
-      "source_url": "https://example.test/iso-a-8-1"
+      "control_id": "A.8.24",
+      "control_family": "Technological",
+      "title": "Use of Cryptography",
+      "description": "Use cryptographic controls to protect the confidentiality, integrity, and authenticity of information.",
+      "objective": "Ensure data in transit and at rest is appropriately protected using cryptographic methods.",
+      "evidence_examples": [
+        "encryption_report"
+      ],
+      "scanner_signals": [
+        "encryption",
+        "tls",
+        "at_rest",
+        "kms",
+        "key_rotation",
+        "secrets"
+      ],
+      "keywords": [
+        "encryption",
+        "tls",
+        "at_rest",
+        "cipher",
+        "kms",
+        "key_rotation",
+        "secrets",
+        "credential"
+      ],
+      "source_url": "https://www.isms.online/iso-27001/annex-a-2022/8-24-use-of-cryptography-2022/"
     },
     {
-      "control_id": "A.8.2",
-      "control_family": "Cryptography",
-      "title": "Key management",
-      "description": "Policies and procedures for the management of cryptographic keys.",
-      "objective": "Ensure proper management of keys through their life cycle.",
-      "evidence_examples": ["kms_audit"],
-      "scanner_signals": ["kms", "key_rotation", "secrets"],
-      "keywords": ["kms", "key_rotation", "secrets", "credential"],
-      "source_url": "https://example.test/iso-a-8-2"
+      "control_id": "A.8.15",
+      "control_family": "Technological",
+      "title": "Logging",
+      "description": "Produce, store, protect, and analyse logs that record relevant activities and events.",
+      "objective": "Create reliable event records that support security monitoring and investigation.",
+      "evidence_examples": [
+        "audit_log"
+      ],
+      "scanner_signals": [
+        "logging",
+        "audit",
+        "trail",
+        "log"
+      ],
+      "keywords": [
+        "logging",
+        "audit",
+        "trail",
+        "log"
+      ],
+      "source_url": "https://www.isms.online/iso-27001/annex-a-2022/8-15-logging-2022/"
     },
     {
-      "control_id": "A.9.1",
-      "control_family": "Logging",
-      "title": "Logging and monitoring",
-      "description": "Activity logging and continuous monitoring of anomalous behaviour.",
-      "objective": "Record events and generate evidence for the detection of anomalous activities.",
-      "evidence_examples": ["audit_log"],
-      "scanner_signals": ["logging", "audit", "trail"],
-      "keywords": ["logging", "audit", "trail", "monitor"],
-      "source_url": "https://example.test/iso-a-9-1"
+      "control_id": "A.8.16",
+      "control_family": "Technological",
+      "title": "Monitoring activities",
+      "description": "Monitor networks, systems, and applications for anomalous behaviour and potential incidents.",
+      "objective": "Detect anomalous activity and assess potential information security incidents.",
+      "evidence_examples": [
+        "audit_log"
+      ],
+      "scanner_signals": [
+        "monitoring",
+        "monitor",
+        "alert",
+        "anomaly"
+      ],
+      "keywords": [
+        "monitoring",
+        "monitor",
+        "alert",
+        "anomaly"
+      ],
+      "source_url": "https://www.isms.online/iso-27001/annex-a-2022/8-16-monitoring-activities-2022/"
     },
     {
-      "control_id": "A.12.1",
-      "control_family": "Network Security",
-      "title": "Network controls",
-      "description": "Networks and network services are securely managed.",
-      "objective": "Protect information in networks and protect the supporting infrastructure.",
-      "evidence_examples": ["firewall_rules"],
-      "scanner_signals": ["network", "firewall", "ingress"],
-      "keywords": ["network", "firewall", "ingress", "port"],
-      "source_url": "https://example.test/iso-a-12-1"
+      "control_id": "A.8.20",
+      "control_family": "Technological",
+      "title": "Networks security",
+      "description": "Protect networks and network services through appropriate technical and organizational controls.",
+      "objective": "Reduce unauthorized access to network resources and limit lateral movement across systems.",
+      "evidence_examples": [
+        "firewall_rules"
+      ],
+      "scanner_signals": [
+        "network",
+        "firewall",
+        "ingress"
+      ],
+      "keywords": [
+        "network",
+        "firewall",
+        "ingress",
+        "port"
+      ],
+      "source_url": "https://www.isms.online/iso-27001/annex-a-2022/8-20-network-security-2022/"
     },
     {
-      "control_id": "A.13.1",
-      "control_family": "Business Continuity",
-      "title": "Information backup",
-      "description": "Procedures for backup and recovery of information.",
-      "objective": "Maintain the continuity of operations during incidents.",
-      "evidence_examples": ["backup_report"],
-      "scanner_signals": ["backup", "restore", "failover"],
-      "keywords": ["backup", "restore", "continuity", "failover"],
-      "source_url": "https://example.test/iso-a-13-1"
+      "control_id": "A.8.13",
+      "control_family": "Technological",
+      "title": "Information Backup",
+      "description": "Implement backup procedures to protect information and support recovery from incidents or failures.",
+      "objective": "Ensure reliable recovery of systems, applications, and data when disruptions occur.",
+      "evidence_examples": [
+        "backup_report"
+      ],
+      "scanner_signals": [
+        "backup",
+        "restore",
+        "failover"
+      ],
+      "keywords": [
+        "backup",
+        "restore",
+        "continuity",
+        "failover"
+      ],
+      "source_url": "https://www.isms.online/iso-27001/annex-a-2022/8-13-information-backup-2022/"
     },
     {
       "control_id": "A.5.18",
-      "control_family": "Access Control",
-      "title": "Access rights",
-      "description": "Provisioning and review of access rights for all users.",
-      "objective": "Prevent privilege escalation and unauthorized use of privileged functions.",
-      "evidence_examples": ["privilege_review"],
-      "scanner_signals": ["privilege", "admin", "sudo"],
-      "keywords": ["privilege", "admin", "sudo", "root"],
-      "source_url": "https://example.test/iso-a-5-18"
+      "control_family": "Organizational",
+      "title": "Access Rights",
+      "description": "Grant, review, and remove access rights based on approved business and security requirements.",
+      "objective": "Ensure users and systems retain only the minimum necessary access for their roles.",
+      "evidence_examples": [
+        "privilege_review"
+      ],
+      "scanner_signals": [
+        "privilege",
+        "admin",
+        "sudo"
+      ],
+      "keywords": [
+        "privilege",
+        "admin",
+        "sudo",
+        "root"
+      ],
+      "source_url": "https://www.isms.online/iso-27001/annex-a-2022/5-18-access-rights-2022/"
     },
     {
       "control_id": "A.8.8",
-      "control_family": "Secure Development",
+      "control_family": "Technological",
       "title": "Management of technical vulnerabilities",
-      "description": "Technical vulnerabilities are identified and remediated in due time.",
-      "objective": "Prevent exploitation of technical vulnerabilities.",
-      "evidence_examples": ["dependency_scan"],
-      "scanner_signals": ["dependency", "vulnerability", "patch"],
-      "keywords": ["dependency", "vulnerability", "patch", "cve"],
-      "source_url": "https://example.test/iso-a-8-8"
+      "description": "Obtain information about technical vulnerabilities and take appropriate measures to address them.",
+      "objective": "Reduce the likelihood and impact of exploitation of technical vulnerabilities.",
+      "evidence_examples": [
+        "dependency_scan"
+      ],
+      "scanner_signals": [
+        "dependency",
+        "vulnerability",
+        "patch"
+      ],
+      "keywords": [
+        "dependency",
+        "vulnerability",
+        "patch",
+        "cve"
+      ],
+      "source_url": "https://www.isms.online/iso-27001/annex-a-2022/8-8-management-of-technical-vulnerabilities-2022/"
     },
     {
-      "control_id": "A.5.17",
-      "control_family": "Access Control",
-      "title": "Authentication",
-      "description": "Processes for verifying identity of users and entities.",
-      "objective": "Ensure users and services are authenticated appropriately.",
-      "evidence_examples": ["mfa_report"],
-      "scanner_signals": ["mfa", "authentication", "password"],
-      "keywords": ["mfa", "authentication", "password", "credential"],
-      "source_url": "https://example.test/iso-a-5-17"
+      "control_id": "A.8.5",
+      "control_family": "Technological",
+      "title": "Secure authentication",
+      "description": "Implement secure authentication technologies and procedures appropriate to access risks.",
+      "objective": "Ensure users and systems authenticate securely before accessing information and services.",
+      "evidence_examples": [
+        "mfa_report"
+      ],
+      "scanner_signals": [
+        "mfa",
+        "authentication",
+        "password"
+      ],
+      "keywords": [
+        "mfa",
+        "authentication",
+        "password",
+        "credential"
+      ],
+      "source_url": "https://www.isms.online/iso-27001/annex-a-2022/8-5-secure-authentication-2022/"
     },
     {
       "control_id": "A.8.9",
-      "control_family": "Secure Development",
+      "control_family": "Technological",
       "title": "Configuration management",
-      "description": "Hardware, software, services and networks are hardened.",
-      "objective": "Establish secure configuration baselines and detect drift.",
-      "evidence_examples": ["hardening_baseline"],
-      "scanner_signals": ["baseline", "hardening", "misconfiguration"],
-      "keywords": ["baseline", "hardening", "misconfiguration", "config"],
-      "source_url": "https://example.test/iso-a-8-9"
+      "description": "Establish, document, implement, monitor, and review configurations for technology.",
+      "objective": "Maintain secure and controlled configurations throughout the technology lifecycle.",
+      "evidence_examples": [
+        "hardening_baseline"
+      ],
+      "scanner_signals": [
+        "baseline",
+        "hardening",
+        "misconfiguration"
+      ],
+      "keywords": [
+        "baseline",
+        "hardening",
+        "misconfiguration",
+        "config"
+      ],
+      "source_url": "https://www.isms.online/iso-27001/annex-a-2022/8-9-configuration-management-2022/"
     },
     {
-      "control_id": "A.5.20",
-      "control_family": "Secure Architecture",
-      "title": "Network segmentation",
-      "description": "Networks are segmented according to the access control policy.",
-      "objective": "Limit the impact of a security incident through separation of environments.",
-      "evidence_examples": ["segmentation_diagram"],
-      "scanner_signals": ["boundary", "segmentation", "dmz"],
-      "keywords": ["boundary", "segmentation", "dmz", "zoning"],
-      "source_url": "https://example.test/iso-a-5-20"
+      "control_id": "A.8.22",
+      "control_family": "Technological",
+      "title": "Segregation of networks",
+      "description": "Separate groups of information services, users, and systems within networks.",
+      "objective": "Limit exposure and lateral movement by controlling communication between network segments.",
+      "evidence_examples": [
+        "segmentation_diagram"
+      ],
+      "scanner_signals": [
+        "boundary",
+        "segmentation",
+        "dmz"
+      ],
+      "keywords": [
+        "boundary",
+        "segmentation",
+        "dmz",
+        "zoning"
+      ],
+      "source_url": "https://www.isms.online/iso-27001/annex-a-2022/8-22-segregation-of-networks-2022/"
     },
     {
       "control_id": "A.7.1",
-      "control_family": "Physical Security",
-      "title": "Physical security perimeters",
-      "description": "Physical barriers protect areas containing information and assets.",
-      "objective": "Prevent unauthorized physical access to facilities and equipment.",
-      "evidence_examples": ["datacenter_access_log"],
-      "scanner_signals": ["datacenter", "badge", "physical"],
-      "keywords": ["datacenter", "badge", "physical", "locks"],
-      "source_url": "https://example.test/iso-a-7-1"
+      "control_family": "Physical",
+      "title": "Physical Security Perimeters",
+      "description": "Implement physical barriers to protect information systems and sensitive areas from unauthorized access.",
+      "objective": "Prevent unauthorized physical entry to sites, rooms, and critical infrastructure.",
+      "evidence_examples": [
+        "datacenter_access_log"
+      ],
+      "scanner_signals": [
+        "datacenter",
+        "badge",
+        "physical"
+      ],
+      "keywords": [
+        "datacenter",
+        "badge",
+        "physical",
+        "locks"
+      ],
+      "source_url": "https://www.isms.online/iso-27001/annex-a-2022/7-1-physical-security-perimeters-2022/"
     },
     {
-      "control_id": "A.16.1",
-      "control_family": "Incident Management",
-      "title": "Incident management planning",
-      "description": "Procedures for responding to and managing information security incidents.",
-      "objective": "Ensure a consistent and effective approach to incident handling.",
-      "evidence_examples": ["soc_runbook"],
-      "scanner_signals": ["incident", "response", "alerting"],
-      "keywords": ["incident", "response", "soc", "alerting"],
-      "source_url": "https://example.test/iso-a-16-1"
+      "control_id": "A.5.24",
+      "control_family": "Organizational",
+      "title": "Information Security Incident Management Planning and Preparation",
+      "description": "Prepare for information security incidents with defined roles, procedures, communications, and escalation paths.",
+      "objective": "Reduce the impact of incidents by ensuring that teams can respond quickly and consistently.",
+      "evidence_examples": [
+        "soc_runbook"
+      ],
+      "scanner_signals": [
+        "incident",
+        "response",
+        "alerting"
+      ],
+      "keywords": [
+        "incident",
+        "response",
+        "soc",
+        "alerting"
+      ],
+      "source_url": "https://www.isms.online/iso-27001/annex-a-2022/5-24-incident-management-planning-and-preparation-2022/"
     },
     {
-      "control_id": "A.18.1",
-      "control_family": "Compliance",
-      "title": "Protection of records",
-      "description": "Records are protected from loss, destruction or falsification.",
-      "objective": "Comply with statutory, regulatory and contractual obligations.",
-      "evidence_examples": ["privacy_register"],
-      "scanner_signals": ["gdpr", "pii", "retention"],
-      "keywords": ["gdpr", "pii", "retention", "privacy"],
-      "source_url": "https://example.test/iso-a-18-1"
+      "control_id": "A.5.34",
+      "control_family": "Organizational",
+      "title": "Privacy and Protection of PII",
+      "description": "Protect Personally Identifiable Information (PII) through appropriate handling, access, retention, and disposal controls.",
+      "objective": "Preserve privacy and reduce the risk of unauthorized exposure of personal data.",
+      "evidence_examples": [
+        "privacy_register"
+      ],
+      "scanner_signals": [
+        "gdpr",
+        "pii",
+        "retention"
+      ],
+      "keywords": [
+        "gdpr",
+        "pii",
+        "retention",
+        "privacy"
+      ],
+      "source_url": "https://www.isms.online/iso-27001/annex-a-2022/5-34-privacy-and-protection-of-pii-2022/"
     },
     {
-      "control_id": "A.15.1",
-      "control_family": "Supplier Relationships",
-      "title": "Supplier assessment",
-      "description": "Risks from the use of products and services supplied externally.",
-      "objective": "Ensure risks from supplier relationships are identified and managed.",
-      "evidence_examples": ["vendor_assessment"],
-      "scanner_signals": ["vendor", "third_party", "supply_chain"],
-      "keywords": ["vendor", "third_party", "supply_chain", "sla"],
-      "source_url": "https://example.test/iso-a-15-1"
+      "control_id": "A.5.19",
+      "control_family": "Organizational",
+      "title": "Information security in supplier relationships",
+      "description": "Manage information security risks arising from supplier products and services.",
+      "objective": "Protect organizational information and assets that are accessible to or affected by suppliers.",
+      "evidence_examples": [
+        "vendor_assessment"
+      ],
+      "scanner_signals": [
+        "vendor",
+        "third_party",
+        "supply_chain"
+      ],
+      "keywords": [
+        "vendor",
+        "third_party",
+        "supply_chain",
+        "sla"
+      ],
+      "source_url": "https://www.isms.online/iso-27001/annex-a-2022/5-19-information-security-supplier-relationships-2022/"
     }
   ],
   "mappings": [
@@ -190,7 +364,7 @@
       "id": 2,
       "scanner_name": "trivy",
       "scanner_finding_id": "GOLD-2",
-      "expected_control_id": "A.8.1",
+      "expected_control_id": "A.8.24",
       "expected_framework": "ISO/IEC 27001:2022 Annex A",
       "raw_json": {
         "finding_type": "encryption tls at_rest cipher",
@@ -205,7 +379,7 @@
       "id": 3,
       "scanner_name": "checkov",
       "scanner_finding_id": "GOLD-3",
-      "expected_control_id": "A.8.2",
+      "expected_control_id": "A.8.24",
       "expected_framework": "ISO/IEC 27001:2022 Annex A",
       "raw_json": {
         "finding_type": "kms key_rotation secrets credential",
@@ -220,22 +394,22 @@
       "id": 4,
       "scanner_name": "trivy",
       "scanner_finding_id": "GOLD-4",
-      "expected_control_id": "A.9.1",
+      "expected_control_id": "A.8.15",
       "expected_framework": "ISO/IEC 27001:2022 Annex A",
       "raw_json": {
-        "finding_type": "logging audit trail monitor",
+        "finding_type": "logging audit trail log disabled",
         "resource_type": "aws_cloudtrail",
         "resource_identifier": "aws_cloudtrail.logging_audit_trail_monitor",
         "severity": "medium",
-        "title": "logging audit trail monitor disabled",
-        "description": "logging audit trail monitor must be enabled"
+        "title": "logging audit trail events are not collected",
+        "description": "logging audit trail data is missing from this resource"
       }
     },
     {
       "id": 5,
       "scanner_name": "checkov",
       "scanner_finding_id": "GOLD-5",
-      "expected_control_id": "A.12.1",
+      "expected_control_id": "A.8.20",
       "expected_framework": "ISO/IEC 27001:2022 Annex A",
       "raw_json": {
         "finding_type": "network firewall ingress port",
@@ -250,7 +424,7 @@
       "id": 6,
       "scanner_name": "checkov",
       "scanner_finding_id": "GOLD-6",
-      "expected_control_id": "A.13.1",
+      "expected_control_id": "A.8.13",
       "expected_framework": "ISO/IEC 27001:2022 Annex A",
       "raw_json": {
         "finding_type": "backup restore continuity failover",
@@ -295,7 +469,7 @@
       "id": 9,
       "scanner_name": "checkov",
       "scanner_finding_id": "GOLD-9",
-      "expected_control_id": "A.5.17",
+      "expected_control_id": "A.8.5",
       "expected_framework": "ISO/IEC 27001:2022 Annex A",
       "raw_json": {
         "finding_type": "mfa authentication password credential",
@@ -325,7 +499,7 @@
       "id": 11,
       "scanner_name": "checkov",
       "scanner_finding_id": "GOLD-11",
-      "expected_control_id": "A.5.20",
+      "expected_control_id": "A.8.22",
       "expected_framework": "ISO/IEC 27001:2022 Annex A",
       "raw_json": {
         "finding_type": "boundary segmentation dmz zoning",
@@ -355,7 +529,7 @@
       "id": 13,
       "scanner_name": "checkov",
       "scanner_finding_id": "GOLD-13",
-      "expected_control_id": "A.16.1",
+      "expected_control_id": "A.5.24",
       "expected_framework": "ISO/IEC 27001:2022 Annex A",
       "raw_json": {
         "finding_type": "incident response soc alerting",
@@ -370,7 +544,7 @@
       "id": 14,
       "scanner_name": "trivy",
       "scanner_finding_id": "GOLD-14",
-      "expected_control_id": "A.18.1",
+      "expected_control_id": "A.5.34",
       "expected_framework": "ISO/IEC 27001:2022 Annex A",
       "raw_json": {
         "finding_type": "gdpr pii retention privacy",
@@ -385,7 +559,7 @@
       "id": 15,
       "scanner_name": "checkov",
       "scanner_finding_id": "GOLD-15",
-      "expected_control_id": "A.15.1",
+      "expected_control_id": "A.5.19",
       "expected_framework": "ISO/IEC 27001:2022 Annex A",
       "raw_json": {
         "finding_type": "vendor third_party supply_chain sla",
@@ -415,7 +589,7 @@
       "id": 17,
       "scanner_name": "trivy",
       "scanner_finding_id": "GOLD-17",
-      "expected_control_id": "A.8.1",
+      "expected_control_id": "A.8.24",
       "expected_framework": "ISO/IEC 27001:2022 Annex A",
       "raw_json": {
         "finding_type": "encryption tls at_rest cipher",
@@ -430,7 +604,7 @@
       "id": 18,
       "scanner_name": "checkov",
       "scanner_finding_id": "GOLD-18",
-      "expected_control_id": "A.8.2",
+      "expected_control_id": "A.8.24",
       "expected_framework": "ISO/IEC 27001:2022 Annex A",
       "raw_json": {
         "finding_type": "kms key_rotation secrets credential",
@@ -445,22 +619,22 @@
       "id": 19,
       "scanner_name": "trivy",
       "scanner_finding_id": "GOLD-19",
-      "expected_control_id": "A.9.1",
+      "expected_control_id": "A.8.16",
       "expected_framework": "ISO/IEC 27001:2022 Annex A",
       "raw_json": {
-        "finding_type": "logging audit trail monitor",
+        "finding_type": "monitoring activities monitor alert anomaly",
         "resource_type": "aws_cloudtrail",
         "resource_identifier": "aws_cloudtrail.logging_audit_trail_monitor_v2",
         "severity": "medium",
-        "title": "logging audit trail monitor disabled v2",
-        "description": "logging audit trail monitor must be enabled v2"
+        "title": "monitoring activities anomaly alert not configured",
+        "description": "monitoring activities do not detect anomalous events or raise alerts"
       }
     },
     {
       "id": 20,
       "scanner_name": "checkov",
       "scanner_finding_id": "GOLD-20",
-      "expected_control_id": "A.12.1",
+      "expected_control_id": "A.8.20",
       "expected_framework": "ISO/IEC 27001:2022 Annex A",
       "raw_json": {
         "finding_type": "network firewall ingress port",
@@ -475,7 +649,7 @@
       "id": 21,
       "scanner_name": "checkov",
       "scanner_finding_id": "GOLD-21",
-      "expected_control_id": "A.13.1",
+      "expected_control_id": "A.8.13",
       "expected_framework": "ISO/IEC 27001:2022 Annex A",
       "raw_json": {
         "finding_type": "backup restore continuity failover",
@@ -520,7 +694,7 @@
       "id": 24,
       "scanner_name": "checkov",
       "scanner_finding_id": "GOLD-24",
-      "expected_control_id": "A.5.17",
+      "expected_control_id": "A.8.5",
       "expected_framework": "ISO/IEC 27001:2022 Annex A",
       "raw_json": {
         "finding_type": "mfa authentication password credential",
@@ -550,7 +724,7 @@
       "id": 26,
       "scanner_name": "checkov",
       "scanner_finding_id": "GOLD-26",
-      "expected_control_id": "A.5.20",
+      "expected_control_id": "A.8.22",
       "expected_framework": "ISO/IEC 27001:2022 Annex A",
       "raw_json": {
         "finding_type": "boundary segmentation dmz zoning",
@@ -580,7 +754,7 @@
       "id": 28,
       "scanner_name": "checkov",
       "scanner_finding_id": "GOLD-28",
-      "expected_control_id": "A.16.1",
+      "expected_control_id": "A.5.24",
       "expected_framework": "ISO/IEC 27001:2022 Annex A",
       "raw_json": {
         "finding_type": "incident response soc alerting",
@@ -595,7 +769,7 @@
       "id": 29,
       "scanner_name": "trivy",
       "scanner_finding_id": "GOLD-29",
-      "expected_control_id": "A.18.1",
+      "expected_control_id": "A.5.34",
       "expected_framework": "ISO/IEC 27001:2022 Annex A",
       "raw_json": {
         "finding_type": "gdpr pii retention privacy",
@@ -610,7 +784,7 @@
       "id": 30,
       "scanner_name": "checkov",
       "scanner_finding_id": "GOLD-30",
-      "expected_control_id": "A.15.1",
+      "expected_control_id": "A.5.19",
       "expected_framework": "ISO/IEC 27001:2022 Annex A",
       "raw_json": {
         "finding_type": "vendor third_party supply_chain sla",
@@ -619,6 +793,36 @@
         "severity": "high",
         "title": "vendor third_party supply_chain sla risk v2",
         "description": "vendor third_party supply_chain sla not assessed v2"
+      }
+    },
+    {
+      "id": 31,
+      "scanner_name": "trivy",
+      "scanner_finding_id": "GOLD-31",
+      "expected_control_id": "A.8.15",
+      "expected_framework": "ISO/IEC 27001:2022 Annex A",
+      "raw_json": {
+        "finding_type": "logging audit trail log disabled",
+        "resource_type": "aws_cloudtrail",
+        "resource_identifier": "aws_cloudtrail.audit_log_events",
+        "severity": "medium",
+        "title": "logging audit trail events are not collected",
+        "description": "logging audit trail data is missing from this resource"
+      }
+    },
+    {
+      "id": 32,
+      "scanner_name": "trivy",
+      "scanner_finding_id": "GOLD-32",
+      "expected_control_id": "A.8.16",
+      "expected_framework": "ISO/IEC 27001:2022 Annex A",
+      "raw_json": {
+        "finding_type": "monitoring activities monitor alert anomaly",
+        "resource_type": "aws_cloudtrail",
+        "resource_identifier": "aws_cloudwatch.monitoring_anomaly_alert",
+        "severity": "medium",
+        "title": "monitoring activities anomaly alert not configured",
+        "description": "monitoring activities do not detect anomalous events or raise alerts"
       }
     }
   ]

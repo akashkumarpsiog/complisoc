@@ -1,237 +1,188 @@
-"""AI Performance & Monitoring Tests
+"""Measured offline processing and existing retry behavior.
 
-Validates AI endpoint performance, token usage tracking, and rate limit handling.
-These tests ensure AI operations meet latency and cost requirements.
+Provider latency, provider token usage, monitoring, and circuit-breaker
+behavior are not instrumented by the application and are not simulated here.
 """
 from __future__ import annotations
 
-import time
-from dataclasses import dataclass
-from typing import Any
-from unittest.mock import MagicMock, patch
+from time import perf_counter
 
 import pytest
 
+from complisoc.backend.compliance.workflow import process_scan_run
+from complisoc.backend.core import retry as retry_module
+from complisoc.backend.core.retry import call_with_retry
 
-@dataclass
-class PerformanceBenchmark:
-    """Performance benchmark for AI operations."""
-    operation: str
-    max_latency_ms: float
-    max_tokens: int
-    description: str
+
+def _measure(db, make_finding, count: int):
+    started = perf_counter()
+    result = process_scan_run(
+        db,
+        target_environment=f"ai-quality-performance-{count}",
+        findings=[make_finding(index) for index in range(1, count + 1)],
+    )
+    return perf_counter() - started, result
 
 
 class TestAIResponseTime:
-    """Tests that AI operations meet latency requirements."""
+    def test_single_finding_measures_real_pipeline(self, ai_quality_db, ai_quality_finding, mocked_ai_services):
+        elapsed, result = _measure(ai_quality_db, ai_quality_finding, 1)
+        assert elapsed > 0
+        assert len(result["mappings"]) == 1
 
-    BENCHMARKS = [
-        PerformanceBenchmark("single_mapping", 2000, 500, "Single finding-control mapping"),
-        PerformanceBenchmark("batch_mapping_10", 5000, 2000, "Batch mapping of 10 findings"),
-        PerformanceBenchmark("batch_mapping_50", 15000, 8000, "Batch mapping of 50 findings"),
-        PerformanceBenchmark("single_verification", 2000, 400, "Single verification"),
-        PerformanceBenchmark("batch_verification_10", 5000, 15000, "Batch verification of 10 items"),
-    ]
+    def test_batch_of_ten_measures_real_pipeline(self, ai_quality_db, ai_quality_finding, mocked_ai_services):
+        elapsed, result = _measure(ai_quality_db, ai_quality_finding, 10)
+        assert elapsed > 0
+        assert len(result["normalized_findings"]) == 10
 
-    def test_single_mapping_latency(self):
-        """Single mapping should complete within 2 seconds."""
-        start = time.monotonic()
-        # Simulate mapping operation
-        time.sleep(0.01)  # Mock delay
-        elapsed_ms = (time.monotonic() - start) * 1000
-        assert elapsed_ms < 2000, f"Single mapping too slow: {elapsed_ms:.0f}ms"
+    def test_batch_of_fifty_measures_real_pipeline(self, ai_quality_db, ai_quality_finding, mocked_ai_services):
+        elapsed, result = _measure(ai_quality_db, ai_quality_finding, 50)
+        assert elapsed > 0
+        assert len(result["mappings"]) == 50
 
-    def test_batch_mapping_latency(self):
-        """Batch mapping of 10 items should complete within 5 seconds."""
-        start = time.monotonic()
-        # Simulate batch mapping
-        time.sleep(0.05)  # Mock delay
-        elapsed_ms = (time.monotonic() - start) * 1000
-        assert elapsed_ms < 5000, f"Batch mapping too slow: {elapsed_ms:.0f}ms"
+    def test_batch_of_one_hundred_measures_real_pipeline(
+        self, ai_quality_db, ai_quality_finding, mocked_ai_services
+    ):
+        elapsed, result = _measure(ai_quality_db, ai_quality_finding, 100)
+        assert elapsed > 0
+        assert len(result["mappings"]) == 100
 
-    def test_verification_latency(self):
-        """Single verification should complete within 2 seconds."""
-        start = time.monotonic()
-        # Simulate verification
-        time.sleep(0.01)  # Mock delay
-        elapsed_ms = (time.monotonic() - start) * 1000
-        assert elapsed_ms < 2000, f"Verification too slow: {elapsed_ms:.0f}ms"
-
-    def test_pipeline_latency(self):
-        """Full pipeline should complete within 30 seconds for 10 findings."""
-        start = time.monotonic()
-        # Simulate pipeline
-        time.sleep(0.1)  # Mock delay
-        elapsed_ms = (time.monotonic() - start) * 1000
-        assert elapsed_ms < 30000, f"Pipeline too slow: {elapsed_ms:.0f}ms"
-
-    def test_benchmarks_defined(self):
-        """All benchmarks should have valid values."""
-        for b in self.BENCHMARKS:
-            assert b.max_latency_ms > 0, f"Invalid latency for {b.operation}"
-            assert b.max_tokens > 0, f"Invalid max_tokens for {b.operation}"
-            assert len(b.description) > 0, f"Missing description for {b.operation}"
+    def test_offline_pipeline_stays_within_local_500_finding_safety_budget(
+        self, ai_quality_db, ai_quality_finding, mocked_ai_services
+    ):
+        elapsed, result = _measure(ai_quality_db, ai_quality_finding, 500)
+        assert elapsed < 180
+        assert len(result["mappings"]) == 500
 
 
 class TestTokenUsageTracking:
-    """Tests that token usage is tracked for cost monitoring."""
-
+    @pytest.mark.skip(reason="Complisoc does not persist provider token-usage telemetry.")
     def test_mapping_token_usage_recorded(self):
-        """Mapping operations should record token usage."""
-        usage = {
-            "prompt_tokens": 1500,
-            "completion_tokens": 300,
-            "total_tokens": 1800,
-            "model": "gemini-2.0-flash",
-        }
-        assert usage["total_tokens"] == usage["prompt_tokens"] + usage["completion_tokens"]
-        assert usage["total_tokens"] > 0
+        pass
 
+    @pytest.mark.skip(reason="Complisoc does not persist provider token-usage telemetry.")
     def test_verification_token_usage_recorded(self):
-        """Verification operations should record token usage."""
-        usage = {
-            "prompt_tokens": 800,
-            "completion_tokens": 200,
-            "total_tokens": 1000,
-            "model": "llama-3.3-70b",
-        }
-        assert usage["total_tokens"] > 0
-        assert usage["prompt_tokens"] > 0
+        pass
 
+    @pytest.mark.skip(reason="Complisoc does not implement a token budget.")
     def test_token_usage_within_budget(self):
-        """Token usage should be within budget limits."""
-        budget = {
-            "gemini_per_request": 5000,
-            "groq_per_request": 3000,
-            "daily_budget": 100000,
-        }
-        current_usage = {
-            "gemini": 1200,
-            "groq": 800,
-        }
-        assert current_usage["gemini"] <= budget["gemini_per_request"]
-        assert current_usage["groq"] <= budget["groq_per_request"]
+        pass
 
+    @pytest.mark.skip(reason="Complisoc does not calculate provider costs.")
     def test_calculation_cost_estimable(self):
-        """Cost should be estimable from token usage."""
-        usage = {"prompt_tokens": 1000, "completion_tokens": 500}
-        cost_per_1k_prompt = 0.001
-        cost_per_1k_completion = 0.002
-        estimated_cost = (
-            (usage["prompt_tokens"] / 1000) * cost_per_1k_prompt +
-            (usage["completion_tokens"] / 1000) * cost_per_1k_completion
-        )
-        assert estimated_cost >= 0
+        pass
 
+    @pytest.mark.skip(reason="Complisoc does not aggregate token usage across requests.")
     def test_token_usage_accumulates(self):
-        """Token usage should accumulate across requests."""
-        usage_log = [
-            {"total_tokens": 1000},
-            {"total_tokens": 1500},
-            {"total_tokens": 800},
-        ]
-        total = sum(u["total_tokens"] for u in usage_log)
-        assert total == 3300
+        pass
 
 
 class TestRateLimitHandling:
-    """Tests for rate limit (429) response handling."""
+    def test_transient_error_retries_and_returns_success(self, monkeypatch):
+        monkeypatch.setattr(retry_module.time, "sleep", lambda _: None)
+        calls = 0
 
-    def test_rate_limit_response_handled(self):
-        """429 response should be handled gracefully."""
-        status_code = 429
-        retry_after = 30
-        if status_code == 429:
-            action = "retry_after_delay"
-            delay = retry_after
-        assert action == "retry_after_delay"
-        assert delay > 0
+        def request():
+            nonlocal calls
+            calls += 1
+            if calls == 1:
+                raise TimeoutError("transient provider timeout")
+            return "response"
 
-    def test_rate_limit_exponential_backoff(self):
-        """Retry delays should use exponential backoff."""
-        base_delay = 1.0
-        max_delay = 60.0
-        attempts = [0, 1, 2, 3, 4]
-        delays = [min(base_delay * (2 ** attempt), max_delay) for attempt in attempts]
-        assert delays == [1.0, 2.0, 4.0, 8.0, 16.0]
+        assert call_with_retry(request, attempts=3, backoff=0) == "response"
+        assert calls == 2
 
-    def test_rate_limit_max_retries(self):
-        """Should stop retrying after max attempts."""
-        max_retries = 3
-        attempt = 0
-        while attempt < max_retries:
-            attempt += 1
-        assert attempt == max_retries
+    def test_exhausted_retries_raise_last_error(self, monkeypatch):
+        monkeypatch.setattr(retry_module.time, "sleep", lambda _: None)
+        calls = 0
 
-    def test_rate_limit_resets_after_delay(self):
-        """Rate limit should reset after delay period."""
-        rate_limit_reset_time = 30  # seconds
-        assert rate_limit_reset_time > 0
+        def request():
+            nonlocal calls
+            calls += 1
+            raise TimeoutError(f"attempt {calls}")
 
-    def test_concurrent_requests_respect_rate_limit(self):
-        """Concurrent requests should respect rate limit."""
-        max_concurrent = 5
-        current_concurrent = 3
-        assert current_concurrent < max_concurrent
+        with pytest.raises(TimeoutError, match="attempt 3"):
+            call_with_retry(request, attempts=3, backoff=0)
+        assert calls == 3
+
+    def test_give_up_condition_stops_retrying(self, monkeypatch):
+        monkeypatch.setattr(retry_module.time, "sleep", lambda _: None)
+        calls = 0
+
+        def request():
+            nonlocal calls
+            calls += 1
+            raise ValueError("quota exhausted")
+
+        with pytest.raises(ValueError, match="quota exhausted"):
+            call_with_retry(
+                request,
+                attempts=3,
+                give_up_on=lambda exc: "quota" in str(exc),
+            )
+        assert calls == 1
+
+    def test_provider_retry_delay_is_used(self, monkeypatch):
+        delays = []
+        monkeypatch.setattr(retry_module.time, "sleep", delays.append)
+        calls = 0
+
+        def request():
+            nonlocal calls
+            calls += 1
+            if calls == 1:
+                raise TimeoutError("retry")
+            return "response"
+
+        assert call_with_retry(
+            request,
+            attempts=2,
+            delay_for=lambda _: 1.5,
+        ) == "response"
+        assert delays == [1.5]
+
+    def test_retry_delay_is_capped(self, monkeypatch):
+        delays = []
+        monkeypatch.setattr(retry_module.time, "sleep", delays.append)
+
+        def request():
+            raise TimeoutError("retry")
+
+        with pytest.raises(TimeoutError):
+            call_with_retry(
+                request,
+                attempts=2,
+                delay_for=lambda _: 10,
+                max_delay=2,
+            )
+        assert delays == [2]
 
 
 class TestAIMonitoring:
-    """Tests for AI monitoring and alerting."""
-
+    @pytest.mark.skip(reason="No request error-rate telemetry is implemented.")
     def test_error_rate_monitored(self):
-        """AI error rate should be monitored."""
-        total_requests = 100
-        failed_requests = 3
-        error_rate = failed_requests / total_requests
-        assert error_rate < 0.05, f"Error rate too high: {error_rate:.1%}"
+        pass
 
+    @pytest.mark.skip(reason="No provider latency telemetry is implemented.")
     def test_latency_p95_monitored(self):
-        """P95 latency should be monitored."""
-        latencies = [100, 150, 200, 250, 300, 350, 400, 450, 500, 1000]
-        p95 = sorted(latencies)[int(len(latencies) * 0.95)]
-        assert p95 > 0
+        pass
 
+    @pytest.mark.skip(reason="No provider latency telemetry is implemented.")
     def test_latency_p99_monitored(self):
-        """P99 latency should be monitored."""
-        latencies = [100, 150, 200, 250, 300, 350, 400, 450, 500, 1000]
-        p99 = sorted(latencies)[int(len(latencies) * 0.99)]
-        assert p99 > 0
+        pass
 
+    @pytest.mark.skip(reason="No token-budget alerting is implemented.")
     def test_token_budget_alert(self):
-        """Alert when token budget is approaching limit."""
-        daily_budget = 100000
-        current_usage = 85000
-        alert_threshold = 0.8
-        if current_usage / daily_budget > alert_threshold:
-            alert = "budget_warning"
-        else:
-            alert = None
-        assert alert == "budget_warning"
+        pass
 
+    @pytest.mark.skip(reason="No provider health monitor is implemented.")
     def test_model_health_monitored(self):
-        """Model health should be monitored."""
-        health = {
-            "gemini": {"status": "healthy", "latency_ms": 500},
-            "groq": {"status": "healthy", "latency_ms": 300},
-        }
-        for model, info in health.items():
-            assert info["status"] in ("healthy", "degraded", "unavailable")
+        pass
 
+    @pytest.mark.skip(reason="No circuit breaker is implemented.")
     def test_circuit_breaker_opens_on_errors(self):
-        """Circuit breaker should open after consecutive errors."""
-        max_consecutive_errors = 5
-        consecutive_errors = 0
-        circuit_open = False
-        for _ in range(max_consecutive_errors):
-            consecutive_errors += 1
-        if consecutive_errors >= max_consecutive_errors:
-            circuit_open = True
-        assert circuit_open
+        pass
 
+    @pytest.mark.skip(reason="No circuit breaker is implemented.")
     def test_circuit_breaker_resets_on_success(self):
-        """Circuit breaker should reset after successful request."""
-        consecutive_errors = 5
-        success = True
-        if success:
-            consecutive_errors = 0
-        assert consecutive_errors == 0
+        pass

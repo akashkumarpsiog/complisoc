@@ -46,9 +46,6 @@ export function Layout({
           </button>
         </div>
         <Nav view={view} onViewChange={(id) => { onViewChange(id); setSidebarOpen(false); }} />
-        <div className="mt-auto border-t border-line px-5 py-3 text-[11px] font-semibold text-subtle tracking-wide">
-          v0.1 · ai mapping
-        </div>
       </aside>
 
       <main className="flex-1 min-w-0 lg:overflow-y-auto">
