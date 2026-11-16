@@ -309,6 +309,67 @@ def test_leadership_report_uses_published_posture_only(client):
     assert Path(report["content_path"]).exists()
 
 
+def test_leadership_and_engineering_pdfs_have_audience_specific_sections(monkeypatch):
+    from complisoc.backend.reporting import reports
+
+    class RecordingPdf:
+        def __init__(self):
+            self.w = 210
+            self.l_margin = 10
+            self.r_margin = 10
+            self.text = []
+
+        def set_auto_page_break(self, **kwargs):
+            pass
+
+        def add_page(self):
+            pass
+
+        def set_font(self, *args, **kwargs):
+            pass
+
+        def cell(self, *args, **kwargs):
+            self.text.append(str(args[2]))
+
+        def multi_cell(self, *args, **kwargs):
+            self.text.append(str(args[2]))
+
+        def ln(self, *args, **kwargs):
+            pass
+
+        def set_x(self, *args, **kwargs):
+            pass
+
+        def output(self, *args, **kwargs):
+            pass
+
+    generated = []
+
+    def capture_pdf(*args, **kwargs):
+        pdf = RecordingPdf()
+        generated.append(pdf)
+        return pdf
+
+    monkeypatch.setattr(reports, "FPDF", capture_pdf)
+    narrative = {
+        "executive_summary": "summary",
+        "risk_summary": "risk",
+        "recommended_actions": "actions",
+        "audience_note": "audience",
+    }
+    reports._generate_pdf(Path("leadership.pdf"), "Leadership", narrative, [], "leadership", 10)
+    reports._generate_pdf(Path("engineering.pdf"), "Engineering", narrative, [], "engineering", 10)
+
+    leadership_text = "\n".join(generated[0].text)
+    engineering_text = "\n".join(generated[1].text)
+    assert "Compliance Posture" in leadership_text
+    assert "Leadership Decisions" in leadership_text
+    assert "Mapping Appendix" not in leadership_text
+    assert "Key Findings" not in leadership_text
+    assert "Key Findings" in engineering_text
+    assert "Mapping Appendix" in engineering_text
+
+
 def test_audit_bundle_contains_lineage_checksums(client):
     with patch("complisoc.backend.compliance.langchain_pipeline.GeminiMapper") as MockMapper, patch(
         "complisoc.backend.compliance.langchain_pipeline.GroqVerifier"

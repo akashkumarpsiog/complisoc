@@ -342,6 +342,38 @@ def _generate_pdf(
     _pdf_heading(pdf, "Executive Summary")
     _pdf_body(pdf, narrative["executive_summary"], 11)
 
+    if report_type == "leadership":
+        coverage = _framework_counts(published)
+        _pdf_heading(pdf, "Compliance Posture")
+        _pdf_kv(pdf, "Published control decisions", len(published))
+        _pdf_kv(pdf, "Pending manual review", len(manual_review))
+        _pdf_kv(pdf, "Distinct controls covered", len({mapping.control_catalog_id for mapping in published}))
+        _pdf_kv(pdf, "Framework coverage (published mappings)", coverage or "No published framework coverage")
+        _pdf_kv(pdf, "Published severity profile", _severity_counts(published) or "No published findings")
+        pdf.ln(3)
+
+        _pdf_heading(pdf, "Risk and Compliance Impact")
+        _pdf_body(pdf, narrative["risk_summary"])
+        _pdf_body(pdf, narrative["audience_note"])
+
+        _pdf_heading(pdf, "Leadership Decisions")
+        if manual_review:
+            _pdf_body(
+                pdf,
+                f"{len(manual_review)} mappings are pending manual review. Resolve these decisions before using them for audit attestation or treating them as confirmed control coverage.",
+            )
+        else:
+            _pdf_body(pdf, "No mappings are pending manual review. Published decisions are ready for governance review.")
+        _pdf_body(pdf, narrative["recommended_actions"])
+
+        _pdf_heading(pdf, "Reporting Scope")
+        _pdf_body(
+            pdf,
+            f"This report summarizes published compliance posture for scan run {scan_run_id}. It is a single-scan snapshot; trend conclusions require comparison with additional scan runs.",
+        )
+        pdf.output(str(path))
+        return
+
     _pdf_heading(pdf, "Summary Metrics")
     _pdf_kv(pdf, "Total mappings", len(mappings))
     _pdf_kv(pdf, "Published", len(published))
